@@ -249,7 +249,62 @@ function EventsPage({ savedCount }: { savedCount: number }) {
   const toggleValue=<T extends string,>(value:T,current:T[],setValue:(items:T[])=>void)=>setValue(current.includes(value)?current.filter((item)=>item!==value):[...current,value])
   const clearFilters=()=>{setQuery('');setCategories([]);setLocations([]);setFormats([]);setDateFilter('all');setDateFrom('');setDateTo('')}
   useEffect(() => { if (window.location.hash) window.setTimeout(() => document.querySelector(window.location.hash)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50) }, [])
-  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="What’s on" title="Make a date of Valechester." description="Markets, live performance, family evenings and the kind of local events worth building a trip around." image={imageLibrary.restaurant} /><section className="event-directory-tools site-container" aria-label="Search and filter events"><header><span className="site-eyebrow plum">Find your event</span><h2>What are you looking for?</h2><p>Choose a date, the kind of experience and where you would like to go. Results update as you filter.</p></header><div className="event-search"><Search size={18}/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search events, venues or places" aria-label="Search events"/>{query&&<button onClick={()=>setQuery('')} aria-label="Clear event search"><X size={16}/></button>}</div><div className="event-filter-accordions"><details open><summary>Event date <ChevronDown size={16}/></summary><div className="event-filter-panel event-date-panel"><div className="event-quick-dates">{([['all','All dates'],['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['next7','Next 7 days']] as [EventDateFilter,string][]).map(([value,label])=><button key={value} className={dateFilter===value?'active':''} onClick={()=>chooseQuickDate(value)}>{label}</button>)}</div><div className="event-custom-dates"><label>From<input type="date" value={dateFrom} onChange={(e)=>{setDateFrom(e.target.value);setDateFilter('custom')}} aria-label="Events from date"/></label><label>To<input type="date" min={dateFrom||undefined} value={dateTo} onChange={(e)=>{setDateTo(e.target.value);setDateFilter('custom')}} aria-label="Events to date"/></label></div></div></details><details><summary>Event type{categories.length>0&&<span>{categories.length}</span>}<ChevronDown size={16}/></summary><div className="event-filter-panel event-check-options">{eventCategories.map((item)=><label key={item}><input type="checkbox" checked={categories.includes(item)} onChange={()=>toggleValue(item,categories,setCategories)}/><span><strong>{item}</strong><small>{published.filter((event)=>event.category===item).length}</small></span></label>)}</div></details><details><summary>Event location{locations.length>0&&<span>{locations.length}</span>}<ChevronDown size={16}/></summary><div className="event-filter-panel event-check-options">{eventLocations.map((item)=><label key={item}><input type="checkbox" checked={locations.includes(item)} onChange={()=>toggleValue(item,locations,setLocations)}/><span><strong>{item}</strong><small>{published.filter((event)=>event.town===item).length}</small></span></label>)}</div></details><details><summary>Event format{formats.length>0&&<span>{formats.length}</span>}<ChevronDown size={16}/></summary><div className="event-filter-panel event-check-options event-format-options">{eventFormats.map((item)=><label key={item.value}><input type="checkbox" checked={formats.includes(item.value)} onChange={()=>toggleValue(item.value,formats,setFormats)}/><span><strong>{item.value}</strong><em>{item.detail}</em><small>{published.filter((event)=>event.format===item.value).length}</small></span></label>)}</div></details></div><div className="event-directory-meta"><div><strong>Showing {filtered.length} {filtered.length===1?'event':'events'}</strong><span>{hasFilters?' matching your filters':' across Valechester'}</span></div><div><button className="event-clear-filters" onClick={clearFilters} disabled={!hasFilters}>Clear all filters</button><button onClick={()=>siteNavigate('/submit-event')}>Add your event <ArrowRight size={14}/></button></div></div></section><section className="event-calendar site-container">{filtered.map((event) => <article id={event.id} key={event.id}><img src={imageLibrary[event.image]??imageLibrary.theatre} alt="" /><div className="event-calendar-date"><strong>{eventDay(event)}</strong><span>{eventMonth(event)}</span></div><div><span className="site-eyebrow plum">{event.category}</span><h2>{event.title}</h2><p>{event.description}</p><dl><div><dt>Where</dt><dd>{event.venueName}, {event.town}</dd></div><div><dt>When</dt><dd>{eventWhen(event)}</dd></div><div><dt>Format</dt><dd>{event.format}</dd></div><div><dt>Tickets</dt><dd>{event.price}</dd></div></dl><div className="public-event-actions"><button onClick={() => siteNavigate(`/plan?event=${event.id}`)}>Plan a trip around this <ArrowRight size={15} /></button>{event.bookingUrl&&<a href={event.bookingUrl}>Book tickets</a>}</div></div></article>)}</section>{!filtered.length&&<div className="site-no-results site-container"><Search size={25}/><h3>No matching events</h3><p>Try changing the dates, location, event type or format.</p><button onClick={clearFilters}>Clear all filters</button></div>}<NewsletterSignup /></main></PublicShell>
+  return <PublicShell savedCount={savedCount}>
+    <main>
+      <PageIntro eyebrow="What’s on" title="Make a date of Valechester." description="Markets, live performance, family evenings and the kind of local events worth building a trip around." image={imageLibrary.restaurant} />
+      <section className="event-directory-tools site-container" aria-label="Search events">
+        <header>
+          <span className="site-eyebrow plum">Find your event</span>
+          <h2>What are you looking for?</h2>
+          <p>Search by event, venue or place, then refine the results using the filters below.</p>
+        </header>
+        <div className="event-search">
+          <Search size={18}/>
+          <input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search events, venues or places" aria-label="Search events"/>
+          {query&&<button onClick={()=>setQuery('')} aria-label="Clear event search"><X size={16}/></button>}
+        </div>
+      </section>
+      <div className="event-browser-layout site-container">
+        <aside className="event-filter-sidebar" aria-label="Filter events">
+          <header className="event-filter-sidebar-heading">
+            <span className="site-eyebrow plum">Refine results</span>
+            <h2>Filter events</h2>
+          </header>
+          <div className="event-filter-accordions">
+            <details open>
+              <summary>Event date <ChevronDown size={16}/></summary>
+              <div className="event-filter-panel event-date-panel">
+                <div className="event-quick-dates">{([['all','All dates'],['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['next7','Next 7 days']] as [EventDateFilter,string][]).map(([value,label])=><button key={value} className={dateFilter===value?'active':''} onClick={()=>chooseQuickDate(value)}>{label}</button>)}</div>
+                <div className="event-custom-dates"><label>From<input type="date" value={dateFrom} onChange={(e)=>{setDateFrom(e.target.value);setDateFilter('custom')}} aria-label="Events from date"/></label><label>To<input type="date" min={dateFrom||undefined} value={dateTo} onChange={(e)=>{setDateTo(e.target.value);setDateFilter('custom')}} aria-label="Events to date"/></label></div>
+              </div>
+            </details>
+            <details>
+              <summary>Event type{categories.length>0&&<span>{categories.length}</span>}<ChevronDown size={16}/></summary>
+              <div className="event-filter-panel event-check-options">{eventCategories.map((item)=><label key={item}><input type="checkbox" checked={categories.includes(item)} onChange={()=>toggleValue(item,categories,setCategories)}/><span><strong>{item}</strong><small>{published.filter((event)=>event.category===item).length}</small></span></label>)}</div>
+            </details>
+            <details>
+              <summary>Event location{locations.length>0&&<span>{locations.length}</span>}<ChevronDown size={16}/></summary>
+              <div className="event-filter-panel event-check-options">{eventLocations.map((item)=><label key={item}><input type="checkbox" checked={locations.includes(item)} onChange={()=>toggleValue(item,locations,setLocations)}/><span><strong>{item}</strong><small>{published.filter((event)=>event.town===item).length}</small></span></label>)}</div>
+            </details>
+            <details>
+              <summary>Event format{formats.length>0&&<span>{formats.length}</span>}<ChevronDown size={16}/></summary>
+              <div className="event-filter-panel event-check-options event-format-options">{eventFormats.map((item)=><label key={item.value}><input type="checkbox" checked={formats.includes(item.value)} onChange={()=>toggleValue(item.value,formats,setFormats)}/><span><strong>{item.value}</strong><em>{item.detail}</em><small>{published.filter((event)=>event.format===item.value).length}</small></span></label>)}</div>
+            </details>
+          </div>
+          <button className="event-sidebar-clear" onClick={clearFilters} disabled={!hasFilters}>Clear all filters</button>
+        </aside>
+        <div className="event-results-column">
+          <div className="event-directory-meta">
+            <div><strong>Showing {filtered.length} {filtered.length===1?'event':'events'}</strong><span>{hasFilters?' matching your filters':' across Valechester'}</span></div>
+            <div><button onClick={()=>siteNavigate('/submit-event')}>Add your event <ArrowRight size={14}/></button></div>
+          </div>
+          <section className="event-calendar">{filtered.map((event) => <article id={event.id} key={event.id}><img src={imageLibrary[event.image]??imageLibrary.theatre} alt="" /><div className="event-calendar-date"><strong>{eventDay(event)}</strong><span>{eventMonth(event)}</span></div><div><span className="site-eyebrow plum">{event.category}</span><h2>{event.title}</h2><p>{event.description}</p><dl><div><dt>Where</dt><dd>{event.venueName}, {event.town}</dd></div><div><dt>When</dt><dd>{eventWhen(event)}</dd></div><div><dt>Format</dt><dd>{event.format}</dd></div><div><dt>Tickets</dt><dd>{event.price}</dd></div></dl><div className="public-event-actions"><button onClick={() => siteNavigate(`/plan?event=${event.id}`)}>Plan a trip around this <ArrowRight size={15} /></button>{event.bookingUrl&&<a href={event.bookingUrl}>Book tickets</a>}</div></div></article>)}</section>
+          {!filtered.length&&<div className="site-no-results"><Search size={25}/><h3>No matching events</h3><p>Try changing the dates, location, event type or format.</p><button onClick={clearFilters}>Clear all filters</button></div>}
+        </div>
+      </div>
+      <NewsletterSignup />
+    </main>
+  </PublicShell>
 }
 
 function EventAccountPage({ savedCount }: { savedCount: number }) {
