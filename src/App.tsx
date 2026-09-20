@@ -1,0 +1,80 @@
+import { useEffect, useState } from 'react'
+import { Layout } from './components/Layout'
+import { AddOrganisationModal, AddTaskModal, CreateInvoiceModal } from './components/Forms'
+import { ListingEditor } from './components/ListingEditor'
+import { OrganisationDrawer } from './components/OrganisationDrawer'
+import { useCRM } from './store'
+import type { Listing, Organisation, ViewKey } from './types'
+import { Agreements } from './views/Agreements'
+import { Billing } from './views/Billing'
+import { Dashboard } from './views/Dashboard'
+import { Listings } from './views/Listings'
+import { Memberships } from './views/Memberships'
+import { Organisations } from './views/Organisations'
+import { Pipeline } from './views/Pipeline'
+import { Settings } from './views/Settings'
+import { Tasks } from './views/Tasks'
+
+const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','billing','agreements','tasks','settings']
+
+function initialView(): ViewKey {
+  const hash = window.location.hash.replace('#/', '') as ViewKey
+  return views.includes(hash) ? hash : 'dashboard'
+}
+
+export default function App() {
+  const { data } = useCRM()
+  const [view, setViewState] = useState<ViewKey>(initialView)
+  const [selectedOrganisationId, setSelectedOrganisationId] = useState<string | null>(null)
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
+  const [modal, setModal] = useState<'organisation' | 'invoice' | 'task' | null>(null)
+
+  useEffect(() => {
+    const handleHash = () => setViewState(initialView())
+    window.addEventListener('hashchange', handleHash)
+    return () => window.removeEventListener('hashchange', handleHash)
+  }, [])
+
+  const setView = (next: ViewKey) => {
+    window.location.hash = `/${next}`
+    setViewState(next)
+  }
+
+  const openOrganisation = (organisation: Organisation) => {
+    setSelectedListingId(null)
+    setSelectedOrganisationId(organisation.id)
+  }
+  const openListing = (listing: Listing) => {
+    setSelectedOrganisationId(null)
+    setSelectedListingId(listing.id)
+  }
+  const selectedOrganisation = data.organisations.find((item) => item.id === selectedOrganisationId)
+  const selectedListing = data.listings.find((item) => item.id === selectedListingId)
+
+  return (
+    <Layout
+      view={view}
+      setView={setView}
+      onAddOrganisation={() => setModal('organisation')}
+      onAddInvoice={() => setModal('invoice')}
+      onAddTask={() => setModal('task')}
+      onOpenOrganisation={openOrganisation}
+    >
+      {view === 'dashboard' && <Dashboard navigate={setView} openOrganisation={openOrganisation} />}
+      {view === 'organisations' && <Organisations onAdd={() => setModal('organisation')} onOpen={openOrganisation} />}
+      {view === 'pipeline' && <Pipeline />}
+      {view === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
+      {view === 'listings' && <Listings onEdit={openListing} />}
+      {view === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
+      {view === 'agreements' && <Agreements />}
+      {view === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
+      {view === 'settings' && <Settings />}
+
+      {selectedOrganisation && <OrganisationDrawer key={selectedOrganisation.id} organisation={selectedOrganisation} onClose={() => setSelectedOrganisationId(null)} onEditListing={openListing} />}
+      {selectedListing && <ListingEditor listing={selectedListing} onClose={() => setSelectedListingId(null)} />}
+      {modal === 'organisation' && <AddOrganisationModal onClose={() => setModal(null)} onCreated={openOrganisation} />}
+      {modal === 'invoice' && <CreateInvoiceModal onClose={() => setModal(null)} />}
+      {modal === 'task' && <AddTaskModal onClose={() => setModal(null)} />}
+    </Layout>
+  )
+}
