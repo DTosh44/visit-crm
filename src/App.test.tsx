@@ -81,7 +81,7 @@ describe('Visit CRM', () => {
     }
   })
 
-  it('uses the public package names and keeps a Free Listing logo-only', () => {
+  it('uses the public package names and keeps a Free Listing basic and unlinked', () => {
     window.history.pushState({}, '', '/listing-templates')
     const { unmount } = renderApp()
     for (const packageName of ['Strategic', 'Gold', 'Silver', 'Bronze', 'Free Listing']) {
@@ -90,8 +90,11 @@ describe('Visit CRM', () => {
     unmount()
     window.history.pushState({}, '', '/place/list-011')
     const { container } = renderApp()
-    expect(container.querySelector('.free-listing-brand .vale-logo')).toBeInTheDocument()
-    expect(screen.queryByText('Riverside Gardens')).not.toBeInTheDocument()
+    expect(container.querySelector('.free-listing-brand-image .vale-logo')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Riverside Gardens', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Business information' })).toBeInTheDocument()
+    expect(screen.getByText('Elegant public gardens following the curve of the River Vale.')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /website|book/i })).not.toBeInTheDocument()
   })
 
   it('moves safely from a standard listing to a template listing', async () => {
