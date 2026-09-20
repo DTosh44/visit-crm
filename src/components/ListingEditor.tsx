@@ -4,7 +4,7 @@ import { useCRM } from '../store'
 import type { Listing } from '../types'
 import { Badge, Button, Drawer, Field, Progress, Tabs } from './UI'
 
-type EditorTab = 'Content' | 'Contact & links' | 'Facilities' | 'Media' | 'Preview'
+type EditorTab = 'Content' | 'Visitor taxonomy' | 'Contact & links' | 'Facilities' | 'Media' | 'Preview'
 
 export function ListingEditor({ listing, onClose }: { listing: Listing; onClose: () => void }) {
   const { updateListing, publishListing } = useCRM()
@@ -30,7 +30,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
         <div><Badge>{listing.status}</Badge><span>Last updated {listing.lastUpdated}</span></div>
         <div className="completion-inline"><span>Listing completeness</span><Progress value={draft.completeness} colour="#5c57d6" /><strong>{draft.completeness}%</strong></div>
       </div>
-      <Tabs items={['Content','Contact & links','Facilities','Media','Preview'] as EditorTab[]} active={tab} onChange={setTab} />
+      <Tabs items={['Content','Visitor taxonomy','Contact & links','Facilities','Media','Preview'] as EditorTab[]} active={tab} onChange={setTab} />
 
       <div className="listing-editor-body">
         <div className="editor-main">
@@ -43,6 +43,15 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
             <Field label="Short description" hint={`${draft.shortDescription.length}/180 characters`}><textarea rows={3} maxLength={180} value={draft.shortDescription} onChange={(event) => set('shortDescription', event.target.value)} /></Field>
             <Field label="Full description" hint="Use clear, visitor-focused language. This appears on the listing page."><textarea rows={8} value={draft.description} onChange={(event) => set('description', event.target.value)} /></Field>
             <div className="form-grid two"><Field label="Town"><input value={draft.town} onChange={(event) => set('town', event.target.value)} /></Field><Field label="Opening hours"><input value={draft.openingHours} onChange={(event) => set('openingHours', event.target.value)} /></Field></div>
+          </div>}
+
+          {tab === 'Visitor taxonomy' && <div className="form-stack">
+            <div><h3 className="form-title">Visitor search taxonomy</h3><p className="form-description">These tags power website search and practical filters. Review highlights stay separate so their evidence remains clear.</p></div>
+            <Field label="Search tags" hint="Separate tags with commas"><textarea rows={4} value={draft.searchTags.join(', ')} onChange={(event) => set('searchTags', event.target.value.split(',').map((item) => item.trim()).filter(Boolean))} /></Field>
+            <div className="taxonomy-suggestions"><strong>Suggested visitor tags</strong><div>{['Rainy-day activity','Great for families','Dog-friendly','Accessible','Free to visit','Romantic','Suitable for groups','Indoor attraction','Outdoor experience','Evening activity','Food available','On-site parking','Booking recommended'].map((tag) => <button type="button" key={tag} className={draft.searchTags.includes(tag) ? 'selected' : ''} onClick={() => set('searchTags', draft.searchTags.includes(tag) ? draft.searchTags.filter((item) => item !== tag) : [...draft.searchTags, tag])}>{draft.searchTags.includes(tag) && <Check size={12} />}{tag}</button>)}</div></div>
+            <Field label="Visitors frequently mention" hint="Evidence-led themes from review analysis"><textarea rows={3} value={draft.reviewHighlights.join(', ')} onChange={(event) => set('reviewHighlights', event.target.value.split(',').map((item) => item.trim()).filter(Boolean))} /></Field>
+            <Field label="Good to know" hint="Practical facts or recurring operational feedback"><textarea rows={3} value={draft.goodToKnow.join(', ')} onChange={(event) => set('goodToKnow', event.target.value.split(',').map((item) => item.trim()).filter(Boolean))} /></Field>
+            <div className="info-note"><Info size={17} /><p>Search tags can be member verified, editorially assigned or supported by reviews. Publish review themes only when the evidence is strong enough.</p></div>
           </div>}
 
           {tab === 'Contact & links' && <div className="form-stack">
@@ -67,7 +76,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
           </div>}
 
           {tab === 'Preview' && <div className="website-preview">
-            <div className="preview-browser"><span /><span /><span /><p>shakespeares-england.co.uk/{draft.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}</p></div>
+            <div className="preview-browser"><span /><span /><span /><p>visitvalechester.co.uk/place/{draft.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}</p></div>
             <div className={`preview-hero image-${draft.image}`}><div><Badge tone="purple">{draft.category}</Badge><h2>{draft.name}</h2><p><MapPin size={15} />{draft.town}</p></div></div>
             <div className="preview-content"><main><p className="preview-lead">{draft.shortDescription}</p><p>{draft.description}</p><h3>Facilities</h3><div className="preview-facilities">{draft.facilities.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></main><aside><h3>Plan your visit</h3><p><strong>Opening hours</strong>{draft.openingHours}</p><p><strong>Contact</strong>{draft.phone}<br />{draft.email}</p>{draft.bookingUrl && <Button>Book now</Button>}<Button variant="secondary" icon={Globe2}>Visit website</Button></aside></div>
           </div>}

@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { demoData } from './data'
+import { initialData } from './data'
 import { supabase, useAuth } from './auth'
 import { tenant } from './tenant'
 import type {
@@ -31,7 +31,7 @@ interface CRMContextValue {
   createTask: (draft: TaskDraft) => void
   incrementBenefit: (organisationId: string, benefitId: string, allowance: number) => void
   addLevel: (level: Omit<MembershipLevel, 'id' | 'members'>) => void
-  resetDemo: () => void
+  resetWorkspace: () => void
 }
 
 const CRMContext = createContext<CRMContextValue | null>(null)
@@ -79,6 +79,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     facilities: row.facilities,
     image: row.image,
     lastUpdated: row.updated_at.slice(0, 10),
+    searchTags: [], reviewHighlights: [], goodToKnow: [],
   }
 }
 
@@ -111,10 +112,10 @@ function toPublicListing(listing: Listing) {
 function readInitialData(): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    const parsed = stored ? JSON.parse(stored) as CRMData : demoData
-    return { ...parsed, socialMetrics: parsed.socialMetrics ?? demoData.socialMetrics }
+    const parsed = stored ? JSON.parse(stored) as CRMData : initialData
+    return { ...parsed, socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
   } catch {
-    return demoData
+    return initialData
   }
 }
 
@@ -141,7 +142,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
         if (active && state?.data) {
           const remoteData = state.data as CRMData
-          setData({ ...remoteData, socialMetrics: remoteData.socialMetrics ?? demoData.socialMetrics })
+          setData({ ...remoteData, socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
         }
       } else {
         const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')
@@ -188,7 +189,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         tier: draft.tier,
         status: draft.status,
         health: 'OK',
-        owner: 'Vicki Zamudio',
+        owner: user?.name ?? 'Morgan Lee',
         primaryContactId: contactId,
         renewalDate: '',
         membershipStart: '',
@@ -217,7 +218,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         }, ...current.contacts],
         activities: [{
           id: id('act'), organisationId, type: 'note', title: 'Organisation created',
-          detail: `${draft.name} was added to the CRM.`, timestamp: new Date().toISOString(), user: 'Darren Tosh',
+          detail: `${draft.name} was added to the CRM.`, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
       return organisation
@@ -235,7 +236,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         activities: [{
           id: id('act'), organisationId: current.listings.find((item) => item.id === listingId)?.organisationId,
           type: 'listing', title: 'Listing updated', detail: 'Listing content was updated in the CRM.',
-          timestamp: new Date().toISOString(), user: 'Darren Tosh',
+          timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
     },
@@ -246,7 +247,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         activities: [{
           id: id('act'), organisationId: current.listings.find((item) => item.id === listingId)?.organisationId,
           type: 'listing', title: 'Listing published', detail: 'The approved listing is now live on the destination website.',
-          timestamp: new Date().toISOString(), user: 'Darren Tosh',
+          timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
     },
@@ -268,7 +269,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           } : item),
           activities: invoice ? [{
             id: id('act'), organisationId: invoice.organisationId, type: 'invoice', title: 'Invoice marked paid',
-            detail: `${invoice.number} marked paid in full.`, timestamp: new Date().toISOString(), user: 'Darren Tosh',
+            detail: `${invoice.number} marked paid in full.`, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
           }, ...current.activities] : current.activities,
         }
       })
@@ -318,7 +319,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     createTask: (draft) => {
       setData((current) => ({
         ...current,
-        tasks: [{ id: id('task'), ...draft, assignee: 'Darren Tosh', completed: false }, ...current.tasks],
+        tasks: [{ id: id('task'), ...draft, assignee: user?.name ?? 'Workspace user', completed: false }, ...current.tasks],
       }))
     },
     incrementBenefit: (organisationId, benefitId, allowance) => {
@@ -337,9 +338,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     addLevel: (level) => {
       setData((current) => ({ ...current, levels: [...current.levels, { ...level, id: id('level'), members: 0 }] }))
     },
-    resetDemo: () => {
+    resetWorkspace: () => {
       localStorage.removeItem(STORAGE_KEY)
-      setData(demoData)
+      setData(initialData)
     },
   }), [data])
 

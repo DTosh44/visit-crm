@@ -43,6 +43,14 @@ create table public.workspace_states (
   updated_at timestamptz not null default now()
 );
 
+create table public.user_preferences (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  dashboard_widgets jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, tenant_id)
+);
+
 -- Public content is separated from private CRM state so anonymous visitors can
 -- never read contacts, invoices, notes, agreements or tasks.
 create table public.public_listings (
@@ -71,7 +79,7 @@ create table public.public_listings (
 );
 
 -- Normalised metrics are ready for scheduled social API imports. The current
--- demo also keeps a copy in workspace_states so it works without credentials.
+-- local workspace also keeps a copy in workspace_states so it works without credentials.
 create table public.social_metrics (
   id bigint generated always as identity primary key,
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -133,6 +141,7 @@ $$;
 alter table public.tenants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.workspace_states enable row level security;
+alter table public.user_preferences enable row level security;
 alter table public.public_listings enable row level security;
 alter table public.social_metrics enable row level security;
 alter table public.audit_log enable row level security;
@@ -153,6 +162,14 @@ create policy "members create workspace" on public.workspace_states
   for insert with check (public.is_tenant_member(tenant_id));
 create policy "members update workspace" on public.workspace_states
   for update using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
+
+create policy "users read own preferences" on public.user_preferences
+  for select using (user_id = auth.uid() and public.is_tenant_member(tenant_id));
+create policy "users create own preferences" on public.user_preferences
+  for insert with check (user_id = auth.uid() and public.is_tenant_member(tenant_id));
+create policy "users update own preferences" on public.user_preferences
+  for update using (user_id = auth.uid() and public.is_tenant_member(tenant_id))
+  with check (user_id = auth.uid() and public.is_tenant_member(tenant_id));
 
 create policy "public reads published listings" on public.public_listings
   for select using (status = 'Published');

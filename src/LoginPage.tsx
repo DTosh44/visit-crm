@@ -1,13 +1,13 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { BrandLogo } from './components/BrandLogo'
-import { DEMO_PASSWORD, demoUsers, useAuth } from './auth'
+import { DEFAULT_PASSWORD, seedUsers, useAuth } from './auth'
 import { tenant } from './tenant'
 
 export function LoginPage() {
   const { signIn, productionAuth } = useAuth()
-  const [email, setEmail] = useState(demoUsers[0].email)
-  const [password, setPassword] = useState(DEMO_PASSWORD)
+  const [email, setEmail] = useState(seedUsers[0].email)
+  const [password, setPassword] = useState(DEFAULT_PASSWORD)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -52,9 +52,9 @@ export function LoginPage() {
             <button className="login-submit" disabled={submitting}>{submitting ? 'Signing in…' : 'Sign in'}<ArrowRight size={17} /></button>
           </form>
 
-          {!productionAuth && <div className="demo-access">
-            <div><ShieldCheck size={17} /><span><strong>Demo access</strong><small>Choose a role. All demo accounts use {DEMO_PASSWORD}</small></span></div>
-            <div className="demo-users">{demoUsers.map((item) => <button key={item.id} onClick={() => { setEmail(item.email); setPassword(DEMO_PASSWORD); setError('') }} className={email === item.email ? 'active' : ''}><span style={{ background: item.colour }}>{item.initials}</span><span><strong>{item.name}</strong><small>{item.role}</small></span></button>)}</div>
+          {!productionAuth && <div className="workspace-access">
+            <div><ShieldCheck size={17} /><span><strong>Workspace access</strong><small>Select an account for this workspace. The access password is {DEFAULT_PASSWORD}</small></span></div>
+            <div className="workspace-users">{seedUsers.map((item) => <button key={item.id} onClick={() => { setEmail(item.email); setPassword(DEFAULT_PASSWORD); setError('') }} className={email === item.email ? 'active' : ''}><span style={{ background: item.colour }}>{item.initials}</span><span><strong>{item.name}</strong><small>{item.role}</small></span></button>)}</div>
           </div>}
         </div>
         <footer>Secure workspace for {tenant.legalName}</footer>

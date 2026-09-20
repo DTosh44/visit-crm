@@ -4,13 +4,13 @@ export const imageLibrary: Record<string, string> = {
   lodge: 'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?auto=format&fit=crop&w=1200&q=84',
   theatre: 'https://images.unsplash.com/photo-1503095396549-807759245b35?auto=format&fit=crop&w=1200&q=84',
   hotel: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1200&q=84',
-  distillery: '/images/valechester-riverside-dining.webp',
-  museum: '/images/valechester-castle-family.webp',
-  gallery: '/images/valechester-castle-family.webp',
-  restaurant: '/images/valechester-riverside-dining.webp',
+  distillery: 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=1200&q=84',
+  museum: 'https://images.unsplash.com/photo-1564399579883-451a5d44ec08?auto=format&fit=crop&w=1200&q=84',
+  gallery: 'https://images.unsplash.com/photo-1561214115-f2f134cc4912?auto=format&fit=crop&w=1200&q=84',
+  restaurant: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1200&q=84',
   books: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=1200&q=84',
-  gardens: '/images/valechester-castle-family.webp',
-  park: '/images/valechester-riverside-hero.webp',
+  gardens: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=1200&q=84',
+  park: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=84',
 }
 
 export const events = [

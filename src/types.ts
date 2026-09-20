@@ -103,6 +103,9 @@ export interface Listing {
   email: string
   openingHours: string
   facilities: string[]
+  searchTags: string[]
+  reviewHighlights: string[]
+  goodToKnow: string[]
   lastUpdated: string
   image: string
 }

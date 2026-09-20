@@ -50,7 +50,7 @@ export const defaultFeatures: Record<FeatureKey, boolean> = {
   tasks: true,
   businessPortal: false,
   travelTrade: false,
-  reviewIntelligence: false,
+  reviewIntelligence: true,
   socialInsights: true,
   aiWebsiteEditor: false,
 }

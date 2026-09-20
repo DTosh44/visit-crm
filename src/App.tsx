@@ -15,6 +15,7 @@ import { Pipeline } from './views/Pipeline'
 import { Settings } from './views/Settings'
 import { Tasks } from './views/Tasks'
 import { useAuth } from './auth'
+import { canAccessView } from './auth'
 import { LoginPage } from './LoginPage'
 import { PublicSite } from './PublicSite'
 import { BrandLogo } from './components/BrandLogo'
@@ -28,6 +29,7 @@ function initialView(): ViewKey {
 
 function CRMApp() {
   const { data } = useCRM()
+  const { user } = useAuth()
   const [view, setViewState] = useState<ViewKey>(initialView)
   const [selectedOrganisationId, setSelectedOrganisationId] = useState<string | null>(null)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
@@ -38,6 +40,10 @@ function CRMApp() {
     window.addEventListener('hashchange', handleHash)
     return () => window.removeEventListener('hashchange', handleHash)
   }, [])
+
+  useEffect(() => {
+    if (user && !canAccessView(user.role, view)) setView('dashboard')
+  }, [user, view])
 
   const setView = (next: ViewKey) => {
     window.location.hash = `/${next}`

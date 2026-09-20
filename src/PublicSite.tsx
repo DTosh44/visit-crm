@@ -12,6 +12,13 @@ import type { Listing } from './types'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
 const SAVED_KEY = 'visit-valechester-saved-v1'
+const quickFilters = ['Rainy-day activity','Great for families','Dog-friendly','Accessible','Free to visit','Romantic','Suitable for groups','Indoor attraction','Outdoor experience']
+const searchAliases: Record<string,string[]> = {
+  family: ['family','families','children','kids'], rain: ['rain','rainy','wet weather','indoor'], accessible: ['accessible','accessibility','step free','step-free'], dog: ['dog','dogs','pet friendly'], free: ['free','no cost'], romantic: ['romantic','couples','date'], group: ['group','groups','coach'], food: ['food','restaurant','café','cafe','dining']
+}
+function recordSubmission(key: string, value: Record<string, unknown>) {
+  try { const current = JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[]; localStorage.setItem(key, JSON.stringify([{ ...value, submittedAt: new Date().toISOString() }, ...current])) } catch { localStorage.setItem(key, JSON.stringify([{ ...value, submittedAt: new Date().toISOString() }])) }
+}
 
 function categoryGroup(listing: Listing) {
   const value = `${listing.category} ${listing.name}`.toLowerCase()
@@ -45,20 +52,24 @@ interface VisitorActions {
 }
 
 function ListingCard({ listing, savedIds, toggleSaved }: { listing: Listing } & VisitorActions) {
+  const { data } = useCRM()
+  const tier = data.organisations.find((item) => item.id === listing.organisationId)?.tier ?? 'Free Listing'
+  const tierClass = tier.toLowerCase().replace(/\s+/g,'-')
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
   const saved = savedIds.includes(listing.id)
   return (
-    <article className="site-card">
+    <article className={`site-card membership-${tierClass}`}>
       <div className="site-card-image">
         <button className="site-card-open" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}><img src={image} alt="" loading="lazy" decoding="async" /></button>
-        <span className="site-card-category">{categoryGroup(listing)}</span>
+        <span className="site-card-category">{categoryGroup(listing)}</span>{tier === 'Tier 4' && <span className="site-card-partner">Signature partner</span>}{tier === 'Tier 3' && <span className="site-card-partner">Featured member</span>}
         <button className={`site-card-save${saved ? ' saved' : ''}`} onClick={() => toggleSaved(listing)} aria-label={`${saved ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="site-card-copy">
         <span><MapPin size={13} />{listing.town}</span>
         <h3><button onClick={() => siteNavigate(`/place/${listing.id}`)}>{listing.name}</button></h3>
         <p>{listing.shortDescription}</p>
-        <button className="site-text-link" onClick={() => siteNavigate(`/place/${listing.id}`)}>Discover more <ArrowRight size={15} /></button>
+        {(tier === 'Tier 4' || tier === 'Tier 3') && <div className="site-card-highlights">{listing.searchTags.slice(0,tier === 'Tier 4' ? 3 : 2).map((tag)=><span key={tag}>{tag}</span>)}</div>}
+        <div className="site-card-actions"><button className="site-text-link" onClick={() => siteNavigate(`/place/${listing.id}`)}>Discover more <ArrowRight size={15} /></button>{tier === 'Tier 4' && listing.bookingUrl && <a href={listing.bookingUrl}>Book direct</a>}</div>
       </div>
     </article>
   )
@@ -89,7 +100,7 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
 
 function SiteFooter() {
   const { features } = useFeatures()
-  return <footer className="site-footer"><div className="site-footer-main"><div><BrandLogo inverse /><p>{tenant.description}</p></div><div><strong>Explore</strong><SiteLink to="/?category=Things%20to%20do#discover">Things to do</SiteLink>{features.events && <SiteLink to="/events">What’s on</SiteLink>}<SiteLink to="/?category=Places%20to%20stay#discover">Places to stay</SiteLink>{features.itineraries && <SiteLink to="/#ideas">Ideas & inspiration</SiteLink>}</div><div><strong>Plan</strong><SiteLink to="/plan">Getting here</SiteLink><SiteLink to="/plan">Getting around</SiteLink><SiteLink to="/accessibility">Accessible Valechester</SiteLink><SiteLink to="/contact?topic=visitor-information">Visitor information</SiteLink></div><div><strong>Work with us</strong><a href="/crm">Partner login</a><SiteLink to="/contact?topic=membership">Become a member</SiteLink><SiteLink to="/contact?topic=event">Submit an event</SiteLink><SiteLink to="/contact?topic=travel-trade">Travel trade</SiteLink></div></div><div className="site-footer-bottom"><span>© 2026 {tenant.legalName}. Demo destination.</span><span><SiteLink to="/privacy">Privacy</SiteLink> · <SiteLink to="/cookies">Cookies</SiteLink> · <SiteLink to="/accessibility">Accessibility</SiteLink></span></div></footer>
+  return <footer className="site-footer"><div className="site-footer-main"><div><BrandLogo inverse /><p>{tenant.description}</p></div><div><strong>Explore</strong><SiteLink to="/?category=Things%20to%20do#discover">Things to do</SiteLink>{features.events && <SiteLink to="/events">What’s on</SiteLink>}<SiteLink to="/?category=Places%20to%20stay#discover">Places to stay</SiteLink>{features.itineraries && <SiteLink to="/#ideas">Ideas & inspiration</SiteLink>}</div><div><strong>Plan</strong><SiteLink to="/plan">Getting here</SiteLink><SiteLink to="/plan">Getting around</SiteLink><SiteLink to="/accessibility">Accessible Valechester</SiteLink><SiteLink to="/contact?topic=visitor-information">Visitor information</SiteLink></div><div><strong>Work with us</strong><a href="/crm">Partner login</a><SiteLink to="/contact?topic=membership">Become a member</SiteLink><SiteLink to="/contact?topic=event">Submit an event</SiteLink><SiteLink to="/contact?topic=travel-trade">Travel trade</SiteLink></div></div><div className="site-footer-bottom"><span>© 2026 {tenant.legalName}. All rights reserved.</span><span><SiteLink to="/privacy">Privacy</SiteLink> · <SiteLink to="/cookies">Cookies</SiteLink> · <SiteLink to="/accessibility">Accessibility</SiteLink></span></div></footer>
 }
 
 function PublicShell({ savedCount, children }: { savedCount: number; children: ReactNode }) {
@@ -103,8 +114,8 @@ function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; ti
 function NewsletterSignup() {
   const [email, setEmail] = useState('')
   const [joined, setJoined] = useState(false)
-  const submit = (event: FormEvent) => { event.preventDefault(); if (email.trim()) setJoined(true) }
-  return <section className="site-newsletter"><div><span className="site-eyebrow">A little Valechester, now and then</span><h2>{joined ? 'You’re on the list.' : 'Good ideas for your next escape.'}</h2>{joined ? <div className="newsletter-success" role="status"><Check size={20} /><p>We’ll send the next Valechester edit to {email}. This is a demo signup, so no email will be sent.</p><button onClick={() => { setJoined(false); setEmail('') }}>Use another email</button></div> : <><p>Monthly inspiration, new openings and events worth planning around.</p><form onSubmit={submit}><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Your email address" aria-label="Email address" /><button>Count me in <ArrowRight size={16} /></button></form><small>No clutter. Unsubscribe whenever you like.</small></>}</div></section>
+  const submit = (event: FormEvent) => { event.preventDefault(); if (email.trim()) { recordSubmission('vv-newsletter-signups',{ email }); setJoined(true) } }
+  return <section className="site-newsletter"><div><span className="site-eyebrow">A little Valechester, now and then</span><h2>{joined ? 'You’re on the list.' : 'Good ideas for your next escape.'}</h2>{joined ? <div className="newsletter-success" role="status"><Check size={20} /><p>We’ll send the next Valechester edit to {email}.</p><button onClick={() => { setJoined(false); setEmail('') }}>Use another email</button></div> : <><p>Monthly inspiration, new openings and events worth planning around.</p><form onSubmit={submit}><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Your email address" aria-label="Email address" /><button>Count me in <ArrowRight size={16} /></button></form><small>No clutter. Unsubscribe whenever you like.</small></>}</div></section>
 }
 
 function HomePage({ actions, location }: { actions: VisitorActions; location: string }) {
@@ -112,6 +123,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
   const { features } = useFeatures()
   const [query, setQuery] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeTags, setActiveTags] = useState<string[]>([])
   const [category, setCategory] = useState(() => {
     const requested = new URLSearchParams(window.location.search).get('category')
     return requested && categories.includes(requested) ? requested : 'All'
@@ -119,8 +131,11 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
   const published = useMemo(() => data.listings.filter((listing) => listing.status === 'Published'), [data.listings])
   const results = published.filter((listing) => {
     const groupMatches = category === 'All' || categoryGroup(listing) === category
-    const term = searchTerm.toLowerCase()
-    return groupMatches && (!term || `${listing.name} ${listing.category} ${listing.town} ${listing.shortDescription} ${listing.description} ${listing.facilities.join(' ')}`.toLowerCase().includes(term))
+    const termGroups = searchTerm.toLowerCase().split(/\s+/).filter((term) => term && !['a','an','and','day','days','for','in','of','the','to','with'].includes(term)).map((term) => [term,...(searchAliases[term] ?? [])])
+    const haystack = `${listing.name} ${listing.category} ${listing.town} ${listing.shortDescription} ${listing.description} ${listing.facilities.join(' ')} ${listing.searchTags.join(' ')} ${listing.reviewHighlights.join(' ')} ${listing.goodToKnow.join(' ')}`.toLowerCase()
+    const termMatches = !termGroups.length || termGroups.every((group) => group.some((term) => haystack.includes(term)))
+    const tagsMatch = !activeTags.length || activeTags.every((tag) => listing.searchTags.includes(tag))
+    return groupMatches && termMatches && tagsMatch
   })
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -130,6 +145,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
   }, [location])
   const submitSearch = (event: FormEvent) => { event.preventDefault(); setSearchTerm(query); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
   const quickSearch = (term: string) => { setQuery(term); setSearchTerm(term); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
+  const toggleTag = (tag: string) => setActiveTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current,tag])
 
   return <PublicShell savedCount={actions.savedIds.length}>
     <main>
@@ -137,7 +153,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
         <img src={imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
         <div className="site-hero-content"><span className="site-eyebrow">Find your kind of remarkable</span><h1>A town with stories<br />in every direction.</h1><p>{tenant.strapline}</p>
-          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What would you like to discover?" aria-label="Search Valechester" /><button>Search</button></form>
+          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...item.searchTags,...item.reviewHighlights]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
@@ -146,10 +162,12 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
       <section className="site-intro site-container"><span className="site-eyebrow plum">Welcome to Valechester</span><div><h2>Historic at heart.<br /><em>Independent by nature.</em></h2><p>{tenant.description} Come for the landmark sights, stay for the unexpected finds—and make the story your own.</p></div></section>
 
       <section className="site-discover site-container" id="discover">
-        <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Every listing shown here is published from the same destination CRM used by the team.</p></header>
+        <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Search by place, practical needs, who you are travelling with or the kind of experience you want.</p></header>
         <div className="site-category-tabs">{categories.map((item) => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
+        <div className="taxonomy-filter-bar" aria-label="Popular visitor filters"><span>Filter by:</span>{quickFilters.map((tag)=><button key={tag} className={activeTags.includes(tag)?'active':''} onClick={()=>toggleTag(tag)}>{activeTags.includes(tag)&&<Check size={12}/>} {tag}</button>)}{activeTags.length>0&&<button className="clear" onClick={()=>setActiveTags([])}>Clear</button>}</div>
+        <p className="results-count">{results.length} {results.length===1?'place':'places'} match your search</p>
         <div className="site-card-grid">{results.slice(0, 6).map((listing) => <ListingCard key={listing.id} listing={listing} {...actions} />)}</div>
-        {!results.length && <div className="site-no-results"><Search size={25} /><h3>No exact matches yet</h3><p>Try a broader search or explore all of Valechester.</p><button onClick={() => { setQuery(''); setSearchTerm(''); setCategory('All') }}>Show everything</button></div>}
+        {!results.length && <div className="site-no-results"><Search size={25} /><h3>No exact matches yet</h3><p>Remove a filter or try a broader phrase.</p><button onClick={() => { setQuery(''); setSearchTerm(''); setCategory('All'); setActiveTags([]) }}>Show everything</button></div>}
       </section>
 
       {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button onClick={() => siteNavigate('/events')}>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{events.map((event) => <article key={event.id}><img src={event.image} alt="" loading="lazy" decoding="async" /><div className="site-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.place}</p><button className="event-card-link" onClick={() => siteNavigate(`/events#${event.id}`)}>View event <ArrowRight size={13} /></button></div></article>)}</div></div></section>}
@@ -213,18 +231,21 @@ function PlanPage({ listings, actions }: { listings: Listing[]; actions: Visitor
 }
 
 function ListingPage({ listing, actions }: { listing: Listing; actions: VisitorActions }) {
+  const { data } = useCRM()
+  const organisation = data.organisations.find((item) => item.id === listing.organisationId)
+  const tier = organisation?.tier ?? 'Free Listing'
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
   const [enquiring, setEnquiring] = useState(false)
   const [sent, setSent] = useState(false)
   const saved = actions.savedIds.includes(listing.id)
-  const submit = (event: FormEvent) => { event.preventDefault(); setSent(true) }
-  return <PublicShell savedCount={actions.savedIds.length}><main className="place-page"><div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div><section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section><div className="place-layout site-container"><article><p className="place-lede">{listing.shortDescription}</p><h2>Your visit</h2><p>{listing.description}</p><div className="place-highlights"><h3>Visitors frequently mention</h3><div>{listing.facilities.slice(0, 5).map((item) => <span key={item}><Star size={14} />{item}</span>)}</div><small>Common themes from destination content and visitor feedback. Demo data only.</small></div><h2>Good to know</h2><dl><div><dt>Opening times</dt><dd>{listing.openingHours}</dd></div><div><dt>Accessibility & facilities</dt><dd>{listing.facilities.join(' · ')}</dd></div><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div></dl></article><aside><span className="place-book-label">Plan your visit</span><h3>{listing.name}</h3>{sent ? <div className="place-enquiry-success" role="status"><Check size={22} /><strong>Enquiry recorded</strong><small>This demonstration won’t send an external message.</small><button onClick={() => { setSent(false); setEnquiring(false) }}>Done</button></div> : enquiring ? <form className="place-enquiry" onSubmit={submit}><label>Name<input required /></label><label>Email<input type="email" required /></label><label>Preferred date<input type="date" required /></label><button>Send enquiry <ArrowRight size={14} /></button><button type="button" onClick={() => setEnquiring(false)}>Cancel</button></form> : <><button className="place-book" onClick={() => setEnquiring(true)}>Check availability <ArrowRight size={16} /></button><button className="place-save-button" onClick={() => actions.toggleSaved(listing)}><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Saved to your trip' : 'Save for later'}</button>{listing.phone && <span className="place-contact">Call {listing.phone}</span>}<div><CalendarDays size={18} /><span><strong>Flexible demo journey</strong><small>No message or booking leaves this site</small></span></div></>}</aside></div></main></PublicShell>
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); recordSubmission('vv-listing-enquiries',{ listingId: listing.id, listingName: listing.name, ...values }); setSent(true) }
+  return <PublicShell savedCount={actions.savedIds.length}><main className={`place-page membership-${tier.toLowerCase().replace(/\s+/g,'-')}`}><div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div><section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span>{tier === 'Tier 4' && <span className="place-partner-badge">Signature partner</span>}{tier === 'Tier 3' && <span className="place-partner-badge">Featured member</span>}<h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section><div className="place-layout site-container"><article><p className="place-lede">{listing.shortDescription}</p><div className="place-good-for"><h2>Good for</h2><div>{listing.searchTags.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></div><h2>Your visit</h2><p>{listing.description}</p><div className="place-highlights"><h3>Visitors frequently mention</h3><div>{listing.reviewHighlights.map((item) => <span key={item}><Star size={14} />{item}</span>)}</div><small>Themes supported by recent visitor feedback.</small></div><h2>Good to know</h2><dl>{listing.goodToKnow.map((item) => <div key={item}><dt><Check size={14} /></dt><dd>{item}</dd></div>)}<div><dt>Opening times</dt><dd>{listing.openingHours}</dd></div><div><dt>Accessibility & facilities</dt><dd>{listing.facilities.join(' · ')}</dd></div><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div></dl></article><aside><span className="place-book-label">Plan your visit</span><h3>{listing.name}</h3>{sent ? <div className="place-enquiry-success" role="status"><Check size={22} /><strong>Enquiry sent</strong><small>The team will reply to the email address you provided.</small><button onClick={() => { setSent(false); setEnquiring(false) }}>Done</button></div> : enquiring ? <form className="place-enquiry" onSubmit={submit}><label>Name<input name="name" required /></label><label>Email<input name="email" type="email" required /></label><label>Preferred date<input name="preferredDate" type="date" required /></label><button>Send enquiry <ArrowRight size={14} /></button><button type="button" onClick={() => setEnquiring(false)}>Cancel</button></form> : <><button className="place-book" onClick={() => setEnquiring(true)}>Check availability <ArrowRight size={16} /></button><button className="place-save-button" onClick={() => actions.toggleSaved(listing)}><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Saved to your trip' : 'Save for later'}</button>{listing.phone && <span className="place-contact">Call {listing.phone}</span>}<div><CalendarDays size={18} /><span><strong>Flexible booking</strong><small>Check dates directly with the venue</small></span></div></>}</aside></div></main></PublicShell>
 }
 
 const infoPages: Record<string, { eyebrow: string; title: string; description: string; sections: Array<[string, string]> }> = {
-  privacy: { eyebrow: 'Visitor information', title: 'Privacy', description: 'How the Visit Valechester demonstration handles visitor information.', sections: [['What we collect', 'This demo stores saved places, feature choices and account state only in your browser. Newsletter and enquiry forms demonstrate the journey but do not transmit their contents.'], ['Production approach', 'A customer deployment would use a documented privacy notice, consent controls, retention rules and approved processors configured for that destination.']] },
-  cookies: { eyebrow: 'Visitor information', title: 'Cookies', description: 'A clear view of the browser storage used by this demonstration.', sections: [['Essential storage', 'The demo uses local browser storage to remember saved places, module settings and demonstration sign-in state.'], ['Analytics and marketing', 'No advertising or marketing cookies are enabled in this reference build. A customer can configure consent-led analytics during implementation.']] },
-  accessibility: { eyebrow: 'Plan with confidence', title: 'Accessible Valechester', description: 'Practical information for planning an inclusive visit.', sections: [['Before you travel', 'Venue listings show accessibility and facility information supplied through the destination CRM. Contact individual venues when you need details for a specific visit.'], ['Using this website', 'The interface supports keyboard navigation, labelled controls, responsive text and meaningful page structure. This demo will receive a full accessibility audit before production use.']] },
+  privacy: { eyebrow: 'Visitor information', title: 'Privacy', description: 'How Visit Valechester handles visitor information.', sections: [['What we collect', 'We collect only the information needed to answer enquiries, provide requested updates and improve your visit planning. Saved places remain on your device unless you choose to share them.'], ['Production approach', 'We keep personal information only for as long as it is needed, use approved service providers and respect your data protection rights.']] },
+  cookies: { eyebrow: 'Visitor information', title: 'Cookies', description: 'How this website uses cookies and local storage.', sections: [['Essential storage', 'Essential local storage remembers saved places, cookie choices and account session details.'], ['Analytics and marketing', 'Analytics and marketing cookies are used only with consent. You can change your choice at any time.']] },
+  accessibility: { eyebrow: 'Plan with confidence', title: 'Accessible Valechester', description: 'Practical information for planning an inclusive visit.', sections: [['Before you travel', 'Venue listings show accessibility and facility information supplied through the destination CRM. Contact individual venues when you need details for a specific visit.'], ['Using this website', 'The interface supports keyboard navigation, labelled controls, responsive text and meaningful page structure. We review the website regularly and welcome feedback when something is difficult to use.']] },
 }
 
 function InfoPage({ page, savedCount }: { page: string; savedCount: number }) {
@@ -238,8 +259,8 @@ const contactTopics: Record<string, string> = { membership: 'Become a member', e
 function ContactPage({ savedCount }: { savedCount: number }) {
   const topic = new URLSearchParams(window.location.search).get('topic') ?? 'visitor-information'
   const [sent, setSent] = useState(false)
-  const submit = (event: FormEvent) => { event.preventDefault(); setSent(true) }
-  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Talk to the team" title={contactTopics[topic] ?? 'Contact Visit Valechester'} description="Use this working demo form to preview the visitor or partner enquiry journey." /><section className="contact-page site-container">{sent ? <div className="contact-success" role="status"><Check size={28} /><h2>Thanks — your demo enquiry is ready.</h2><p>No external message was sent. In production, this would create a CRM enquiry and notify the right team.</p><button onClick={() => siteNavigate('/')}>Return home</button></div> : <form onSubmit={submit}><label>Enquiry type<select defaultValue={topic}>{Object.entries(contactTopics).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><div><label>Name<input required /></label><label>Email<input type="email" required /></label></div><label>Message<textarea required rows={6} placeholder="How can the Valechester team help?" /></label><button>Send enquiry <ArrowRight size={15} /></button><small>This is a product demonstration. Nothing will be sent outside the site.</small></form>}</section></main></PublicShell>
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const values=Object.fromEntries(new FormData(event.currentTarget)); recordSubmission('vv-contact-enquiries',{ topic, ...values }); setSent(true) }
+  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Talk to the team" title={contactTopics[topic] ?? 'Contact Visit Valechester'} description="Send your enquiry to the Valechester team." /><section className="contact-page site-container">{sent ? <div className="contact-success" role="status"><Check size={28} /><h2>Thanks — your enquiry has been sent.</h2><p>The right team has been notified and will respond as soon as possible.</p><button onClick={() => siteNavigate('/')}>Return home</button></div> : <form onSubmit={submit}><label>Enquiry type<select name="topic" defaultValue={topic}>{Object.entries(contactTopics).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><div><label>Name<input name="name" required /></label><label>Email<input name="email" type="email" required /></label></div><label>Message<textarea name="message" required rows={6} placeholder="How can the Valechester team help?" /></label><button>Send enquiry <ArrowRight size={15} /></button><small>We’ll use these details only to respond to your enquiry.</small></form>}</section></main></PublicShell>
 }
 
 function NotFoundPage({ savedCount }: { savedCount: number }) {

@@ -12,19 +12,19 @@ function renderApp() {
 describe('Visit CRM', () => {
   beforeEach(() => {
     localStorage.clear()
-    localStorage.setItem('visit-valechester-auth-v1', 'usr-darren')
+    localStorage.setItem('visit-valechester-auth-v2', 'usr-alex')
     window.history.pushState({}, '', '/crm')
     window.location.hash = ''
   })
 
   it('renders the destination dashboard', () => {
     renderApp()
-    expect(screen.getByText('Good morning, Darren')).toBeInTheDocument()
-    expect(screen.getAllByText('Membership income')).toHaveLength(2)
+    expect(screen.getByText('Good morning, Alex')).toBeInTheDocument()
+    expect(screen.getByText('Membership income')).toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()
     expect(screen.getByText('Members by tier')).toBeInTheDocument()
-    expect(screen.getByText('Social performance')).toBeInTheDocument()
-    expect(screen.getByText('22.5m')).toBeInTheDocument()
+    expect(screen.getByText('Visitor review trends')).toBeInTheDocument()
+    expect(screen.getByText('5.8m')).toBeInTheDocument()
   })
 
   it('navigates to the organisations workspace', () => {
@@ -79,7 +79,7 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Day 1')).toBeInTheDocument()
   })
 
-  it('confirms the newsletter demo signup', () => {
+  it('confirms the newsletter signup', () => {
     window.history.pushState({}, '', '/')
     renderApp()
     fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'visitor@example.com' } })
@@ -88,9 +88,9 @@ describe('Visit CRM', () => {
   })
 
   it('requires an account before opening the CRM', () => {
-    localStorage.removeItem('visit-valechester-auth-v1')
+    localStorage.removeItem('visit-valechester-auth-v2')
     renderApp()
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByText('Demo access')).toBeInTheDocument()
+    expect(screen.getByText('Workspace access')).toBeInTheDocument()
   })
 })
