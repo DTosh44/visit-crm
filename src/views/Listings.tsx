@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Eye, FilePenLine, Globe2, Grid2X2, List, Plus, Search, Send } from 'lucide-react'
+import { CheckCircle2, ChevronDown, Copy, Eye, FilePenLine, Globe2, Grid2X2, List, Plus, Search, Send, Trash2, Undo2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { Listing } from '../types'
@@ -7,7 +7,7 @@ import { imageLibrary } from '../siteData'
 import { Badge, Button, Field, Modal, PageHeader, Progress } from '../components/UI'
 
 export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
-  const { data, publishListing, createListing } = useCRM()
+  const { data, publishListing, unpublishListing, duplicateListing, deleteListing, createListing } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All statuses')
   const [layout, setLayout] = useState<'grid' | 'list'>('grid')
@@ -48,9 +48,9 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
               <div className="listing-card-content">
                 <small>{org?.name}</small><h3>{listing.name}</h3><p>{listing.shortDescription}</p>
                 <div className="listing-completeness"><div><span>Completeness</span><strong>{listing.completeness}%</strong></div><Progress value={listing.completeness} colour={listing.completeness >= 85 ? '#278362' : '#d28d30'} /></div>
-                <div className="listing-metrics"><span><Eye size={14} /><strong>{listing.views.toLocaleString()}</strong> views</span><span><Send size={14} /><strong>{listing.enquiries}</strong> clicks</span></div>
+                <div className="listing-metrics"><span><Eye size={14} /><strong>{listing.views.toLocaleString()}</strong> views</span><span><Send size={14} /><strong>{listing.enquiries}</strong> enquiries</span></div>
               </div>
-              <footer><span>Updated {formatDate(listing.lastUpdated, { day: 'numeric', month: 'short' })}</span><div>{listing.status !== 'Published' && <button className="publish-icon" onClick={() => publishListing(listing.id)} title="Approve and publish"><CheckCircle2 size={17} /></button>}<Button variant="secondary" size="sm" onClick={() => onEdit(listing)}>Edit</Button></div></footer>
+              <footer><span>Updated {formatDate(listing.lastUpdated, { day: 'numeric', month: 'short' })}</span><div>{listing.status !== 'Published' ? <button className="publish-icon" onClick={() => publishListing(listing.id)} title="Approve and publish" aria-label={`Publish ${listing.name}`}><CheckCircle2 size={17} /></button>:<button className="icon-button" onClick={()=>unpublishListing(listing.id)} title="Return to draft" aria-label={`Unpublish ${listing.name}`}><Undo2 size={16}/></button>}<button className="icon-button" onClick={()=>{const copy=duplicateListing(listing.id);if(copy)onEdit(copy)}} title="Duplicate" aria-label={`Duplicate ${listing.name}`}><Copy size={16}/></button><button className="icon-button danger" onClick={()=>confirm(`Delete ${listing.name}?`)&&deleteListing(listing.id)} title="Delete" aria-label={`Delete ${listing.name}`}><Trash2 size={16}/></button><Button variant="secondary" size="sm" onClick={() => onEdit(listing)}>Edit</Button></div></footer>
             </article>
           })}
         </div>

@@ -70,7 +70,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
           </section>
 
           <section className="subpanel next-action-card">
-            <header><div><h3>Next action</h3><p>Keep this relationship moving</p></div><Badge tone={organisation.nextActionDate < '2026-09-20' ? 'red' : 'amber'}>{formatDate(organisation.nextActionDate, { day: 'numeric', month: 'short' })}</Badge></header>
+            <header><div><h3>Next action</h3><p>Keep this relationship moving</p></div><Badge tone={organisation.nextActionDate < new Date().toISOString().slice(0,10) ? 'red' : 'amber'}>{formatDate(organisation.nextActionDate, { day: 'numeric', month: 'short' })}</Badge></header>
             <div className="next-action-main"><span><ListChecks size={18} /></span><div><strong>{organisation.nextAction}</strong><p>Owned by {organisation.owner}</p></div></div>
             <div className="next-action-buttons"><Button variant="secondary" size="sm" icon={Check} onClick={()=>{addActivity(organisation.id,'Action completed',organisation.nextAction);updateOrganisation(organisation.id,{nextAction:'No action scheduled',nextActionDate:''})}}>Complete</Button><Button variant="ghost" size="sm" icon={Clock3} onClick={()=>{const date=window.prompt('New action date (YYYY-MM-DD)',organisation.nextActionDate);if(date)updateOrganisation(organisation.id,{nextActionDate:date})}}>Reschedule</Button></div>
           </section>

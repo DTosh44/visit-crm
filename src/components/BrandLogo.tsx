@@ -1,4 +1,4 @@
-import { tenant } from '../tenant'
+import { useCRM } from '../store'
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
@@ -12,10 +12,14 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 }
 
 export function BrandLogo({ inverse = false, compact = false }: { inverse?: boolean; compact?: boolean }) {
+  const {data}=useCRM()
+  const words=data.workspace.destinationName.trim().split(/\s+/)
+  const prefix=words[0]?.toLowerCase()==='visit'?'Visit':''
+  const name=prefix?words.slice(1).join(' '):data.workspace.destinationName
   return (
     <span className={`vale-logo${inverse ? ' inverse' : ''}${compact ? ' compact' : ''}`}>
       <BrandMark compact={compact} />
-      {!compact && <span className="vale-wordmark"><small>Visit</small><strong>{tenant.shortName}</strong></span>}
+      {!compact && <span className="vale-wordmark"><small>{prefix}</small><strong>{name}</strong></span>}
     </span>
   )
 }

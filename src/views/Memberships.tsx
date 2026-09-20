@@ -38,8 +38,8 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
 
       {tab === 'Overview' && <>
         <section className="membership-stats">
-          <div><span className="summary-icon purple"><UsersRound size={18} /></span><p><small>Paid members</small><strong>{paidTotal}</strong><em>across five packages</em></p></div>
-          <div><span className="summary-icon green"><Layers3 size={18} /></span><p><small>Membership income</small><strong>£74,210</strong><em>92.8% of target</em></p></div>
+          <div><span className="summary-icon purple"><UsersRound size={18} /></span><p><small>Paid members</small><strong>{paidTotal}</strong><em>across {data.levels.filter((level)=>level.active&&level.price>0).length} packages</em></p></div>
+          <div><span className="summary-icon green"><Layers3 size={18} /></span><p><small>Membership income</small><strong>{currency.format(revenueTotal)}</strong><em>current annual value</em></p></div>
           <div><p><small>Free listings</small><strong>{freeTotal}</strong><em>{activeTotal} total relationships</em></p></div>
           <div><p><small>Renewing soon</small><strong>{renewals.length}</strong><em>within 30 days</em></p></div>
         </section>

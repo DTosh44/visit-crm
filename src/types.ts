@@ -20,7 +20,7 @@ export type InvoiceStatus = 'Draft' | 'Sent' | 'Overdue' | 'Paid' | 'Void'
 export type AgreementStatus = 'Draft' | 'Sent' | 'Viewed' | 'Signed' | 'Declined' | 'Expired'
 export type TaskPriority = 'High' | 'Medium' | 'Low'
 export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won'
-export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
+export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested' | 'Withdrawn'
 export type EventFormat = 'One-off and short run' | 'Ongoing events' | 'Online events'
 export type EventRecurrence = 'None' | 'Daily' | 'Weekly' | 'Monthly'
 
@@ -129,6 +129,8 @@ export interface Listing {
   lastUpdated: string
   image: string
   media?: ListingMedia[]
+  awards?: string[]
+  imageRightsConfirmed?: boolean
 }
 
 export interface DestinationEvent {
@@ -175,6 +177,8 @@ export interface Invoice {
   reminderStep: number
   sentTo: string
   paidAt?: string
+  paidAmount?: number
+  paymentReference?: string
 }
 
 export interface Agreement {
@@ -216,6 +220,7 @@ export interface Opportunity {
   nextActionDate: string
   owner: string
   daysInStage: number
+  stageEnteredAt?: string
 }
 
 export interface ContentPage {
@@ -228,6 +233,8 @@ export interface ContentPage {
   image: string
   status: 'Draft' | 'Published'
   updatedAt: string
+  metaTitle?: string
+  metaDescription?: string
 }
 
 export interface WebsiteSubmission {
@@ -298,6 +305,7 @@ export interface WorkspaceSettings {
   bankProvider?: string
   accountingProvider?: string
   reviewProvider?: string
+  vatRate?: number
 }
 
 export interface OrganisationDraft {

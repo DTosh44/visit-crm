@@ -1,9 +1,4 @@
-export const currency = new Intl.NumberFormat('en-GB', {
-  style: 'currency',
-  currency: 'GBP',
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-})
+export const currency = {format(value:number){let code='GBP';try{const saved=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'null') as {workspace?:{currency?:string}}|null;code=saved?.workspace?.currency??code}catch{/* Use the destination default. */}return new Intl.NumberFormat('en-GB',{style:'currency',currency:code,minimumFractionDigits:0,maximumFractionDigits:2}).format(value)}}
 
 export function formatDate(value?: string, options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) {
   if (!value) return 'Not set'

@@ -20,7 +20,7 @@ describe('Visit CRM', () => {
 
   it('renders the destination dashboard', () => {
     renderApp()
-    expect(screen.getByText('Good morning, Alex')).toBeInTheDocument()
+    expect(screen.getByText(/Good (morning|afternoon|evening), Alex/)).toBeInTheDocument()
     expect(screen.getByText('Membership income')).toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()
     expect(screen.getByText('Members by level')).toBeInTheDocument()
@@ -349,6 +349,7 @@ describe('Visit CRM', () => {
     window.history.pushState({}, '', '/')
     renderApp()
     fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'visitor@example.com' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: /I agree to receive destination emails/ }))
     fireEvent.click(screen.getByRole('button', { name: /Count me in/ }))
     expect(screen.getByRole('heading', { name: 'You’re on the list.' })).toBeInTheDocument()
   })

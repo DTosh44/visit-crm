@@ -54,7 +54,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
       if(error) throw error
       return {url:supabase.storage.from('listing-media').getPublicUrl(storagePath).data.publicUrl,storagePath}
     }
-    if(file.size>2*1024*1024) throw new Error('Connect Supabase Storage to upload images over 2 MB. Smaller files are stored in this demo workspace.')
+    if(file.size>2*1024*1024) throw new Error('Connect Supabase Storage to upload images over 2 MB. Smaller files can be stored in this browser.')
     return {url:await fileDataUrl(file),storagePath:undefined}
   }
   const addImages=async(files:File[])=>{
@@ -152,6 +152,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
               const checked = draft.facilities.includes(facility)
               return <label className={checked ? 'checked' : ''} key={facility}><input type="checkbox" checked={checked} onChange={() => set('facilities', checked ? draft.facilities.filter((item) => item !== facility) : [...draft.facilities, facility])} /><span><Check size={13} /></span>{facility}</label>
             })}</div>
+            <Field label="Awards and accreditations" hint="Only include verified recognition, separated by commas"><textarea rows={3} value={(draft.awards??[]).join(', ')} onChange={(event)=>set('awards',event.target.value.split(',').map((item)=>item.trim()).filter(Boolean))}/></Field>
           </div>}
 
           {tab === 'Media' && <div className="form-stack listing-media-manager">
@@ -163,7 +164,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
               {mediaError&&<div className="media-error" role="alert">{mediaError}</div>}
               <section className="media-manager-section video-manager"><header><div><strong>Hosted videos</strong><small>Add a YouTube, Vimeo, Mux or other public video URL.</small></div>{videos.length<(membershipLevel?.videoAllowance??0)&&<Button variant="secondary" size="sm" icon={Plus} onClick={()=>set('media',[...media,{id:`video-${Date.now()}`,type:'video',url:'',title:`Watch ${draft.name}`}])}>Add video</Button>}</header>{membershipLevel?.videoAllowance?<div className="video-editor-list">{videos.map((item)=><article key={item.id}><Film size={20}/><Field label="Video title"><input value={item.title??''} onChange={(event)=>updateMedia(item.id,{title:event.target.value})}/></Field><Field label="Video URL"><input type="url" value={item.url} placeholder="https://" onChange={(event)=>updateMedia(item.id,{url:event.target.value})}/></Field><button type="button" onClick={()=>removeMedia(item)} aria-label={`Remove ${item.title||'video'}`}><Trash2 size={16}/></button></article>)}</div>:<p className="media-empty">Video is not included with this membership level.</p>}</section>
             </>}
-            <div className="info-note"><Info size={17}/><p>Only upload media the organisation owns or has permission to use. Images are delivered from managed storage when Supabase is connected. Hosted video platforms handle streaming and playback quality.</p></div>
+            <label className="info-note"><input type="checkbox" checked={draft.imageRightsConfirmed??false} onChange={(event)=>set('imageRightsConfirmed',event.target.checked)}/><p>I confirm the organisation owns this media or has permission for it to be published.</p></label>
           </div>}
 
           {tab === 'Preview' && <div className="website-preview">
@@ -174,8 +175,8 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
         </div>
 
         <aside className="editor-side">
-          <div className="editor-status-card"><h3>Publishing</h3><div><span>Current status</span><Badge>{listing.status}</Badge></div><div><span>Visibility</span><strong><Globe2 size={14} /> Public</strong></div><div><span>Last updated</span><strong>{listing.lastUpdated}</strong></div></div>
-          <div className="editor-checklist"><h3>Before publishing</h3><p className="done"><Check size={13} />Name and category</p><p className="done"><Check size={13} />Visitor description</p><p className={draft.bookingUrl ? 'done' : ''}>{draft.bookingUrl ? <Check size={13} /> : <span /> }Booking link</p><p className={draft.facilities.length >= 3 ? 'done' : ''}>{draft.facilities.length >= 3 ? <Check size={13} /> : <span /> }Facilities</p><p><span />Image rights confirmed</p></div>
+          <div className="editor-status-card"><h3>Publishing</h3><div><span>Current status</span><Badge>{draft.status}</Badge></div><div><span>Visibility</span><strong><Globe2 size={14} /> {draft.status==='Published'?'Public':'Not public'}</strong></div><div><span>Last updated</span><strong>{listing.lastUpdated}</strong></div></div>
+          <div className="editor-checklist"><h3>Before publishing</h3><p className={draft.name&&draft.category?'done':''}>{draft.name&&draft.category?<Check size={13}/>:<span/>}Name and category</p><p className={draft.shortDescription&&draft.description?'done':''}>{draft.shortDescription&&draft.description?<Check size={13}/>:<span/>}Visitor description</p><p className={draft.bookingUrl ? 'done' : ''}>{draft.bookingUrl ? <Check size={13} /> : <span /> }Booking link</p><p className={draft.facilities.length >= 3 ? 'done' : ''}>{draft.facilities.length >= 3 ? <Check size={13} /> : <span /> }Facilities</p><p className={draft.imageRightsConfirmed?'done':''}>{draft.imageRightsConfirmed?<Check size={13}/>:<span/>}Image rights confirmed</p></div>
         </aside>
       </div>
 

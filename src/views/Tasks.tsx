@@ -43,7 +43,7 @@ export function Tasks({ onAdd, openOrganisation }: { onAdd: () => void; openOrga
           {!collapsed.includes(group.title)&&group.tasks.map((task) => {
             const org = data.organisations.find((item) => item.id === task.organisationId)
             return <div className={`task-row ${task.completed ? 'completed' : ''}`} key={task.id}>
-              <button className="task-check" onClick={() => toggleTask(task.id)}>{task.completed ? <Check size={14} /> : <Circle size={14} />}</button>
+              <button className="task-check" onClick={() => toggleTask(task.id)} aria-label={`${task.completed?'Mark as incomplete':'Mark as complete'}: ${task.title}`}>{task.completed ? <Check size={14} /> : <Circle size={14} />}</button>
               <div className="task-title"><strong>{task.title}</strong>{org && <button onClick={() => openOrganisation(org)}>{org.name}</button>}</div>
               <Badge tone="grey">{task.category}</Badge>
               <span className="task-assignee"><Avatar name={task.assignee} size="sm" />{task.assignee}</span>

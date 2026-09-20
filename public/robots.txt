@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /crm
+Sitemap: https://visit-crm.vercel.app/sitemap.xml

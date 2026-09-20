@@ -64,6 +64,8 @@ export function matchesVisitorOption(listing: Listing, option: VisitorFilterOpti
 }
 
 const ignoredSearchWords=new Set(['a','an','and','day','days','for','in','me','my','of','our','the','to','with','want','looking'])
+const aliases:Record<string,string[]>= { partner:['couple','romantic'],girlfriend:['couple','romantic'],boyfriend:['couple','romantic'],kids:['family','children'],child:['family','children'],raining:['rainy','indoor'],wet:['rainy','indoor'],mobility:['accessible','step-free'],wheelchairs:['wheelchair','accessible'],cheap:['free'],night:['evening'] }
+function editDistance(a:string,b:string){const row=Array.from({length:b.length+1},(_,index)=>index);for(let i=1;i<=a.length;i++){let previous=row[0];row[0]=i;for(let j=1;j<=b.length;j++){const saved=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,previous+(a[i-1]===b[j-1]?0:1));previous=saved}}return row[b.length]}
 
 export function filtersForVisitorQuery(query:string) {
   const normalized=` ${query.toLowerCase().replace(/[^a-z0-9-]+/g,' ').replace(/\s+/g,' ').trim()} `
@@ -74,9 +76,12 @@ export function filtersForVisitorQuery(query:string) {
 }
 export function matchesVisitorQuery(listing: Listing, query: string, allowedSearchTags: string[]) {
   const text=listingTaxonomyText(listing,allowedSearchTags)
+  const textWords=Array.from(new Set(text.split(/[^a-z0-9-]+/).filter(Boolean)))
   const words=query.toLowerCase().split(/\s+/).map((word)=>word.replace(/[^a-z0-9-]/g,'')).filter((word)=>word&&!ignoredSearchWords.has(word))
   return words.every((word)=>{
     if(text.includes(word)) return true
+    if((aliases[word]??[]).some((alias)=>text.includes(alias)))return true
+    if(word.length>=5&&textWords.some((candidate)=>candidate.length>=5&&editDistance(word,candidate)<=1))return true
     const options=visitorFilterGroups.flatMap((group)=>group.options).filter((option)=>option.terms.some((term)=>term.includes(word)||word.includes(term)))
     return options.some((option)=>matchesVisitorOption(listing,option,allowedSearchTags))
   })

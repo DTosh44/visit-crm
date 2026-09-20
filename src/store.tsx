@@ -39,6 +39,9 @@ interface CRMContextValue {
   createListing: (organisationId: string, name: string) => Listing
   updateListing: (id: string, changes: Partial<Listing>) => void
   publishListing: (id: string) => void
+  unpublishListing: (id: string) => void
+  duplicateListing: (id: string) => Listing | undefined
+  deleteListing: (id: string) => void
   createEvent: (draft: EventDraft) => DestinationEvent
   updateEvent: (id: string, changes: Partial<DestinationEvent>) => void
   publishEvent: (id: string) => void
@@ -50,10 +53,13 @@ interface CRMContextValue {
   markInvoicePaid: (id: string) => void
   toggleInvoiceReminders: (id: string) => void
   sendInvoice: (id: string) => void
+  updateInvoice: (id: string, changes: Partial<CRMData['invoices'][number]>) => void
+  deleteInvoice: (id: string) => void
   createInvoice: (draft: InvoiceDraft) => void
   runInvoiceReminders: () => number
   createAgreement: (agreement: Omit<Agreement, 'id' | 'number' | 'createdAt'>) => void
   updateAgreement: (id: string, changes: Partial<Agreement>) => void
+  deleteAgreement: (id: string) => void
   toggleTask: (id: string) => void
   createTask: (draft: TaskDraft) => void
   updateTask: (id: string, changes: Partial<CRMData['tasks'][number]>) => void
@@ -93,6 +99,13 @@ interface PublicListingRow {
   facilities: string[]
   image: string
   media?: Listing['media']
+  search_tags?: string[]
+  visitor_taxonomy?: string[]
+  review_highlights?: string[]
+  review_sites?: Listing['reviewSites']
+  good_to_know?: string[]
+  awards?: string[]
+  image_rights_confirmed?: boolean
   updated_at: string
 }
 
@@ -122,7 +135,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     image: row.image,
     media: row.media ?? [],
     lastUpdated: row.updated_at.slice(0, 10),
-    searchTags: [], reviewHighlights: [], goodToKnow: [],
+    searchTags: row.search_tags ?? [], visitorTaxonomy: row.visitor_taxonomy ?? [], reviewHighlights: row.review_highlights ?? [], reviewSites: row.review_sites ?? [], goodToKnow: row.good_to_know ?? [], awards: row.awards ?? [], imageRightsConfirmed: row.image_rights_confirmed ?? false,
   }
 }
 
@@ -148,6 +161,13 @@ function toPublicListing(listing: Listing) {
     facilities: listing.facilities,
     image: listing.image,
     media: listing.media ?? [],
+    search_tags: listing.searchTags,
+    visitor_taxonomy: listing.visitorTaxonomy ?? [],
+    review_highlights: listing.reviewHighlights,
+    review_sites: listing.reviewSites ?? [],
+    good_to_know: listing.goodToKnow,
+    awards: listing.awards ?? [],
+    image_rights_confirmed: listing.imageRightsConfirmed ?? false,
     published_at: listing.status === 'Published' ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   }
@@ -208,6 +228,11 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function listingCompleteness(listing: Listing) {
+  const checks = [listing.name, listing.category, listing.town, listing.shortDescription, listing.description, listing.openingHours, listing.image, listing.facilities.length, listing.searchTags.length, listing.goodToKnow.length, listing.imageRightsConfirmed]
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100)
+}
+
 export function CRMProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [data, setData] = useState<CRMData>(readInitialData)
@@ -234,9 +259,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         if(active&&auditRows?.length)setData((current)=>({...current,activities:auditRows.map((row)=>({id:`audit-${row.id}`,organisationId:row.entity_type==='organisation'?row.entity_id:undefined,type:'note' as const,title:`${row.action.replaceAll('_',' ')} · ${row.entity_type.replaceAll('_',' ')}`,detail:JSON.stringify(row.detail??{}),timestamp:row.created_at,user:row.actor_id??'System'}))}))
       } else {
         const [{ data: listings },{data:events},{data:content}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published')])
-        if (active && listings?.length) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
-        if(active&&events?.length)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
-        if(active&&content?.length)setData((current)=>({...current,contentPages:content.map((row)=>({id:row.id,type:row.type,title:row.title,slug:row.slug,summary:row.summary,body:row.body,image:row.image,status:row.status,updatedAt:row.updated_at.slice(0,10)} as ContentPage))}))
+        if (active && listings) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
+        if(active&&events)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
+        if(active&&content)setData((current)=>({...current,contentPages:content.map((row)=>({id:row.id,type:row.type,title:row.title,slug:row.slug,summary:row.summary,body:row.body,image:row.image,status:row.status,metaTitle:row.meta_title??'',metaDescription:row.meta_description??'',updatedAt:row.updated_at.slice(0,10)} as ContentPage))}))
       }
       if (active) setRemoteReady(true)
     }
@@ -274,7 +299,13 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'tenant_id' })
       void client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' })
-      void client.from('public_content').upsert(data.contentPages.map((page)=>({id:page.id,tenant_id:tenant.id,type:page.type,title:page.title,slug:page.slug,summary:page.summary,body:page.body,image:page.image,status:page.status,updated_at:new Date().toISOString()})),{onConflict:'tenant_id,id'})
+      void client.from('public_content').upsert(data.contentPages.map((page)=>({id:page.id,tenant_id:tenant.id,type:page.type,title:page.title,slug:page.slug,summary:page.summary,body:page.body,image:page.image,status:page.status,meta_title:page.metaTitle??'',meta_description:page.metaDescription??'',updated_at:new Date().toISOString()})),{onConflict:'tenant_id,id'})
+      const listingIds=data.listings.map((item)=>item.id)
+      const contentIds=data.contentPages.map((item)=>item.id)
+      if(listingIds.length)void client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)
+      else void client.from('public_listings').delete().eq('tenant_id',tenant.id)
+      if(contentIds.length)void client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)
+      else void client.from('public_content').delete().eq('tenant_id',tenant.id)
     }, 650)
     return () => window.clearTimeout(timer)
   }, [data, remoteReady, user])
@@ -338,14 +369,14 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       audit('update','organisation',organisationId,changes)
     },
     deleteOrganisation: (organisationId) => {setData((current)=>({...current,organisations:current.organisations.filter((item)=>item.id!==organisationId),contacts:current.contacts.filter((item)=>item.organisationId!==organisationId),listings:current.listings.filter((item)=>item.organisationId!==organisationId),agreements:current.agreements.filter((item)=>item.organisationId!==organisationId),invoices:current.invoices.filter((item)=>item.organisationId!==organisationId),tasks:current.tasks.filter((item)=>item.organisationId!==organisationId),benefitUsage:current.benefitUsage.filter((item)=>item.organisationId!==organisationId),activities:current.activities.filter((item)=>item.organisationId!==organisationId),events:current.events.map((item)=>item.organisationId===organisationId?{...item,organisationId:undefined}:item)}));audit('delete','organisation',organisationId)},
-    deduplicateOrganisations: () => {const seen=new Set<string>();const duplicates=data.organisations.filter((item)=>{const key=`${item.name}|${item.town}`.toLowerCase();if(seen.has(key))return true;seen.add(key);return false});const duplicateIds=new Set(duplicates.map((item)=>item.id));setData((current)=>({...current,organisations:current.organisations.filter((item)=>!duplicateIds.has(item.id)),contacts:current.contacts.filter((item)=>!duplicateIds.has(item.organisationId))}));audit('deduplicate','organisation',undefined,{removed:duplicates.length});return duplicates.length},
+    deduplicateOrganisations: () => {const canonical=new Map<string,string>();const remap=new Map<string,string>();data.organisations.forEach((item)=>{const key=`${item.name}|${item.town}`.toLowerCase();const existing=canonical.get(key);if(existing)remap.set(item.id,existing);else canonical.set(key,item.id)});const duplicateIds=new Set(remap.keys());setData((current)=>({...current,organisations:current.organisations.filter((item)=>!duplicateIds.has(item.id)),contacts:current.contacts.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),listings:current.listings.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),agreements:current.agreements.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),invoices:current.invoices.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),tasks:current.tasks.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),benefitUsage:current.benefitUsage.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),activities:current.activities.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),events:current.events.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item)}));audit('deduplicate','organisation',undefined,{removed:duplicateIds.size});return duplicateIds.size},
     addContact: (contact) => setData((current) => ({ ...current, contacts: [{ ...contact, id: id('con') }, ...current.contacts.map((item)=>contact.primary&&item.organisationId===contact.organisationId?{...item,primary:false}:item)] })),
     updateContact: (contactId, changes) => setData((current) => {const target=current.contacts.find((item)=>item.id===contactId);return{...current,contacts:current.contacts.map((item)=>changes.primary&&target&&item.organisationId===target.organisationId?{...item,...(item.id===contactId?changes:{primary:false})}:item.id===contactId?{...item,...changes}:item)}}),
-    deleteContact: (contactId) => {setData((current)=>({...current,contacts:current.contacts.filter((item)=>item.id!==contactId)}));audit('delete','contact',contactId)},
+    deleteContact: (contactId) => {setData((current)=>{const removed=current.contacts.find((item)=>item.id===contactId);const contacts=current.contacts.filter((item)=>item.id!==contactId);if(!removed)return current;const remaining=contacts.filter((item)=>item.organisationId===removed.organisationId);const nextPrimary=remaining[0];return{...current,contacts:contacts.map((item)=>item.id===nextPrimary?.id?{...item,primary:true}:item),organisations:current.organisations.map((item)=>item.id===removed.organisationId?{...item,primaryContactId:nextPrimary?.id??''}:item)}});audit('delete','contact',contactId)},
     addActivity: (organisationId, title, detail) => setData((current) => ({ ...current, activities: [{ id: id('act'), organisationId, type: 'note', title, detail, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities] })),
     createListing: (organisationId, name) => {
       const organisation = data.organisations.find((item) => item.id === organisationId)
-      const listing: Listing = { id: id('list'), organisationId, name, category: organisation?.type ?? 'Attractions', town: organisation?.town ?? '', status: 'Draft', completeness: 20, views: 0, enquiries: 0, shortDescription: '', description: '', website: organisation?.website ?? '', bookingUrl: '', phone: '', email: '', openingHours: '', facilities: [], searchTags: [], visitorTaxonomy: [], reviewHighlights: [], reviewSites: [], goodToKnow: [], lastUpdated: todayISO(), image: 'hero', media: [] }
+      const listing: Listing = { id: id('list'), organisationId, name, category: organisation?.type ?? 'Attractions', town: organisation?.town ?? '', status: 'Draft', completeness: 9, views: 0, enquiries: 0, shortDescription: '', description: '', website: organisation?.website ?? '', bookingUrl: '', phone: '', email: '', openingHours: '', facilities: [], searchTags: [], visitorTaxonomy: [], reviewHighlights: [], reviewSites: [], goodToKnow: [], awards:[], imageRightsConfirmed:false, lastUpdated: todayISO(), image: 'hero', media: [] }
       setData((current) => ({ ...current, listings: [listing, ...current.listings], organisations: current.organisations.map((item) => item.id === organisationId ? { ...item, listings: item.listings + 1 } : item) }))
       audit('create','listing',listing.id,{organisationId,name})
       return listing
@@ -353,7 +384,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     updateListing: (listingId, changes) => {
       setData((current) => ({
         ...current,
-        listings: current.listings.map((item) => item.id === listingId ? { ...item, ...changes, lastUpdated: todayISO() } : item),
+        listings: current.listings.map((item) => {if(item.id!==listingId)return item;const updated={...item,...changes,lastUpdated:todayISO()};return{...updated,completeness:listingCompleteness(updated)}}),
         activities: [{
           id: id('act'), organisationId: current.listings.find((item) => item.id === listingId)?.organisationId,
           type: 'listing', title: 'Listing updated', detail: 'Listing content was updated in the CRM.',
@@ -374,6 +405,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       }))
       audit('publish','listing',listingId)
     },
+    unpublishListing: (listingId) => {setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',lastUpdated:todayISO()}:item)}));audit('unpublish','listing',listingId)},
+    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
+    deleteListing: (listingId) => {setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});audit('delete','listing',listingId);if(supabase)void supabase.from('public_listings').delete().eq('tenant_id',tenant.id).eq('id',listingId)},
     createEvent: (draft) => {
       const event: DestinationEvent = { ...draft, id: id('event'), lastUpdated: todayISO() }
       setData((current) => ({
@@ -395,15 +429,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       events: current.events.map((item) => item.id === eventId ? { ...item, status: 'Published', lastUpdated: todayISO() } : item),
     }));audit('publish','event',eventId);if(supabase)void supabase.from('events').update({status:'Published',updated_at:new Date().toISOString()}).eq('id',eventId)},
     deleteEvent: (eventId) => {setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) }));audit('delete','event',eventId);if(supabase)void supabase.from('events').delete().eq('id',eventId)},
-    moveOpportunity: (opportunityId, stage) => {
-      setData((current) => ({
-        ...current,
-        opportunities: current.opportunities.map((item) => item.id === opportunityId ? {
-          ...item, stage, daysInStage: 0, probability: stage === 'Won' ? 100 : item.probability,
-        } : item),
-      }))
-    },
-    addOpportunity: (opportunity) => setData((current) => ({ ...current, opportunities: [{ ...opportunity, id: id('opp'), daysInStage: 0 }, ...current.opportunities] })),
+    moveOpportunity: (opportunityId, stage) => {setData((current)=>{const opportunity=current.opportunities.find((item)=>item.id===opportunityId);if(!opportunity)return current;const alreadyExists=current.organisations.some((item)=>item.name.toLowerCase()===opportunity.organisationName.toLowerCase());const organisationId=id('org');const contactId=id('con');const level=current.levels.find((item)=>item.name===opportunity.proposedLevel);return{...current,opportunities:current.opportunities.map((item)=>item.id===opportunityId?{...item,stage,daysInStage:0,stageEnteredAt:new Date().toISOString(),probability:stage==='Won'?100:item.probability}:item),...(stage==='Won'&&!alreadyExists?{organisations:[{id:organisationId,name:opportunity.organisationName,type:'Other',town:'Valechester',address:'',website:'',tier:opportunity.proposedLevel,status:'Active' as const,health:'OK' as const,owner:opportunity.owner,primaryContactId:contactId,renewalDate:'',membershipStart:todayISO(),annualValue:opportunity.value,listings:0,lastActivity:new Date().toISOString(),nextAction:'Complete member onboarding',nextActionDate:todayISO(),tags:['New member'],notes:`Converted from ${opportunity.source}`,colour:level?.colour??'#376b87'},...current.organisations],contacts:[{id:contactId,organisationId,name:opportunity.contactName,jobTitle:'',email:'',phone:'',roles:['Primary'],primary:true,portalAccess:false},...current.contacts],tasks:[{id:id('task'),title:`Complete onboarding for ${opportunity.organisationName}`,organisationId,dueDate:todayISO(),priority:'High' as const,assignee:opportunity.owner,category:'Follow-up' as const,completed:false},...current.tasks]}:{})}});audit('move','opportunity',opportunityId,{stage})},
+    addOpportunity: (opportunity) => setData((current) => ({ ...current, opportunities: [{ ...opportunity, id: id('opp'), daysInStage: 0, stageEnteredAt:new Date().toISOString() }, ...current.opportunities] })),
     updateOpportunity: (opportunityId, changes) => {setData((current)=>({...current,opportunities:current.opportunities.map((item)=>item.id===opportunityId?{...item,...changes}:item)}));audit('update','opportunity',opportunityId,changes)},
     deleteOpportunity: (opportunityId) => {setData((current)=>({...current,opportunities:current.opportunities.filter((item)=>item.id!==opportunityId)}));audit('delete','opportunity',opportunityId)},
     markInvoicePaid: (invoiceId) => {
@@ -433,14 +460,17 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         invoices: current.invoices.map((item) => item.id === invoiceId && item.status === 'Draft' ? { ...item, status: 'Sent' } : item),
       }))
     },
+    updateInvoice: (invoiceId, changes) => {setData((current)=>({...current,invoices:current.invoices.map((item)=>item.id===invoiceId?{...item,...changes}:item)}));audit('update','invoice',invoiceId,changes)},
+    deleteInvoice: (invoiceId) => {setData((current)=>({...current,invoices:current.invoices.filter((item)=>item.id!==invoiceId)}));audit('delete','invoice',invoiceId)},
     createInvoice: (draft) => {
       const count = data.invoices.length + 1060
-      const vat = Math.round(draft.subtotal * 0.2 * 100) / 100
+      const vat = Math.round(draft.subtotal * ((data.workspace.vatRate??20)/100) * 100) / 100
+      const year=new Date().getFullYear()
       setData((current) => ({
         ...current,
         invoices: [{
           id: id('inv'),
-          number: `VV-2026-${count}`,
+          number: `VV-${year}-${count}`,
           organisationId: draft.organisationId,
           description: draft.description,
           issueDate: todayISO(),
@@ -460,6 +490,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     runInvoiceReminders: () => {let sent=0;const today=todayISO();setData((current)=>({...current,invoices:current.invoices.map((invoice)=>{if(invoice.status==='Paid'||invoice.status==='Draft'||invoice.remindersPaused||invoice.dueDate>=today)return invoice;sent++;return{...invoice,status:'Overdue',reminderStep:Math.min(3,invoice.reminderStep+1)}}),activities:sent?[{id:id('act'),type:'invoice',title:'Invoice reminders processed',detail:`${sent} overdue invoice reminder${sent===1?'':'s'} queued.`,timestamp:new Date().toISOString(),user:user?.name??'Workspace user'},...current.activities]:current.activities}));audit('process_reminders','invoice',undefined,{sent});return sent},
     createAgreement: (agreement) => setData((current) => ({ ...current, agreements: [{ ...agreement, id: id('agr'), number: `AGR-${new Date().getFullYear()}-${String(current.agreements.length + 113).padStart(3, '0')}`, createdAt: todayISO() }, ...current.agreements] })),
     updateAgreement: (agreementId, changes) => setData((current) => ({ ...current, agreements: current.agreements.map((item) => item.id === agreementId ? { ...item, ...changes } : item) })),
+    deleteAgreement: (agreementId) => {setData((current)=>({...current,agreements:current.agreements.filter((item)=>item.id!==agreementId)}));audit('delete','agreement',agreementId)},
     toggleTask: (taskId) => {
       setData((current) => ({
         ...current,
@@ -481,7 +512,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           ...current,
           benefitUsage: existing
             ? current.benefitUsage.map((item) => item.id === existing.id ? {
-              ...item, used: item.used >= item.allowance ? 0 : item.used + 1, updatedAt: todayISO(),
+              ...item, used: Math.min(item.allowance,item.used + 1), updatedAt: todayISO(),
             } : item)
             : [{ id: id('use'), organisationId, benefitId, used: 1, allowance, updatedAt: todayISO() }, ...current.benefitUsage],
         }

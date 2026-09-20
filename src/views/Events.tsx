@@ -1,6 +1,7 @@
 import { CalendarDays, CheckCircle2, Edit3, MapPin, Plus, Search, Trash2, X } from 'lucide-react'
 import { useMemo, useState, type FormEvent } from 'react'
-import { useAuth } from '../auth'
+import { supabase, useAuth } from '../auth'
+import { tenant } from '../tenant'
 import { imageLibrary } from '../siteData'
 import { useCRM } from '../store'
 import type { DestinationEvent, EventDraft, EventFormat, EventRecurrence, EventStatus } from '../types'
@@ -9,25 +10,26 @@ import { Badge, Button, EmptyState, PageHeader } from '../components/UI'
 const categories = ['Music & Shows','Festivals & Seasonal','Food & Drink','Family','Arts & Culture','Talks & Workshops','Tours & Heritage','Outdoors & Sport','Wellbeing','Social']
 const formats: EventFormat[] = ['One-off and short run','Ongoing events','Online events']
 const blankEvent = (submittedBy: string): EventDraft => ({
-  title:'', category:'Festivals & Seasonal', format:'One-off and short run', description:'', startDate:'2026-10-01', endDate:'2026-10-01', startTime:'10:00', endTime:'16:00',
+  title:'', category:'Festivals & Seasonal', format:'One-off and short run', description:'', startDate:new Date().toISOString().slice(0,10), endDate:new Date().toISOString().slice(0,10), startTime:'10:00', endTime:'16:00',
   venueName:'', address:'', town:'Valechester', postcode:'', price:'Free', bookingUrl:'', contactName:'', contactEmail:'',
   image:'theatre', accessibility:'', status:'Draft', submittedBy, recurrence:'None', recurrenceUntil:'',
 })
 
 function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: () => void }) {
-  const { createEvent, updateEvent } = useCRM()
+  const { data, createEvent, updateEvent } = useCRM()
   const { user } = useAuth()
   const [draft, setDraft] = useState<EventDraft>(event ? { ...event } : blankEvent(user?.name ?? 'Destination team'))
   const set = <K extends keyof EventDraft>(key: K, value: EventDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
-  const submit = (formEvent: FormEvent) => { formEvent.preventDefault(); if (event) updateEvent(event.id, draft); else createEvent(draft); onClose() }
-  const uploadImage=(file?:File)=>{if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))return;const reader=new FileReader();reader.onload=()=>set('image',String(reader.result));reader.readAsDataURL(file)}
+  const [error,setError]=useState('')
+  const submit = (formEvent: FormEvent) => { formEvent.preventDefault();setError('');if(draft.endDate<draft.startDate){setError('The end date must be on or after the start date.');return}if(draft.endDate===draft.startDate&&draft.endTime<=draft.startTime){setError('The end time must be after the start time.');return}if((draft.recurrence??'None')!=='None'&&draft.recurrenceUntil&&draft.recurrenceUntil<draft.startDate){setError('The repeat-until date must be on or after the start date.');return}if(!event&&data.events.some((item)=>item.title.toLowerCase()===draft.title.toLowerCase()&&item.startDate===draft.startDate&&item.venueName.toLowerCase()===draft.venueName.toLowerCase())){setError('A matching event already exists for this date and venue.');return} if (event) updateEvent(event.id, draft); else createEvent(draft); onClose() }
+  const uploadImage=async(file?:File)=>{if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return;if(supabase){const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,'-');const path=`${tenant.id}/${event?.id??'draft'}/${Date.now()}-${safe}`;const {error:uploadError}=await supabase.storage.from('event-media').upload(path,file,{contentType:file.type});if(!uploadError){set('image',supabase.storage.from('event-media').getPublicUrl(path).data.publicUrl);return}}const reader=new FileReader();reader.onload=()=>set('image',String(reader.result));reader.readAsDataURL(file)}
   return <div className="modal-backdrop" role="presentation"><form className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-label={event ? `Edit ${event.title}` : 'Add event'}>
     <header><div><span className="eyebrow">Website content</span><h2>{event ? 'Edit event' : 'Add event'}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={20}/></button></header>
     <div className="event-form-grid">
       <label className="event-field-wide">Event title<input required value={draft.title} onChange={(e)=>set('title',e.target.value)}/></label>
       <label>Category<select value={draft.category} onChange={(e)=>set('category',e.target.value)}>{categories.map((item)=><option key={item}>{item}</option>)}</select></label>
       <label>Event format<select value={draft.format} onChange={(e)=>set('format',e.target.value as EventFormat)}>{formats.map((item)=><option key={item}>{item}</option>)}</select></label>
-      <label>Status<select value={draft.status} onChange={(e)=>set('status',e.target.value as EventStatus)}><option>Draft</option><option>In review</option><option>Changes requested</option><option>Published</option></select></label>
+      <label>Status<select value={draft.status} onChange={(e)=>set('status',e.target.value as EventStatus)}><option>Draft</option><option>In review</option><option>Changes requested</option><option>Withdrawn</option><option>Published</option></select></label>
       <label className="event-field-wide">Description<textarea required rows={4} value={draft.description} onChange={(e)=>set('description',e.target.value)}/></label>
       <label>Start date<input required type="date" value={draft.startDate} onChange={(e)=>set('startDate',e.target.value)}/></label>
       <label>End date<input required type="date" value={draft.endDate} onChange={(e)=>set('endDate',e.target.value)}/></label>
@@ -48,7 +50,7 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
       <label className="event-field-wide">Accessibility information<textarea rows={3} value={draft.accessibility} onChange={(e)=>set('accessibility',e.target.value)}/></label>
       <label className="event-field-wide">Moderation note<textarea rows={3} value={draft.moderationNote??''} onChange={(e)=>set('moderationNote',e.target.value)} placeholder="Feedback for the organiser or an internal approval note"/></label>
     </div>
-    <footer><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">Save event</Button></footer>
+    {error&&<p className="form-error" role="alert">{error}</p>}<footer><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">Save event</Button></footer>
   </form></div>
 }
 
@@ -65,7 +67,7 @@ export function Events() {
     <PageHeader eyebrow="Website" title="Events" description="Review, edit and publish events from members, independent venues and community organisers." actions={<Button icon={Plus} onClick={()=>setEditing(null)}>Add event</Button>}/>
     <section className="summary-strip event-summary"><div><CalendarDays size={18}/><p><strong>{data.events.length}</strong><small>Total events</small></p></div><div><p><strong>{published}</strong><small>Published</small></p></div><div><p><strong>{review}</strong><small>Awaiting review</small></p></div><div><p><strong>{new Set(data.events.map((event)=>event.venueName)).size}</strong><small>Venues</small></p></div></section>
     <section className="panel data-panel events-panel">
-      <div className="table-toolbar"><div className="table-search"><Search size={17}/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search events, venues or organisers..."/></div><label className="select-wrap"><select value={status} onChange={(e)=>setStatus(e.target.value)}><option>All</option><option>Published</option><option>Draft</option><option>In review</option><option>Changes requested</option></select></label></div>
+      <div className="table-toolbar"><div className="table-search"><Search size={17}/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search events, venues or organisers..."/></div><label className="select-wrap"><select value={status} onChange={(e)=>setStatus(e.target.value)}><option>All</option><option>Published</option><option>Draft</option><option>In review</option><option>Changes requested</option><option>Withdrawn</option></select></label></div>
       {filtered.length ? <div className="table-scroll"><table className="data-table events-table"><thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Submitted by</th><th>Status</th><th/></tr></thead><tbody>{filtered.map((event)=><tr key={event.id}>
         <td><div className="event-name-cell"><img src={imageLibrary[event.image]??event.image??imageLibrary.theatre} alt=""/><div><strong>{event.title}</strong><small>{event.category}</small></div></div></td>
         <td><strong>{new Date(`${event.startDate}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</strong><small>{event.startTime}–{event.endTime}</small></td>

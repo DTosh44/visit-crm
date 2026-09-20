@@ -9,7 +9,7 @@ import type { Organisation, ViewKey } from '../types'
 import { classNames } from '../utils'
 import { Avatar } from './UI'
 import { BrandLogo } from './BrandLogo'
-import { tenant, type FeatureKey } from '../tenant'
+import { type FeatureKey } from '../tenant'
 import { canAccessView, useAuth } from '../auth'
 import { useFeatures } from '../features'
 
@@ -68,13 +68,16 @@ export function Layout({
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   const [notificationsOpen,setNotificationsOpen]=useState(false)
+  const [dismissedNotifications,setDismissedNotifications]=useState<string[]>(()=>{try{return JSON.parse(localStorage.getItem('vv-dismissed-notifications')??'[]') as string[]}catch{return[]}})
   const [query, setQuery] = useState('')
+  const [activeResult,setActiveResult]=useState(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
+        setActiveResult(0)
         setSearchOpen(true)
       }
       if (event.key === 'Escape') {
@@ -99,12 +102,15 @@ export function Layout({
       return [org.name,org.town,org.type,org.tier,...org.tags,...contacts.flatMap((contact)=>[contact.name,contact.email]),...listings.flatMap((listing)=>[listing.name,listing.category,listing.town])].join(' ').toLowerCase().includes(term)
     }).slice(0, 7)
   }, [data.contacts,data.listings,data.organisations, query])
-  const notifications=useMemo(()=>{const today=new Date().toISOString().slice(0,10);return[
+  useEffect(()=>{if(!searchOpen)return;const handle=(event:KeyboardEvent)=>{if(event.key==='ArrowDown'){event.preventDefault();setActiveResult((current)=>Math.min(searchResults.length-1,current+1))}if(event.key==='ArrowUp'){event.preventDefault();setActiveResult((current)=>Math.max(0,current-1))}if(event.key==='Enter'&&searchResults[activeResult]){event.preventDefault();setSearchOpen(false);setQuery('');onOpenOrganisation(searchResults[activeResult])}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[activeResult,onOpenOrganisation,searchOpen,searchResults])
+  const generatedNotifications=useMemo(()=>{const today=new Date().toISOString().slice(0,10);return[
     ...data.tasks.filter((task)=>!task.completed&&task.dueDate<=today).map((task)=>({id:`task-${task.id}`,title:task.title,detail:task.dueDate<today?'Task is overdue':'Task is due today',view:'tasks' as ViewKey})),
     ...data.invoices.filter((invoice)=>invoice.status==='Overdue').map((invoice)=>({id:`invoice-${invoice.id}`,title:`${invoice.number} is overdue`,detail:'Payment follow-up required',view:'billing' as ViewKey})),
     ...data.events.filter((event)=>event.status==='In review').map((event)=>({id:`event-${event.id}`,title:event.title,detail:'Event is awaiting review',view:'events' as ViewKey})),
     ...data.agreements.filter((agreement)=>agreement.status==='Sent').map((agreement)=>({id:`agreement-${agreement.id}`,title:agreement.number,detail:'Agreement is waiting for signature',view:'agreements' as ViewKey})),
   ].slice(0,12)},[data.agreements,data.events,data.invoices,data.tasks])
+  const notifications=generatedNotifications.filter((item)=>!dismissedNotifications.includes(item.id))
+  const dismissNotifications=()=>{const next=Array.from(new Set([...dismissedNotifications,...generatedNotifications.map((item)=>item.id)]));setDismissedNotifications(next);localStorage.setItem('vv-dismissed-notifications',JSON.stringify(next))}
 
   const navigate = (key: ViewKey) => {
     setView(key)
@@ -121,14 +127,14 @@ export function Layout({
 
         <div className="workspace-switcher">
           <span className="workspace-logo">VV</span>
-          <span><small>Destination</small><strong>{tenant.name}</strong></span>
+          <span><small>Destination</small><strong>{data.workspace.destinationName}</strong></span>
         </div>
 
         <nav className="nav">
           {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <span className="nav-label">{group.label}</span>
-              {group.items.filter((item) => (!item.feature || features[item.feature]) && canAccessView(user?.role, item.key)).map(({ key, label, icon: Icon }) => (
+              {group.items.filter((item) => (item.key==='insights' ? features.reviewIntelligence||features.socialInsights : !item.feature || features[item.feature]) && canAccessView(user?.role, item.key)).map(({ key, label, icon: Icon }) => (
                 <button key={key} className={classNames('nav-item', view === key && 'active')} onClick={() => navigate(key)}>
                   <Icon size={18} strokeWidth={1.9} />
                   <span>{label}</span>
@@ -157,13 +163,13 @@ export function Layout({
         <header className="topbar">
           <div className="topbar-left">
             <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={21} /></button>
-            <span className="breadcrumb"><span>{tenant.name} CRM</span><i>/</i><strong>{pageNames[view]}</strong></span>
+            <span className="breadcrumb"><span>{data.workspace.destinationName} CRM</span><i>/</i><strong>{pageNames[view]}</strong></span>
           </div>
           <div className="topbar-right">
-            <button className="search-trigger" onClick={() => setSearchOpen(true)}>
+            <button className="search-trigger" onClick={() => {setActiveResult(0);setSearchOpen(true)}}>
               <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
             </button>
-            <div className="notification-wrap"><button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div className="notification-panel"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div><button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
+            <div className="notification-wrap"><button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div className="notification-panel"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div>{notifications.length>0&&<button onClick={dismissNotifications}>Mark all read</button>}<button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
             <div className="quick-wrap">
               <button className="button button-primary button-md" onClick={() => setQuickOpen((value) => !value)}><Plus size={17} />Add new</button>
               {quickOpen && (
@@ -184,11 +190,11 @@ export function Layout({
       {searchOpen && (
         <div className="command-overlay" onMouseDown={(event) => event.target === event.currentTarget && setSearchOpen(false)}>
           <div className="command-palette">
-            <div className="command-input"><Search size={20} /><input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organisations, contacts and listings..." /><kbd>esc</kbd></div>
+            <div className="command-input"><Search size={20} /><input ref={searchRef} value={query} onChange={(event) => {setQuery(event.target.value);setActiveResult(0)}} placeholder="Search organisations, contacts and listings..." /><kbd>esc</kbd></div>
             <div className="command-results">
               <span className="command-label">{query ? 'Results' : 'Recently viewed'}</span>
-              {searchResults.length ? searchResults.map((org) => (
-                <button key={org.id} onClick={() => { setSearchOpen(false); setQuery(''); onOpenOrganisation(org) }}>
+              {searchResults.length ? searchResults.map((org,index) => (
+                <button key={org.id} className={index===activeResult?'active':''} onMouseEnter={()=>setActiveResult(index)} onClick={() => { setSearchOpen(false); setQuery(''); onOpenOrganisation(org) }}>
                   <span className="search-result-avatar" style={{ background: org.colour }}>{org.name.slice(0, 2).toUpperCase()}</span>
                   <span><strong>{org.name}</strong><small>{org.type} · {org.town}</small></span>
                   <span className="search-result-meta">{org.tier}</span>

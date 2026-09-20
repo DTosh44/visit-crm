@@ -23,8 +23,11 @@ import { canAccessView } from './auth'
 import { LoginPage } from './LoginPage'
 import { PublicSite } from './PublicSite'
 import { BrandLogo } from './components/BrandLogo'
+import { useFeatures } from './features'
+import type { FeatureKey } from './tenant'
 
 const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -34,6 +37,7 @@ function initialView(): ViewKey {
 function CRMApp() {
   const { data } = useCRM()
   const { user } = useAuth()
+  const { features } = useFeatures()
   const [view, setViewState] = useState<ViewKey>(initialView)
   const [selectedOrganisationId, setSelectedOrganisationId] = useState<string | null>(null)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
@@ -50,7 +54,9 @@ function CRMApp() {
     setViewState(next)
   }
 
-  const activeView=user&&canAccessView(user.role,view)?view:'dashboard'
+  const requiredFeature=viewFeatures[view]
+  const featureEnabled=view==='insights'?(features.reviewIntelligence||features.socialInsights):(!requiredFeature||features[requiredFeature])
+  const activeView=user&&canAccessView(user.role,view)&&featureEnabled?view:'dashboard'
 
   const openOrganisation = (organisation: Organisation) => {
     setSelectedListingId(null)
