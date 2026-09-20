@@ -70,6 +70,7 @@ const eventTitles = [
 ]
 const eventCategories = ['Festival','Food & drink','Family','Culture','Film','Markets','Sport','Heritage','Comedy','Music','Outdoors','Workshops']
 const eventVenues = ['Market Square','Riverside Gardens','Valechester Castle','The Foundry','Willowmere Green','North Vale Park','Eastgate Hall','River Vale','Castle Quarter','Market Vale']
+const eventDates = ['2026-09-26','2026-10-03','2026-10-17','2026-10-22','2026-10-30','2026-10-24','2026-11-07','2026-10-10','2027-04-18','2027-09-11','2026-11-14','2026-11-20','2026-11-28','2026-12-05','2027-01-02','2027-02-07','2027-02-20','2027-03-05','2027-03-20','2027-03-27','2027-04-03','2027-04-10','2027-04-16','2027-04-24','2027-05-01','2027-05-08','2027-06-05','2027-06-12','2027-06-19','2027-06-25','2027-07-02','2027-07-10','2027-07-17','2027-07-24','2027-08-07','2027-08-14','2027-08-20','2027-08-28','2027-09-04','2027-09-17','2027-10-02','2027-10-16','2027-10-23','2027-10-29','2027-11-06','2027-11-05','2027-11-13','2027-01-09','2026-12-12','2027-01-16']
 function eventCategory(title: string) {
   if (/food|beer|bake|apple|pumpkin|street food|harvest/i.test(title)) return 'Food & drink'
   if (/half marathon|regatta/i.test(title)) return 'Sport'
@@ -83,16 +84,41 @@ function eventCategory(title: string) {
   if (/book|poetry|literature|theatre|film|voices|arts|diwali|pride|fashion/i.test(title)) return 'Culture'
   return eventCategories[0]
 }
+function eventVenue(title: string, index: number) {
+  if (/castle/i.test(title)) return 'Valechester Castle'
+  if (/river|riverside|regatta|carols/i.test(title)) return /regatta/i.test(title) ? 'River Vale' : 'Riverside Gardens'
+  if (/foundry/i.test(title)) return 'The Foundry'
+  if (/willowmere|apple|pumpkin/i.test(title)) return 'Willowmere Green'
+  if (/north vale/i.test(title)) return 'North Vale Park'
+  if (/market|square|diwali|street food/i.test(title)) return 'Market Square'
+  if (/museum|science|invention/i.test(title)) return 'Museum of Motion'
+  if (/railway/i.test(title)) return 'Valechester Heritage Railway'
+  return eventVenues[index % eventVenues.length]
+}
+function eventTown(venue: string) {
+  if (/castle/i.test(venue)) return 'Castle Quarter'
+  if (/river/i.test(venue)) return 'Riverside'
+  if (/foundry|eastgate|museum/i.test(venue)) return 'Eastgate'
+  if (/willowmere/i.test(venue)) return 'Willowmere'
+  if (/north vale/i.test(venue)) return 'North Vale'
+  if (/market/i.test(venue)) return 'Market Vale'
+  return 'Valechester'
+}
+function eventTimes(title: string): [string,string] {
+  if (/half marathon|walk|trail|regatta|bluebell|garden/i.test(title)) return ['09:30','16:00']
+  if (/after dark|light|cinema|comedy|jazz|lantern|ghost|bonfire|carols|theatre/i.test(title)) return ['18:00','22:00']
+  return ['10:00','16:00']
+}
 
 export const seededEvents: DestinationEvent[] = eventTitles.map((title, index) => {
-  const date = new Date(Date.UTC(2026, 8, 26 + index * 5))
-  const startDate = date.toISOString().slice(0, 10)
-  const venueName = eventVenues[index % eventVenues.length]
+  const startDate = eventDates[index]
+  const venueName = eventVenue(title,index)
+  const [startTime,endTime] = eventTimes(title)
   return {
     id: `event-${String(index + 1).padStart(3, '0')}`, title, category: eventCategory(title),
     description: `${title} brings visitors and local communities together for a memorable day in Valechester, with a welcoming programme and clear information for planning ahead.`,
-    startDate, endDate: startDate, startTime: index % 3 === 0 ? '10:00' : index % 3 === 1 ? '17:30' : '19:00', endTime: index % 3 === 0 ? '16:00' : '22:00',
-    venueName, address: `${index + 1} Event Way`, town: towns[index % towns.length], postcode: `VC${(index % 6) + 1} ${(index % 9) + 1}EV`,
+    startDate, endDate: startDate, startTime, endTime,
+    venueName, address: `${index + 1} Event Way`, town: eventTown(venueName), postcode: `VC${(index % 6) + 1} ${(index % 9) + 1}EV`,
     price: index % 4 === 0 ? 'Free' : index % 4 === 1 ? 'From £6' : index % 4 === 2 ? 'From £12' : '£18',
     bookingUrl: index % 4 === 0 ? '' : `https://example.com/events/${index + 1}`, contactName: 'Events team', contactEmail: `event${index + 1}@example.com`,
     image: images[index % images.length], accessibility: 'Step-free information is available from the organiser. Contact the event team for specific requirements.',
