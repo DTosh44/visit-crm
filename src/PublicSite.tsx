@@ -409,7 +409,10 @@ function ListingPage({ listing, actions }: { listing: Listing; actions: VisitorA
   const organisation = data.organisations.find((item) => item.id === listing.organisationId)
   const tier = organisation?.tier ?? 'Free Listing'
   const profile = listingTemplateProfiles.find((item)=>item.listingId===listing.id)
-  if (!profile) return <LegacyListingPage listing={listing} actions={actions} tier={tier}/>
+  return profile ? <TemplateListingPage listing={listing} actions={actions} tier={tier} profile={profile}/> : <LegacyListingPage listing={listing} actions={actions} tier={tier}/>
+}
+
+function TemplateListingPage({ listing, actions, tier, profile }: { listing: Listing; actions: VisitorActions; tier: string; profile: ListingTemplateProfile }) {
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
   const [enquiring, setEnquiring] = useState(false)
   const [sent, setSent] = useState(false)

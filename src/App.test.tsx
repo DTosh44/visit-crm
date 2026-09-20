@@ -73,6 +73,16 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('link', { name: /Visit website/ })).toBeInTheDocument()
   })
 
+  it('moves safely from a standard listing to a template listing', async () => {
+    window.history.pushState({}, '', '/place/list-002')
+    renderApp()
+    expect(screen.getByRole('heading', { name: 'The Keep Lodges', level: 1 })).toBeInTheDocument()
+    window.history.pushState({}, '', '/place/list-001')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    expect(await screen.findByRole('heading', { name: 'Valechester Castle', level: 1 })).toBeInTheDocument()
+    expect(screen.getByText('Half a day or more')).toBeInTheDocument()
+  })
+
   it('shows fifty editable events in the CMS', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Events' }))
