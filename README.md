@@ -26,6 +26,19 @@ npm run dev
 
 The visitor website is at `/` and the destination workspace is at `/crm`.
 
+## Production services
+
+The interface works without credentials by using browser storage. A shared production workspace requires a Supabase project:
+
+1. Run `supabase/schema.sql`, followed by the migrations in `supabase/migrations`.
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the deployment environment.
+3. Deploy the `invite-workspace-user` and `manage-workspace-user` Edge Functions.
+4. Create the first administrator in Supabase Auth and add the matching row to `public.profiles`.
+
+This enables shared records, live multi-user updates, secure staff and event-organiser accounts, dashboard preferences, public submissions, image storage and tenant permissions. Configure an SMTP provider in Supabase before inviting real users or sending password resets.
+
+Images are stored in Supabase Storage. Listing videos use hosted YouTube, Vimeo or Mux URLs. Open Banking, accounting, review and video-processing providers require the destination's own provider account and API credentials; the CRM exposes their configuration and connection state without embedding provider secrets in the browser.
+
 ## Quality checks
 
 ```bash

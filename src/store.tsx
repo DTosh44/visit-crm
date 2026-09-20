@@ -220,6 +220,16 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     return () => { active = false }
   }, [user])
 
+  useEffect(()=>{
+    const client=supabase
+    if(!client||!user)return
+    const channel=client.channel(`workspace-${tenant.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'workspace_states',filter:`tenant_id=eq.${tenant.id}`},(payload)=>{
+      const record=payload.new as {data?:CRMData;updated_by?:string}
+      if(record.updated_by!==user.id&&record.data)setData(normalizeCRMData(record.data))
+    }).subscribe()
+    return()=>{void client.removeChannel(channel)}
+  },[user])
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     document.documentElement.style.setProperty('--tenant-primary',data.workspace.primaryColour)
