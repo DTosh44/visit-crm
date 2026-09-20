@@ -53,6 +53,40 @@ describe('Visit CRM', () => {
     expect(screen.queryByText('The Lantern House Hotel')).not.toBeInTheDocument()
   })
 
+  it('saves a place and opens the saved places page', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Save Valechester Castle' }))
+    expect(screen.getByText('Valechester Castle saved for your trip')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Saved places (1)' }))
+    expect(screen.getByRole('heading', { name: 'Saved places' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Remove Valechester Castle' })).toBeInTheDocument()
+  })
+
+  it('opens the events calendar from the homepage', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /View full calendar/ }))
+    expect(screen.getByRole('heading', { name: 'Make a date of Valechester.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Harvest & Makers Market' })).toBeInTheDocument()
+  })
+
+  it('builds a personalised itinerary', () => {
+    window.history.pushState({}, '', '/plan')
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /Build my trip/ }))
+    expect(screen.getByRole('heading', { name: 'Your Valechester itinerary' })).toBeInTheDocument()
+    expect(screen.getByText('Day 1')).toBeInTheDocument()
+  })
+
+  it('confirms the newsletter demo signup', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'visitor@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /Count me in/ }))
+    expect(screen.getByRole('heading', { name: 'You’re on the list.' })).toBeInTheDocument()
+  })
+
   it('requires an account before opening the CRM', () => {
     localStorage.removeItem('visit-valechester-auth-v1')
     renderApp()

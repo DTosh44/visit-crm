@@ -1,8 +1,8 @@
 import {
-  Accessibility, ArrowRight, CalendarDays, ChevronDown, Clock3, Heart, MapPin, Menu,
-  Search, Sparkles, Star, TrainFront, X,
+  Accessibility, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Clock3,
+  Heart, Mail, MapPin, Menu, Search, Sparkles, Star, TrainFront, X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type AnchorHTMLAttributes, type FormEvent, type ReactNode } from 'react'
 import { BrandLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import { events, guides, imageLibrary, neighbourhoods } from './siteData'
@@ -11,6 +11,7 @@ import { tenant } from './tenant'
 import type { Listing } from './types'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
+const SAVED_KEY = 'visit-valechester-saved-v1'
 
 function categoryGroup(listing: Listing) {
   const value = `${listing.category} ${listing.name}`.toLowerCase()
@@ -25,15 +26,34 @@ function siteNavigate(path: string) {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-function ListingCard({ listing, featured = false }: { listing: Listing; featured?: boolean }) {
+function SiteLink({ to, onClick, ...props }: { to: string } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'>) {
+  return <a href={to} {...props} onClick={(event) => { onClick?.(event); if (!event.defaultPrevented) { event.preventDefault(); siteNavigate(to) } }} />
+}
+
+function readSavedPlaces() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SAVED_KEY) ?? '[]')
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+interface VisitorActions {
+  savedIds: string[]
+  toggleSaved: (listing: Listing) => void
+}
+
+function ListingCard({ listing, savedIds, toggleSaved }: { listing: Listing } & VisitorActions) {
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
+  const saved = savedIds.includes(listing.id)
   return (
-    <article className={`site-card${featured ? ' site-card-featured' : ''}`}>
-      <button className="site-card-image" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}>
-        <img src={image} alt="" loading="lazy" decoding="async" />
+    <article className="site-card">
+      <div className="site-card-image">
+        <button className="site-card-open" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}><img src={image} alt="" loading="lazy" decoding="async" /></button>
         <span className="site-card-category">{categoryGroup(listing)}</span>
-        <span className="site-card-save"><Heart size={18} /></span>
-      </button>
+        <button className={`site-card-save${saved ? ' saved' : ''}`} onClick={() => toggleSaved(listing)} aria-label={`${saved ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button>
+      </div>
       <div className="site-card-copy">
         <span><MapPin size={13} />{listing.town}</span>
         <h3><button onClick={() => siteNavigate(`/place/${listing.id}`)}>{listing.name}</button></h3>
@@ -44,54 +64,81 @@ function ListingCard({ listing, featured = false }: { listing: Listing; featured
   )
 }
 
-function SiteHeader() {
+function SiteHeader({ savedCount }: { savedCount: number }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { features } = useFeatures()
+  const closeMenu = () => setMenuOpen(false)
   return (
     <>
-      <div className="site-utility"><div><span>{tenant.location}</span><nav><a href="#plan">Plan your visit</a><a href="#accessibility">Accessibility</a><a href="/crm">Partner login</a></nav></div></div>
+      <div className="site-utility"><div><span>{tenant.location}</span><nav><SiteLink to="/plan">Plan your visit</SiteLink><SiteLink to="/accessibility">Accessibility</SiteLink><SiteLink to="/saved">Saved places{savedCount ? ` (${savedCount})` : ''}</SiteLink><a href="/crm">Partner login</a></nav></div></div>
       <header className="site-header">
-        <a href="/" className="site-logo" aria-label={`${tenant.name} home`}><BrandLogo /></a>
+        <SiteLink to="/" className="site-logo" aria-label={`${tenant.name} home`}><BrandLogo /></SiteLink>
         <nav className={menuOpen ? 'site-nav open' : 'site-nav'} aria-label="Main navigation">
-          <a href="#discover" onClick={() => setMenuOpen(false)}>Things to do <ChevronDown size={14} /></a>
-          <a href="#events" onClick={() => setMenuOpen(false)}>What’s on</a>
-          <a href="#discover" onClick={() => setMenuOpen(false)}>Stay</a>
-          <a href="#discover" onClick={() => setMenuOpen(false)}>Food & drink</a>
-          <a href="#ideas" onClick={() => setMenuOpen(false)}>Ideas & inspiration</a>
-          <a href="#plan" onClick={() => setMenuOpen(false)}>Plan your visit</a>
+          <SiteLink to="/?category=Things%20to%20do#discover" onClick={closeMenu}>Things to do <ChevronDown size={14} /></SiteLink>
+          {features.events && <SiteLink to="/events" onClick={closeMenu}>What’s on</SiteLink>}
+          <SiteLink to="/?category=Places%20to%20stay#discover" onClick={closeMenu}>Stay</SiteLink>
+          <SiteLink to="/?category=Food%20%26%20drink#discover" onClick={closeMenu}>Food & drink</SiteLink>
+          {features.itineraries && <SiteLink to="/#ideas" onClick={closeMenu}>Ideas & inspiration</SiteLink>}
+          <SiteLink to="/plan" onClick={closeMenu}>Plan your visit</SiteLink>
         </nav>
-        <div className="site-header-actions"><button aria-label="Search"><Search size={20} /></button><a href="#plan" className="site-plan-button">Plan my trip</a><button className="site-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle menu">{menuOpen ? <X size={22} /> : <Menu size={22} />}</button></div>
+        <div className="site-header-actions"><button onClick={() => siteNavigate('/?search=1')} aria-label="Search"><Search size={20} /></button><SiteLink to="/plan" className="site-plan-button">Plan my trip</SiteLink><button className="site-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle menu">{menuOpen ? <X size={22} /> : <Menu size={22} />}</button></div>
       </header>
     </>
   )
 }
 
 function SiteFooter() {
-  return <footer className="site-footer"><div className="site-footer-main"><div><BrandLogo inverse /><p>{tenant.description}</p></div><div><strong>Explore</strong><a href="#discover">Things to do</a><a href="#events">What’s on</a><a href="#discover">Places to stay</a><a href="#ideas">Ideas & inspiration</a></div><div><strong>Plan</strong><a href="#plan">Getting here</a><a href="#plan">Getting around</a><a href="#accessibility">Accessible Valechester</a><a href="#plan">Visitor information</a></div><div><strong>Work with us</strong><a href="/crm">Partner login</a><a href="mailto:hello@visitvalechester.example">Become a member</a><a href="mailto:hello@visitvalechester.example">Submit an event</a><a href="mailto:hello@visitvalechester.example">Travel trade</a></div></div><div className="site-footer-bottom"><span>© 2026 {tenant.legalName}. Demo destination.</span><span>Privacy · Cookies · Accessibility</span></div></footer>
+  const { features } = useFeatures()
+  return <footer className="site-footer"><div className="site-footer-main"><div><BrandLogo inverse /><p>{tenant.description}</p></div><div><strong>Explore</strong><SiteLink to="/?category=Things%20to%20do#discover">Things to do</SiteLink>{features.events && <SiteLink to="/events">What’s on</SiteLink>}<SiteLink to="/?category=Places%20to%20stay#discover">Places to stay</SiteLink>{features.itineraries && <SiteLink to="/#ideas">Ideas & inspiration</SiteLink>}</div><div><strong>Plan</strong><SiteLink to="/plan">Getting here</SiteLink><SiteLink to="/plan">Getting around</SiteLink><SiteLink to="/accessibility">Accessible Valechester</SiteLink><SiteLink to="/contact?topic=visitor-information">Visitor information</SiteLink></div><div><strong>Work with us</strong><a href="/crm">Partner login</a><SiteLink to="/contact?topic=membership">Become a member</SiteLink><SiteLink to="/contact?topic=event">Submit an event</SiteLink><SiteLink to="/contact?topic=travel-trade">Travel trade</SiteLink></div></div><div className="site-footer-bottom"><span>© 2026 {tenant.legalName}. Demo destination.</span><span><SiteLink to="/privacy">Privacy</SiteLink> · <SiteLink to="/cookies">Cookies</SiteLink> · <SiteLink to="/accessibility">Accessibility</SiteLink></span></div></footer>
 }
 
-function HomePage() {
+function PublicShell({ savedCount, children }: { savedCount: number; children: ReactNode }) {
+  return <div className="public-site"><SiteHeader savedCount={savedCount} />{children}<SiteFooter /></div>
+}
+
+function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; title: string; description: string; image?: string }) {
+  return <section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to Valechester</SiteLink><span className="site-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{image && <img src={image} alt="" />}</section>
+}
+
+function NewsletterSignup() {
+  const [email, setEmail] = useState('')
+  const [joined, setJoined] = useState(false)
+  const submit = (event: FormEvent) => { event.preventDefault(); if (email.trim()) setJoined(true) }
+  return <section className="site-newsletter"><div><span className="site-eyebrow">A little Valechester, now and then</span><h2>{joined ? 'You’re on the list.' : 'Good ideas for your next escape.'}</h2>{joined ? <div className="newsletter-success" role="status"><Check size={20} /><p>We’ll send the next Valechester edit to {email}. This is a demo signup, so no email will be sent.</p><button onClick={() => { setJoined(false); setEmail('') }}>Use another email</button></div> : <><p>Monthly inspiration, new openings and events worth planning around.</p><form onSubmit={submit}><input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Your email address" aria-label="Email address" /><button>Count me in <ArrowRight size={16} /></button></form><small>No clutter. Unsubscribe whenever you like.</small></>}</div></section>
+}
+
+function HomePage({ actions, location }: { actions: VisitorActions; location: string }) {
   const { data } = useCRM()
   const { features } = useFeatures()
   const [query, setQuery] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
-  const [category, setCategory] = useState('All')
+  const [category, setCategory] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('category')
+    return requested && categories.includes(requested) ? requested : 'All'
+  })
   const published = useMemo(() => data.listings.filter((listing) => listing.status === 'Published'), [data.listings])
   const results = published.filter((listing) => {
     const groupMatches = category === 'All' || categoryGroup(listing) === category
     const term = searchTerm.toLowerCase()
     return groupMatches && (!term || `${listing.name} ${listing.category} ${listing.town} ${listing.shortDescription} ${listing.description} ${listing.facilities.join(' ')}`.toLowerCase().includes(term))
   })
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const target = window.location.hash
+    if (params.has('search')) window.setTimeout(() => { const input = document.querySelector<HTMLInputElement>('[aria-label="Search Valechester"]'); input?.focus(); input?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 50)
+    else if (target) window.setTimeout(() => document.querySelector(target)?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }, [location])
   const submitSearch = (event: FormEvent) => { event.preventDefault(); setSearchTerm(query); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
+  const quickSearch = (term: string) => { setQuery(term); setSearchTerm(term); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
 
-  return <div className="public-site">
-    <SiteHeader />
+  return <PublicShell savedCount={actions.savedIds.length}>
     <main>
       <section className="site-hero">
         <img src={imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
         <div className="site-hero-content"><span className="site-eyebrow">Find your kind of remarkable</span><h1>A town with stories<br />in every direction.</h1><p>{tenant.strapline}</p>
           <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What would you like to discover?" aria-label="Search Valechester" /><button>Search</button></form>
-          <div className="site-popular"><span>Popular:</span><button onClick={() => { setQuery('family'); setSearchTerm('family') }}>Family days</button><button onClick={() => { setQuery('free'); setSearchTerm('free') }}>Free things</button><button onClick={() => { setQuery('heritage'); setSearchTerm('heritage') }}>Heritage</button></div>
+          <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
       </section>
@@ -101,40 +148,142 @@ function HomePage() {
       <section className="site-discover site-container" id="discover">
         <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Every listing shown here is published from the same destination CRM used by the team.</p></header>
         <div className="site-category-tabs">{categories.map((item) => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
-        <div className="site-card-grid">{results.slice(0, 6).map((listing, index) => <ListingCard key={listing.id} listing={listing} featured={index === 0} />)}</div>
+        <div className="site-card-grid">{results.slice(0, 6).map((listing) => <ListingCard key={listing.id} listing={listing} {...actions} />)}</div>
         {!results.length && <div className="site-no-results"><Search size={25} /><h3>No exact matches yet</h3><p>Try a broader search or explore all of Valechester.</p><button onClick={() => { setQuery(''); setSearchTerm(''); setCategory('All') }}>Show everything</button></div>}
       </section>
 
-      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{events.map((event) => <article key={event.id}><img src={event.image} alt="" loading="lazy" decoding="async" /><div className="site-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.place}</p></div></article>)}</div></div></section>}
+      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button onClick={() => siteNavigate('/events')}>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{events.map((event) => <article key={event.id}><img src={event.image} alt="" loading="lazy" decoding="async" /><div className="site-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.place}</p><button className="event-card-link" onClick={() => siteNavigate(`/events#${event.id}`)}>View event <ArrowRight size={13} /></button></div></article>)}</div></div></section>}
 
-      {features.itineraries && <section className="site-ideas site-container" id="ideas"><header className="site-section-heading"><div><span className="site-eyebrow plum">Ideas worth travelling for</span><h2>Follow your curiosity</h2></div><button>All guides & itineraries <ArrowRight size={16} /></button></header><div className="site-guide-grid">{guides.map((guide) => <article key={guide.title}><img src={guide.image} alt="" loading="lazy" decoding="async" /><div><span>{guide.eyebrow}</span><h3>{guide.title}</h3><p>{guide.description}</p><button>Read the guide <ArrowRight size={15} /></button></div></article>)}</div></section>}
+      {features.itineraries && <section className="site-ideas site-container" id="ideas"><header className="site-section-heading"><div><span className="site-eyebrow plum">Ideas worth travelling for</span><h2>Follow your curiosity</h2></div><button onClick={() => siteNavigate('/plan')}>Build your own itinerary <ArrowRight size={16} /></button></header><div className="site-guide-grid">{guides.map((guide) => <article key={guide.title}><img src={guide.image} alt="" loading="lazy" decoding="async" /><div><span>{guide.eyebrow}</span><h3>{guide.title}</h3><p>{guide.description}</p><button onClick={() => siteNavigate(`/guide/${guide.slug}`)}>Read the guide <ArrowRight size={15} /></button></div></article>)}</div></section>}
 
-      <section className="site-neighbourhoods"><div className="site-container"><div className="site-section-heading inverse"><div><span className="site-eyebrow">Pick a neighbourhood</span><h2>Three sides of the same story</h2></div></div><div className="site-neighbourhood-grid">{neighbourhoods.map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async" /><div><h3>{place.name}</h3><p>{place.detail}</p><button aria-label={`Explore ${place.name}`}><ArrowRight size={18} /></button></div></article>)}</div></div></section>
+      <section className="site-neighbourhoods"><div className="site-container"><div className="site-section-heading inverse"><div><span className="site-eyebrow">Pick a neighbourhood</span><h2>Three sides of the same story</h2></div></div><div className="site-neighbourhood-grid">{neighbourhoods.map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async" /><div><h3>{place.name}</h3><p>{place.detail}</p><button onClick={() => siteNavigate(`/neighbourhood/${place.slug}`)} aria-label={`Explore ${place.name}`}><ArrowRight size={18} /></button></div></article>)}</div></div></section>
 
-      <section className="site-planner site-container" id="plan"><div><span className="planner-icon"><Sparkles size={24} /></span><span className="site-eyebrow plum">Made for your kind of trip</span><h2>Not sure where to start?</h2><p>Tell us who’s coming, what you love and how long you have. We’ll shape a Valechester itinerary around you.</p><button>Build my itinerary <ArrowRight size={17} /></button></div><aside id="accessibility"><span><TrainFront size={21} /><strong>42 mins</strong><small>by direct train from Birmingham</small></span><span><Accessibility size={21} /><strong>Accessible</strong><small>routes and venue details</small></span><span><Clock3 size={21} /><strong>2–3 days</strong><small>to see the town at its best</small></span></aside></section>
+      <section className="site-planner site-container" id="plan"><div><span className="planner-icon"><Sparkles size={24} /></span><span className="site-eyebrow plum">Made for your kind of trip</span><h2>Not sure where to start?</h2><p>Tell us who’s coming, what you love and how long you have. We’ll shape a Valechester itinerary around you.</p><button onClick={() => siteNavigate('/plan')}>Build my itinerary <ArrowRight size={17} /></button></div><aside><span><TrainFront size={21} /><strong>42 mins</strong><small>by direct train from Birmingham</small></span><span><Accessibility size={21} /><strong>Accessible</strong><small>routes and venue details</small></span><span><Clock3 size={21} /><strong>2–3 days</strong><small>to see the town at its best</small></span></aside></section>
 
-      <section className="site-newsletter"><div><span className="site-eyebrow">A little Valechester, now and then</span><h2>Good ideas for your next escape.</h2><p>Monthly inspiration, new openings and events worth planning around.</p><form onSubmit={(event) => event.preventDefault()}><input type="email" placeholder="Your email address" aria-label="Email address" /><button>Count me in <ArrowRight size={16} /></button></form><small>No clutter. Unsubscribe whenever you like.</small></div></section>
+      <NewsletterSignup />
     </main>
-    <SiteFooter />
-  </div>
+  </PublicShell>
 }
 
-function ListingPage({ listing }: { listing: Listing }) {
+function EventsPage({ savedCount }: { savedCount: number }) {
+  useEffect(() => { if (window.location.hash) window.setTimeout(() => document.querySelector(window.location.hash)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50) }, [])
+  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="What’s on" title="Make a date of Valechester." description="Markets, live performance, family evenings and the kind of local events worth building a trip around." image={imageLibrary.restaurant} /><section className="event-calendar site-container">{events.map((event) => <article id={event.id} key={event.id}><img src={event.image} alt="" /><div className="event-calendar-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span className="site-eyebrow plum">{event.category}</span><h2>{event.title}</h2><p>{event.description}</p><dl><div><dt>Where</dt><dd>{event.place}</dd></div><div><dt>When</dt><dd>{event.time}</dd></div><div><dt>Tickets</dt><dd>{event.price}</dd></div></dl><button onClick={() => siteNavigate(`/plan?event=${event.id}`)}>Plan a trip around this <ArrowRight size={15} /></button></div></article>)}</section><NewsletterSignup /></main></PublicShell>
+}
+
+function GuidePage({ slug, listings, actions }: { slug: string; listings: Listing[]; actions: VisitorActions }) {
+  const guide = guides.find((item) => item.slug === slug)
+  if (!guide) return <NotFoundPage savedCount={actions.savedIds.length} />
+  const stops = guide.stops.map((id) => listings.find((listing) => listing.id === id)).filter((item): item is Listing => Boolean(item))
+  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow={`${guide.eyebrow} · ${guide.duration}`} title={guide.title} description={guide.intro} image={guide.image} /><section className="guide-route site-container"><header><span className="site-eyebrow plum">Your route</span><h2>{stops.length} stops, one very good trip.</h2></header><div>{stops.map((listing, index) => <article key={listing.id}><span>{String(index + 1).padStart(2, '0')}</span><ListingCard listing={listing} {...actions} /></article>)}</div><aside><Sparkles size={22} /><div><h3>Make it your own</h3><p>Use these stops as a starting point, then let the planner adapt the trip to your interests.</p></div><button onClick={() => siteNavigate('/plan')}>Open trip planner <ArrowRight size={15} /></button></aside></section></main></PublicShell>
+}
+
+function NeighbourhoodPage({ slug, listings, actions }: { slug: string; listings: Listing[]; actions: VisitorActions }) {
+  const place = neighbourhoods.find((item) => item.slug === slug)
+  if (!place) return <NotFoundPage savedCount={actions.savedIds.length} />
+  const results = listings.filter((listing) => listing.town === place.name)
+  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow="Explore the neighbourhood" title={place.name} description={place.intro} image={place.image} /><section className="visitor-listing-section site-container"><header><span className="site-eyebrow plum">Worth your time</span><h2>Places in {place.name}</h2></header><div className="site-card-grid">{results.map((listing) => <ListingCard key={listing.id} listing={listing} {...actions} />)}</div>{!results.length && <p className="visitor-empty">More places are being prepared by the destination team.</p>}</section></main></PublicShell>
+}
+
+function SavedPage({ listings, actions }: { listings: Listing[]; actions: VisitorActions }) {
+  const saved = listings.filter((listing) => actions.savedIds.includes(listing.id))
+  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow="Your trip" title="Saved places" description="Keep the places that catch your eye together while you shape your Valechester visit." /><section className="visitor-listing-section site-container">{saved.length ? <div className="site-card-grid">{saved.map((listing) => <ListingCard key={listing.id} listing={listing} {...actions} />)}</div> : <div className="saved-empty"><Heart size={28} /><h2>Nothing saved yet</h2><p>Tap the heart on any place to keep it here.</p><button onClick={() => siteNavigate('/#discover')}>Start exploring <ArrowRight size={15} /></button></div>}</section></main></PublicShell>
+}
+
+const interestMatchers: Record<string, RegExp> = {
+  Heritage: /castle|heritage|museum|garden/i,
+  'Food & drink': /distill|food|drink|restaurant|café/i,
+  Culture: /theatre|gallery|book|museum/i,
+  Outdoors: /park|garden|river|outdoor/i,
+  Family: /family|museum|castle|garden|play/i,
+}
+
+function PlanPage({ listings, actions }: { listings: Listing[]; actions: VisitorActions }) {
+  const [days, setDays] = useState(2)
+  const [group, setGroup] = useState('Couple')
+  const [interests, setInterests] = useState<string[]>(['Heritage', 'Food & drink'])
+  const [plan, setPlan] = useState<Listing[]>([])
+  const toggleInterest = (interest: string) => setInterests((current) => current.includes(interest) ? current.filter((item) => item !== interest) : [...current, interest])
+  const buildPlan = (event: FormEvent) => {
+    event.preventDefault()
+    const ranked = listings.map((listing) => ({ listing, score: interests.reduce((score, interest) => score + (interestMatchers[interest].test(`${listing.name} ${listing.category} ${listing.description} ${listing.facilities.join(' ')}`) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score)
+    setPlan(ranked.slice(0, Math.min(days * 2, ranked.length)).map((item) => item.listing))
+    window.setTimeout(() => document.querySelector('#your-plan')?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow="Trip planner" title="Shape your Valechester." description="Choose the pace and the things you enjoy. We’ll turn published destination listings into a practical starting itinerary." image={imageLibrary.hero} /><section className="planner-builder site-container"><form onSubmit={buildPlan}><div><label>Who’s coming?<select value={group} onChange={(event) => setGroup(event.target.value)}><option>Solo traveller</option><option>Couple</option><option>Family</option><option>Friends</option></select></label><label>How long?<select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={1}>One day</option><option value={2}>Two days</option><option value={3}>Three days</option></select></label></div><fieldset><legend>What sounds good?</legend><div>{Object.keys(interestMatchers).map((interest) => <label key={interest} className={interests.includes(interest) ? 'selected' : ''}><input type="checkbox" checked={interests.includes(interest)} onChange={() => toggleInterest(interest)} />{interest}</label>)}</div></fieldset><button type="submit">Build my trip <Sparkles size={17} /></button></form>{plan.length > 0 && <section id="your-plan" className="generated-plan" aria-live="polite"><header><span className="site-eyebrow plum">Made for a {group.toLowerCase()}</span><h2>Your Valechester itinerary</h2><p>{days} {days === 1 ? 'day' : 'days'} · {interests.join(' · ')}</p></header>{Array.from({ length: days }, (_, day) => { const dayStops = plan.slice(day * 2, day * 2 + 2); return dayStops.length > 0 && <div className="plan-day" key={day}><h3>Day {day + 1}</h3>{dayStops.map((listing, index) => <article key={listing.id}><span>{index === 0 ? 'Morning' : 'Afternoon'}</span><img src={imageLibrary[listing.image] ?? imageLibrary.hero} alt="" /><div><small>{listing.town}</small><h4>{listing.name}</h4><p>{listing.shortDescription}</p><button onClick={() => siteNavigate(`/place/${listing.id}`)}>View place <ArrowRight size={14} /></button></div><button className={`plan-save${actions.savedIds.includes(listing.id) ? ' saved' : ''}`} onClick={() => actions.toggleSaved(listing)} aria-label={`${actions.savedIds.includes(listing.id) ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={17} fill={actions.savedIds.includes(listing.id) ? 'currentColor' : 'none'} /></button></article>)}</div> })}</section>}</section></main></PublicShell>
+}
+
+function ListingPage({ listing, actions }: { listing: Listing; actions: VisitorActions }) {
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
-  return <div className="public-site"><SiteHeader /><main className="place-page"><div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div><section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section><div className="place-layout site-container"><article><p className="place-lede">{listing.shortDescription}</p><h2>Your visit</h2><p>{listing.description}</p><div className="place-highlights"><h3>Visitors frequently mention</h3><div>{listing.facilities.slice(0, 5).map((item) => <span key={item}><Star size={14} />{item}</span>)}</div><small>Common themes from destination content and visitor feedback. Demo data only.</small></div><h2>Good to know</h2><dl><div><dt>Opening times</dt><dd>{listing.openingHours}</dd></div><div><dt>Accessibility & facilities</dt><dd>{listing.facilities.join(' · ')}</dd></div><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div></dl></article><aside><span className="place-book-label">Plan your visit</span><h3>{listing.name}</h3><a className="place-book" href={listing.bookingUrl || listing.website}>Visit website <ArrowRight size={16} /></a><a href={`mailto:${listing.email}`}>{listing.email || 'Contact venue'}</a>{listing.phone && <a href={`tel:${listing.phone}`}>{listing.phone}</a>}<div><CalendarDays size={18} /><span><strong>Save for later</strong><small>Add this place to your trip</small></span></div></aside></div></main><SiteFooter /></div>
+  const [enquiring, setEnquiring] = useState(false)
+  const [sent, setSent] = useState(false)
+  const saved = actions.savedIds.includes(listing.id)
+  const submit = (event: FormEvent) => { event.preventDefault(); setSent(true) }
+  return <PublicShell savedCount={actions.savedIds.length}><main className="place-page"><div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div><section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section><div className="place-layout site-container"><article><p className="place-lede">{listing.shortDescription}</p><h2>Your visit</h2><p>{listing.description}</p><div className="place-highlights"><h3>Visitors frequently mention</h3><div>{listing.facilities.slice(0, 5).map((item) => <span key={item}><Star size={14} />{item}</span>)}</div><small>Common themes from destination content and visitor feedback. Demo data only.</small></div><h2>Good to know</h2><dl><div><dt>Opening times</dt><dd>{listing.openingHours}</dd></div><div><dt>Accessibility & facilities</dt><dd>{listing.facilities.join(' · ')}</dd></div><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div></dl></article><aside><span className="place-book-label">Plan your visit</span><h3>{listing.name}</h3>{sent ? <div className="place-enquiry-success" role="status"><Check size={22} /><strong>Enquiry recorded</strong><small>This demonstration won’t send an external message.</small><button onClick={() => { setSent(false); setEnquiring(false) }}>Done</button></div> : enquiring ? <form className="place-enquiry" onSubmit={submit}><label>Name<input required /></label><label>Email<input type="email" required /></label><label>Preferred date<input type="date" required /></label><button>Send enquiry <ArrowRight size={14} /></button><button type="button" onClick={() => setEnquiring(false)}>Cancel</button></form> : <><button className="place-book" onClick={() => setEnquiring(true)}>Check availability <ArrowRight size={16} /></button><button className="place-save-button" onClick={() => actions.toggleSaved(listing)}><Heart size={15} fill={saved ? 'currentColor' : 'none'} />{saved ? 'Saved to your trip' : 'Save for later'}</button>{listing.phone && <span className="place-contact">Call {listing.phone}</span>}<div><CalendarDays size={18} /><span><strong>Flexible demo journey</strong><small>No message or booking leaves this site</small></span></div></>}</aside></div></main></PublicShell>
+}
+
+const infoPages: Record<string, { eyebrow: string; title: string; description: string; sections: Array<[string, string]> }> = {
+  privacy: { eyebrow: 'Visitor information', title: 'Privacy', description: 'How the Visit Valechester demonstration handles visitor information.', sections: [['What we collect', 'This demo stores saved places, feature choices and account state only in your browser. Newsletter and enquiry forms demonstrate the journey but do not transmit their contents.'], ['Production approach', 'A customer deployment would use a documented privacy notice, consent controls, retention rules and approved processors configured for that destination.']] },
+  cookies: { eyebrow: 'Visitor information', title: 'Cookies', description: 'A clear view of the browser storage used by this demonstration.', sections: [['Essential storage', 'The demo uses local browser storage to remember saved places, module settings and demonstration sign-in state.'], ['Analytics and marketing', 'No advertising or marketing cookies are enabled in this reference build. A customer can configure consent-led analytics during implementation.']] },
+  accessibility: { eyebrow: 'Plan with confidence', title: 'Accessible Valechester', description: 'Practical information for planning an inclusive visit.', sections: [['Before you travel', 'Venue listings show accessibility and facility information supplied through the destination CRM. Contact individual venues when you need details for a specific visit.'], ['Using this website', 'The interface supports keyboard navigation, labelled controls, responsive text and meaningful page structure. This demo will receive a full accessibility audit before production use.']] },
+}
+
+function InfoPage({ page, savedCount }: { page: string; savedCount: number }) {
+  const content = infoPages[page]
+  if (!content) return <NotFoundPage savedCount={savedCount} />
+  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow={content.eyebrow} title={content.title} description={content.description} /><section className="info-page site-container">{content.sections.map(([title, body]) => <article key={title}><h2>{title}</h2><p>{body}</p></article>)}<div className="info-contact"><Mail size={20} /><div><strong>Need this in another format?</strong><p>Use the visitor information form and the team will help.</p></div><button onClick={() => siteNavigate('/contact?topic=accessibility')}>Contact visitor information</button></div></section></main></PublicShell>
+}
+
+const contactTopics: Record<string, string> = { membership: 'Become a member', event: 'Submit an event', 'travel-trade': 'Travel trade enquiry', 'visitor-information': 'Visitor information', accessibility: 'Accessibility request' }
+
+function ContactPage({ savedCount }: { savedCount: number }) {
+  const topic = new URLSearchParams(window.location.search).get('topic') ?? 'visitor-information'
+  const [sent, setSent] = useState(false)
+  const submit = (event: FormEvent) => { event.preventDefault(); setSent(true) }
+  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Talk to the team" title={contactTopics[topic] ?? 'Contact Visit Valechester'} description="Use this working demo form to preview the visitor or partner enquiry journey." /><section className="contact-page site-container">{sent ? <div className="contact-success" role="status"><Check size={28} /><h2>Thanks — your demo enquiry is ready.</h2><p>No external message was sent. In production, this would create a CRM enquiry and notify the right team.</p><button onClick={() => siteNavigate('/')}>Return home</button></div> : <form onSubmit={submit}><label>Enquiry type<select defaultValue={topic}>{Object.entries(contactTopics).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><div><label>Name<input required /></label><label>Email<input type="email" required /></label></div><label>Message<textarea required rows={6} placeholder="How can the Valechester team help?" /></label><button>Send enquiry <ArrowRight size={15} /></button><small>This is a product demonstration. Nothing will be sent outside the site.</small></form>}</section></main></PublicShell>
+}
+
+function NotFoundPage({ savedCount }: { savedCount: number }) {
+  return <PublicShell savedCount={savedCount}><main><section className="not-found-page"><Search size={28} /><h1>We couldn’t find that page.</h1><p>Try exploring the latest places, events and ideas instead.</p><button onClick={() => siteNavigate('/')}>Return to Valechester</button></section></main></PublicShell>
 }
 
 export function PublicSite() {
   const { data } = useCRM()
   const { features } = useFeatures()
-  const [path, setPath] = useState(window.location.pathname)
+  const [location, setLocation] = useState(() => `${window.location.pathname}${window.location.search}${window.location.hash}`)
+  const [savedIds, setSavedIds] = useState<string[]>(readSavedPlaces)
+  const [notice, setNotice] = useState('')
   useEffect(() => {
-    const listener = () => { setPath(window.location.pathname); window.scrollTo({ top: 0 }) }
+    const listener = () => { setLocation(`${window.location.pathname}${window.location.search}${window.location.hash}`); if (!window.location.hash) window.scrollTo({ top: 0 }) }
     window.addEventListener('popstate', listener)
     return () => window.removeEventListener('popstate', listener)
   }, [])
   if (!features.publicWebsite) return <main className="site-disabled"><BrandLogo /><h1>Website module is not enabled</h1><p>This destination currently uses the CRM workspace without a public website.</p><a href="/crm">Open destination workspace</a></main>
-  const listingId = path.startsWith('/place/') ? path.split('/')[2] : null
-  const listing = data.listings.find((item) => item.id === listingId && item.status === 'Published')
-  return listing ? <ListingPage listing={listing} /> : <HomePage />
+  const published = data.listings.filter((listing) => listing.status === 'Published')
+  const toggleSaved = (listing: Listing) => {
+    setSavedIds((current) => {
+      const removing = current.includes(listing.id)
+      const next = removing ? current.filter((id) => id !== listing.id) : [...current, listing.id]
+      localStorage.setItem(SAVED_KEY, JSON.stringify(next))
+      setNotice(removing ? `${listing.name} removed from saved places` : `${listing.name} saved for your trip`)
+      window.setTimeout(() => setNotice(''), 2200)
+      return next
+    })
+  }
+  const actions = { savedIds, toggleSaved }
+  const path = window.location.pathname
+  const parts = path.split('/').filter(Boolean)
+  let page: ReactNode
+  if (path === '/') page = <HomePage key={location} actions={actions} location={location} />
+  else if (path === '/events' && features.events) page = <EventsPage savedCount={savedIds.length} />
+  else if (path === '/saved') page = <SavedPage listings={published} actions={actions} />
+  else if (path === '/plan' && features.itineraries) page = <PlanPage listings={published} actions={actions} />
+  else if (path === '/contact') page = <ContactPage savedCount={savedIds.length} />
+  else if (['/privacy', '/cookies', '/accessibility'].includes(path)) page = <InfoPage page={parts[0]} savedCount={savedIds.length} />
+  else if (parts[0] === 'guide' && features.itineraries) page = <GuidePage slug={parts[1]} listings={published} actions={actions} />
+  else if (parts[0] === 'neighbourhood') page = <NeighbourhoodPage slug={parts[1]} listings={published} actions={actions} />
+  else if (parts[0] === 'place') {
+    const listing = published.find((item) => item.id === parts[1])
+    page = listing ? <ListingPage listing={listing} actions={actions} /> : <NotFoundPage savedCount={savedIds.length} />
+  } else page = <NotFoundPage savedCount={savedIds.length} />
+  return <>{page}{notice && <div className="site-toast" role="status"><Check size={16} />{notice}</div>}</>
 }
