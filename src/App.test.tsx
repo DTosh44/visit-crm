@@ -79,6 +79,33 @@ describe('Visit CRM', () => {
     for (const heading of ['Gallery', 'At a glance', 'What visitors say', 'Accessibility information', 'Facilities', 'Opening information', 'Location and contact', 'Awards and accreditations', 'Make it part of your trip']) {
       expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
     }
+    expect(screen.queryByText(/Strategic partner/i)).not.toBeInTheDocument()
+    expect(document.querySelector<HTMLElement>('.template-place-page')?.style.getPropertyValue('--template-accent')).toBe('#a86b78')
+  })
+
+  it('shows the complete Tier 1 visitor and search taxonomy without naming the tier', () => {
+    window.history.pushState({}, '', '/place/list-009')
+    renderApp()
+    expect(screen.getByRole('heading', { name: 'Visitor information' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Visitor interests' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Search filters' })).toBeInTheDocument()
+    expect(screen.getByText('Independent shopping')).toBeInTheDocument()
+    expect(screen.getByText('Wet-weather planners')).toBeInTheDocument()
+    expect(screen.queryByText(/Bronze|Tier 1/i)).not.toBeInTheDocument()
+  })
+
+  it('lets CRM users configure taxonomy allowances and review sites', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Memberships' }))
+    expect(screen.getByText('Up to 12 searchable categories')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Listings' }))
+    fireEvent.change(screen.getByPlaceholderText('Search listings...'), { target: { value: 'Wren & Quill Books' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Review sites' }))
+    expect(screen.getByRole('heading', { name: 'Review sites' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add review site' }))
+    expect(screen.getByDisplayValue('Google Business Profile')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('https://')).toBeInTheDocument()
   })
 
   it('uses the public package names and keeps a Free Listing basic and unlinked', () => {

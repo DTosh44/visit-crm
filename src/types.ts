@@ -74,6 +74,7 @@ export interface MembershipLevel {
   listingAllowance: number
   imageAllowance: number
   videoAllowance: number
+  taxonomyAllowance: number
   active: boolean
   members: number
 }
@@ -106,8 +107,10 @@ export interface Listing {
   email: string
   openingHours: string
   facilities: string[]
+  visitorTaxonomy?: string[]
   searchTags: string[]
   reviewHighlights: string[]
+  reviewSites?: Array<{ id: string; name: string; url: string }>
   goodToKnow: string[]
   lastUpdated: string
   image: string

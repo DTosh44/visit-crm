@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { initialData } from './data'
 import { supabase, useAuth } from './auth'
 import { tenant } from './tenant'
+import { visitorTaxonomyFor } from './listingTaxonomy'
 import type {
   CRMData,
   DestinationEvent,
@@ -115,11 +116,24 @@ function toPublicListing(listing: Listing) {
   }
 }
 
+function normalizeCRMData(parsed: CRMData): CRMData {
+  return {
+    ...parsed,
+    events: (parsed.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })),
+    socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics,
+    levels: (parsed.levels ?? initialData.levels).map((level) => ({ ...level, taxonomyAllowance: level.taxonomyAllowance ?? initialData.levels.find((item) => item.name === level.name)?.taxonomyAllowance ?? 6 })),
+    listings: parsed.listings.map((item) => {
+      const listing = { ...item, searchTags: item.searchTags ?? [] }
+      return { ...listing, visitorTaxonomy: item.visitorTaxonomy ?? visitorTaxonomyFor(listing), reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
+    }),
+  }
+}
+
 function readInitialData(): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? JSON.parse(stored) as CRMData : initialData
-    return { ...parsed, events: (parsed.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })), socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
+    return normalizeCRMData(parsed)
   } catch {
     return initialData
   }
@@ -148,7 +162,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
         if (active && state?.data) {
           const remoteData = state.data as CRMData
-          setData({ ...remoteData, events: (remoteData.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })), socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
+          setData(normalizeCRMData(remoteData))
         }
       } else {
         const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')

@@ -8,6 +8,7 @@ import { useFeatures } from './features'
 import { guides, imageLibrary, neighbourhoods } from './siteData'
 import { useCRM } from './store'
 import { tenant } from './tenant'
+import { visitorTaxonomyFor } from './listingTaxonomy'
 import type { DestinationEvent, EventDraft, EventFormat, Listing } from './types'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
@@ -91,14 +92,13 @@ interface VisitorActions {
 function ListingCard({ listing, savedIds, toggleSaved }: { listing: Listing } & VisitorActions) {
   const { data } = useCRM()
   const tier = data.organisations.find((item) => item.id === listing.organisationId)?.tier ?? 'Free Listing'
-  const tierClass = tier.toLowerCase().replace(/\s+/g,'-')
   const image = imageLibrary[listing.image] ?? imageLibrary.hero
   const saved = savedIds.includes(listing.id)
   return (
-    <article className={`site-card membership-${tierClass}`}>
+    <article className="site-card">
       <div className="site-card-image">
-        <button className="site-card-open" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}><img src={image} alt="" loading="lazy" decoding="async" /></button>
-        <span className="site-card-category">{categoryGroup(listing)}</span>{tier === 'Tier 4' && <span className="site-card-partner">Signature partner</span>}{tier === 'Tier 3' && <span className="site-card-partner">Featured member</span>}
+        <button className="site-card-open" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}>{tier === 'Free Listing' ? <span className="site-card-brand-image"><BrandLogo inverse /></span> : <img src={image} alt="" loading="lazy" decoding="async" />}</button>
+        <span className="site-card-category">{categoryGroup(listing)}</span>
         <button className={`site-card-save${saved ? ' saved' : ''}`} onClick={() => toggleSaved(listing)} aria-label={`${saved ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="site-card-copy">
@@ -167,12 +167,18 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
     return requested && categories.includes(requested) ? requested : 'All'
   })
   const published = useMemo(() => data.listings.filter((listing) => listing.status === 'Published'), [data.listings])
+  const searchableTagsFor = (listing: Listing) => {
+    const organisation = data.organisations.find((item) => item.id === listing.organisationId)
+    const allowance = data.levels.find((item) => item.name === organisation?.tier)?.taxonomyAllowance ?? 0
+    return listing.searchTags.slice(0, allowance)
+  }
   const results = published.filter((listing) => {
     const groupMatches = category === 'All' || categoryGroup(listing) === category
     const termGroups = searchTerm.toLowerCase().split(/\s+/).filter((term) => term && !['a','an','and','day','days','for','in','of','the','to','with'].includes(term)).map((term) => [term,...(searchAliases[term] ?? [])])
-    const haystack = `${listing.name} ${listing.category} ${listing.town} ${listing.shortDescription} ${listing.description} ${listing.facilities.join(' ')} ${listing.searchTags.join(' ')} ${listing.reviewHighlights.join(' ')} ${listing.goodToKnow.join(' ')}`.toLowerCase()
+    const searchableTags = searchableTagsFor(listing)
+    const haystack = `${listing.name} ${listing.category} ${listing.town} ${listing.shortDescription} ${listing.description} ${listing.facilities.join(' ')} ${searchableTags.join(' ')} ${listing.reviewHighlights.join(' ')} ${listing.goodToKnow.join(' ')}`.toLowerCase()
     const termMatches = !termGroups.length || termGroups.every((group) => group.some((term) => haystack.includes(term)))
-    const tagsMatch = !activeTags.length || activeTags.every((tag) => listing.searchTags.includes(tag))
+    const tagsMatch = !activeTags.length || activeTags.every((tag) => searchableTags.includes(tag))
     return groupMatches && termMatches && tagsMatch
   })
   useEffect(() => {
@@ -191,7 +197,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
         <img src={imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
         <div className="site-hero-content"><span className="site-eyebrow">Find your kind of remarkable</span><h1>A town with stories<br />in every direction.</h1><p>{tenant.strapline}</p>
-          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...item.searchTags,...item.reviewHighlights]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
+          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...item.reviewHighlights]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
@@ -373,13 +379,13 @@ interface ListingTemplateProfile {
   listingId: string
   templateName: string
   purpose: string
-  publicBadge?: string
   accent: string
   media: string
   includes: string[]
   goodForLimit: number
   imageCount: number
   videoCount: number
+  taxonomyAllowance: number
   showAtGlance: boolean
   showReviews: boolean
   showPlanningSummary: boolean
@@ -390,12 +396,12 @@ interface ListingTemplateProfile {
 }
 
 const listingTemplateProfiles: ListingTemplateProfile[] = [
-  { tier:'Tier 4', packageName:'Strategic', listingId:'list-001', templateName:'Main destination listing', purpose:'The complete best-practice page for priority partners, based on the Warwick Castle prototype functionality.', publicBadge:'Strategic partner', accent:'#6d294f', media:'10 images · 2 videos', includes:['Full media gallery and direct booking','At a glance, detailed story and complete taxonomy','Visitor reviews and verified awards','Accessibility, grouped facilities, hours and map','Related guides, itineraries, events and offers'], goodForLimit:8, imageCount:10, videoCount:2, showAtGlance:true, showReviews:true, showPlanningSummary:true, showMap:true, showAwards:true, showRelated:true, action:'book' },
-  { tier:'Tier 3', packageName:'Gold', listingId:'list-005', templateName:'Enhanced destination listing', purpose:'A rich listing with most planning functions and strong bookable content.', publicBadge:'Gold member', accent:'#f0785e', media:'5 images · 1 video', includes:['Five-image gallery, video and direct booking','At a glance and detailed story','Visitor feedback themes','Accessibility, facilities, hours and map','Related visitor inspiration'], goodForLimit:7, imageCount:5, videoCount:1, showAtGlance:true, showReviews:true, showPlanningSummary:true, showMap:true, showAwards:false, showRelated:true, action:'book' },
-  { tier:'Tier 2', packageName:'Silver', listingId:'list-007', templateName:'Bookable member listing', purpose:'A practical, attractive listing with direct conversion and the details needed to plan.', accent:'#7a9a83', media:'3 images', includes:['Three-image gallery and direct booking','Visitor introduction and selected taxonomy','Accessibility and grouped facilities','Opening information, contact and map','Save and website actions'], goodForLimit:6, imageCount:3, videoCount:0, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:true, showAwards:false, showRelated:false, action:'book' },
-  { tier:'Tier 1', packageName:'Bronze', listingId:'list-009', templateName:'Core member listing', purpose:'A clear one-image page with strong visitor essentials and an official website journey.', accent:'#a86b78', media:'1 image', includes:['One hero image','Visitor introduction and priority taxonomy','Accessibility and grouped facilities','Opening, contact and directions','Official website link; no direct booking'], goodForLimit:4, imageCount:1, videoCount:0, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:false, showAwards:false, showRelated:false, action:'website' },
-  { tier:'Supplier', packageName:'Supplier', listingId:'list-013', templateName:'Visitor economy supplier', purpose:'A business-to-business page focused on services, coverage and qualified enquiries.', accent:'#247a77', media:'Up to 8 images · 1 video', includes:['Service-led media and introduction','Customer and service taxonomy','Credibility themes from feedback','Coverage, access and operating details','Quote enquiry and website actions'], goodForLimit:5, imageCount:5, videoCount:1, showAtGlance:false, showReviews:true, showPlanningSummary:false, showMap:true, showAwards:false, showRelated:false, action:'quote' },
-  { tier:'Free Listing', packageName:'Free Listing', listingId:'list-011', templateName:'Basic directory listing', purpose:'Essential business information with Visit Valechester branding in place of a business image.', accent:'#7b8798', media:'Visit Valechester branded image', includes:['Business name, category and location','Short description and opening information','Essential facilities','Visit Valechester logo as the listing image','No business website or booking link'], goodForLimit:0, imageCount:0, videoCount:0, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:false, showAwards:false, showRelated:false, action:'website' },
+  { tier:'Tier 4', packageName:'Strategic', listingId:'list-001', templateName:'Main destination listing', purpose:'The complete best-practice page for priority partners, based on the Warwick Castle prototype functionality.', accent:'#a86b78', media:'10 images · 2 videos', includes:['Up to 12 searchable visitor categories','Full media gallery and direct booking','At a glance, detailed story and visitor reviews','Accessibility, grouped facilities, hours and map','Awards, guides, itineraries, events and offers'], goodForLimit:8, imageCount:10, videoCount:2, taxonomyAllowance:12, showAtGlance:true, showReviews:true, showPlanningSummary:true, showMap:true, showAwards:true, showRelated:true, action:'book' },
+  { tier:'Tier 3', packageName:'Gold', listingId:'list-005', templateName:'Enhanced destination listing', purpose:'A rich listing with most planning functions and strong bookable content.', accent:'#a86b78', media:'5 images · 1 video', includes:['Up to 10 searchable visitor categories','Five-image gallery, video and direct booking','At a glance and visitor feedback themes','Accessibility, facilities, hours and map','Related visitor inspiration'], goodForLimit:7, imageCount:5, videoCount:1, taxonomyAllowance:10, showAtGlance:true, showReviews:true, showPlanningSummary:true, showMap:true, showAwards:false, showRelated:true, action:'book' },
+  { tier:'Tier 2', packageName:'Silver', listingId:'list-007', templateName:'Bookable member listing', purpose:'A practical, attractive listing with direct conversion and the details needed to plan.', accent:'#a86b78', media:'3 images', includes:['Up to 8 searchable visitor categories','Three-image gallery and direct booking','Visitor introduction and accessibility','Opening information, contact and map','Save and website actions'], goodForLimit:6, imageCount:3, videoCount:0, taxonomyAllowance:8, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:true, showAwards:false, showRelated:false, action:'book' },
+  { tier:'Tier 1', packageName:'Bronze', listingId:'list-009', templateName:'Core member listing', purpose:'A clear one-image page with strong visitor essentials and an official website journey.', accent:'#a86b78', media:'1 image', includes:['Up to 6 searchable visitor categories','One hero image and visitor introduction','Accessibility and grouped facilities','Opening, contact and directions','Official website link; no direct booking'], goodForLimit:6, imageCount:1, videoCount:0, taxonomyAllowance:6, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:false, showAwards:false, showRelated:false, action:'website' },
+  { tier:'Supplier', packageName:'Supplier', listingId:'list-013', templateName:'Visitor economy supplier', purpose:'A business-to-business page focused on services, coverage and qualified enquiries.', accent:'#a86b78', media:'Up to 8 images · 1 video', includes:['Up to 8 searchable service categories','Service-led media and introduction','Credibility themes from feedback','Coverage, access and operating details','Quote enquiry and website actions'], goodForLimit:5, imageCount:5, videoCount:1, taxonomyAllowance:8, showAtGlance:false, showReviews:true, showPlanningSummary:false, showMap:true, showAwards:false, showRelated:false, action:'quote' },
+  { tier:'Free Listing', packageName:'Free Listing', listingId:'list-011', templateName:'Basic directory listing', purpose:'Essential business information with Visit Valechester branding in place of a business image.', accent:'#a86b78', media:'Visit Valechester branded image', includes:['Up to 3 searchable visitor categories','Business name, category and location','Short description and opening information','Essential facilities and Visit Valechester image','No business website or booking link'], goodForLimit:0, imageCount:0, videoCount:0, taxonomyAllowance:3, showAtGlance:false, showReviews:false, showPlanningSummary:false, showMap:false, showAwards:false, showRelated:false, action:'website' },
 ]
 
 function ListingTemplatesPage({ listings, actions }: { listings: Listing[]; actions: VisitorActions }) {
@@ -415,8 +421,8 @@ function ListingPage({ listing, actions }: { listing: Listing; actions: VisitorA
   const { data } = useCRM()
   const organisation = data.organisations.find((item) => item.id === listing.organisationId)
   const tier = organisation?.tier ?? 'Free Listing'
-  const profile = listingTemplateProfiles.find((item)=>item.tier===tier)
-  return profile ? <TemplateListingPage listing={listing} actions={actions} tier={tier} profile={profile}/> : <LegacyListingPage listing={listing} actions={actions} tier={tier}/>
+  const profile = listingTemplateProfiles.find((item)=>item.tier===tier) ?? listingTemplateProfiles.find((item)=>item.tier==='Tier 1')!
+  return <TemplateListingPage listing={listing} actions={actions} tier={tier} profile={profile}/>
 }
 
 function TemplateListingPage({ listing, actions, tier, profile }: { listing: Listing; actions: VisitorActions; tier: string; profile: ListingTemplateProfile }) {
@@ -430,7 +436,7 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
       <div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div>
       <section className="free-listing-hero site-container">
         <div className="free-listing-brand-image" role="img" aria-label="Visit Valechester branded listing image"><BrandLogo inverse /></div>
-        <div className="free-listing-heading"><span className="site-eyebrow plum">{listing.category}</span><span className="free-listing-badge">Free listing</span><h1>{listing.name}</h1><p><MapPin size={16}/>{listing.town}</p></div>
+        <div className="free-listing-heading"><span className="site-eyebrow plum">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16}/>{listing.town}</p></div>
       </section>
       <section className="free-listing-details site-container">
         <article><span className="site-eyebrow plum">About</span><h2>About {listing.name}</h2><p className="place-lede">{listing.shortDescription}</p><p>{listing.description}</p></article>
@@ -448,16 +454,17 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
   return <PublicShell savedCount={actions.savedIds.length}>
     <main className={`place-page template-place-page membership-${tier.toLowerCase().replace(/\s+/g,'-')}`} style={{'--template-accent':profile.accent} as CSSProperties}>
       <div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div>
-      <section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span>{profile.publicBadge&&<span className="place-partner-badge">{profile.publicBadge}</span>}<h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section>
+      <section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section>
       {profile.showPlanningSummary&&<div className="place-planning-summary"><div className="site-container"><span><strong>Best for</strong><small>{listing.searchTags.slice(0,2).join(' · ')}</small></span><span><strong>Allow</strong><small>{tier==='Tier 4'?'Half a day or more':'Around two hours'}</small></span><span><strong>Plan ahead</strong><small>{listing.goodToKnow[0]}</small></span></div></div>}
       {profile.imageCount>1&&<section className="member-media site-container"><header><div><span className="site-eyebrow plum">See the experience</span><h2>Gallery</h2></div><small>{profile.imageCount} images{profile.videoCount?` · ${profile.videoCount} ${profile.videoCount===1?'video':'videos'}`:''}</small></header><div className={`member-media-grid media-count-${gallery.length}`}>{gallery.map((src,index)=><img key={src} src={src} alt={`${listing.name} gallery view ${index+1}`}/>)}</div>{profile.videoCount>0&&<button className="member-video"><PlayCircle size={22}/><span><strong>Watch {listing.name}</strong><small>{profile.videoCount} video feature{profile.videoCount===1?'':'s'} available</small></span><ArrowRight size={16}/></button>}</section>}
       {profile.showAtGlance&&<section className="listing-at-glance"><div className="site-container"><header><span className="site-eyebrow plum">Visitor essentials</span><h2>At a glance</h2></header><dl><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div><div><dt>Experience</dt><dd>{listing.category}</dd></div><div><dt>Booking</dt><dd>{listing.bookingUrl?'Online booking available':'Check directly before visiting'}</dd></div><div><dt>Opening information</dt><dd>{listing.openingHours}</dd></div></dl></div></section>}
       <div className="place-layout site-container">
         <article>
           <p className="place-lede">{listing.shortDescription}</p>
-          <div className="place-good-for"><h2>{profile.action==='quote'?'Services and strengths':'Good for'}</h2><div>{listing.searchTags.slice(0,profile.goodForLimit).map((item)=><span key={item}><Check size={13}/>{item}</span>)}</div></div>
+          {profile.tier!=='Tier 1'&&<div className="place-good-for"><h2>{profile.action==='quote'?'Services and strengths':'Good for'}</h2><div>{listing.searchTags.slice(0,profile.goodForLimit).map((item)=><span key={item}><Check size={13}/>{item}</span>)}</div></div>}
           <section className="listing-feature-section"><span className="site-eyebrow plum">{profile.action==='quote'?'What we provide':'The story'}</span><h2>{sectionTitle}</h2><p>{listing.description}</p><p>Use the practical information below to decide whether it suits your plans, then check current availability and any date-specific details directly with the business.</p></section>
-          {profile.showReviews&&<section className="listing-feature-section listing-reviews"><span className="site-eyebrow plum">Visitor feedback</span><h2>{profile.action==='quote'?'What clients value':'What visitors say'}</h2><p>Recent feedback themes help people understand what stands out before they visit.</p><div>{listing.reviewHighlights.map((item)=><blockquote key={item}><Star size={16}/><strong>{item}</strong><small>Recurring feedback theme</small></blockquote>)}</div><small className="review-source">A live rating or review widget appears here when an authorised source is connected.</small></section>}
+          {profile.tier==='Tier 1'&&<section className="listing-feature-section listing-taxonomy"><span className="site-eyebrow plum">Plan the right visit</span><h2>Visitor information</h2><p>These details help visitors find experiences that suit their interests and practical needs.</p><div><section><h3>Visitor interests</h3><div>{visitorTaxonomyFor(listing).map((item)=><span key={item}><Check size={13}/>{item}</span>)}</div><h3 className="taxonomy-subheading">Search filters</h3><div>{listing.searchTags.slice(0,profile.taxonomyAllowance).map((item)=><span key={item}><Search size={13}/>{item}</span>)}</div></section><section><h3>Good to know</h3><ul>{listing.goodToKnow.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section></div></section>}
+          {profile.showReviews&&<section className="listing-feature-section listing-reviews"><span className="site-eyebrow plum">Visitor feedback</span><h2>{profile.action==='quote'?'What clients value':'What visitors say'}</h2><p>Recent feedback themes help people understand what stands out before they visit.</p><div>{listing.reviewHighlights.map((item)=><blockquote key={item}><Star size={16}/><strong>{item}</strong><small>Recurring feedback theme</small></blockquote>)}</div>{listing.reviewSites?.length?<nav aria-label="Review sites">{listing.reviewSites.filter((site)=>site.url).map((site)=><a key={site.id} href={site.url} target="_blank" rel="noreferrer">Reviews on {site.name} <ArrowRight size={13}/></a>)}</nav>:<small className="review-source">A live rating or review widget appears here when an authorised source is connected.</small>}</section>}
           <section className="listing-feature-section listing-access"><span className="site-eyebrow plum">Plan with confidence</span><h2>Accessibility information</h2><p>Accessibility information is available on every paid member listing. Contact the business if you need details for a specific visit.</p><div><span><Accessibility size={20}/><strong>{accessFacilities.length?accessFacilities.join(' · '):'Ask the venue about step-free routes and individual access requirements'}</strong></span><a href={`mailto:${listing.email}`}>Contact about accessibility <ArrowRight size={14}/></a></div></section>
           <section className="listing-feature-section listing-facilities"><span className="site-eyebrow plum">Useful details</span><h2>Facilities</h2><div><section><h3>On site</h3><ul>{generalFacilities.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section><section><h3>Access and support</h3><ul>{(accessFacilities.length?accessFacilities:['Contact the venue for access details']).map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section><section><h3>Before you travel</h3><ul>{listing.goodToKnow.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section></div></section>
           <section className="listing-feature-section listing-opening"><span className="site-eyebrow plum">When to visit</span><h2>Opening information</h2><div><Clock3 size={22}/><span><strong>{listing.openingHours}</strong><small>Check the official website for seasonal changes and exceptions.</small></span></div></section>

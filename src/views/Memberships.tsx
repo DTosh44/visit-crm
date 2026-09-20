@@ -11,7 +11,7 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
   const { data, addLevel } = useCRM()
   const [tab, setTab] = useState<MembershipTab>('Overview')
   const [addOpen, setAddOpen] = useState(false)
-  const [newLevel, setNewLevel] = useState({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0 })
+  const [newLevel, setNewLevel] = useState({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0, taxonomyAllowance: 6 })
   const activeTotal = data.levels.reduce((sum, level) => sum + level.members, 0)
   const paidTotal = data.levels.filter((level)=>level.price>0).reduce((sum,level)=>sum+level.members,0)
   const freeTotal = data.levels.find((level)=>level.name==='Free Listing')?.members ?? 0
@@ -22,7 +22,7 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
     if (!newLevel.name.trim()) return
     addLevel({ ...newLevel, benefits: [], active: true })
     setAddOpen(false)
-    setNewLevel({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0 })
+    setNewLevel({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0, taxonomyAllowance: 6 })
   }
 
   return (
@@ -46,7 +46,7 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
             <p>{level.description}</p>
             <div className="level-price"><strong>{level.price ? currency.format(level.price) : '£0'}</strong><span>ex VAT / year</span></div>
             <div className="level-usage"><div><span>Members</span><strong>{level.members}</strong></div><Progress value={Math.min(100, level.members * 2)} colour={level.colour} /></div>
-            <ul><li><Check size={14} />{level.listingAllowance} website {level.listingAllowance === 1 ? 'listing' : 'listings'}</li><li><Check size={14} />Up to {level.imageAllowance} images</li><li><Check size={14} />{level.benefits.length} tracked benefits</li></ul>
+            <ul><li><Check size={14} />{level.listingAllowance} website {level.listingAllowance === 1 ? 'listing' : 'listings'}</li><li><Check size={14} />Up to {level.imageAllowance} images</li><li><Check size={14} />Up to {level.taxonomyAllowance} searchable categories</li><li><Check size={14} />{level.benefits.length} tracked benefits</li></ul>
             <footer><Button variant="secondary" size="sm">Edit level</Button><button aria-label={`Open ${level.name}`}><ChevronRight size={18} /></button></footer>
           </article>)}
         </section>
@@ -75,7 +75,7 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
         <div className="form-stack">
           <div className="form-grid two"><Field label="Level name"><input autoFocus value={newLevel.name} onChange={(event) => setNewLevel({ ...newLevel, name: event.target.value })} placeholder="e.g. Partner" /></Field><Field label="Annual price (ex VAT)"><input type="number" min="0" value={newLevel.price} onChange={(event) => setNewLevel({ ...newLevel, price: Number(event.target.value) })} /></Field></div>
           <Field label="Description"><textarea rows={3} value={newLevel.description} onChange={(event) => setNewLevel({ ...newLevel, description: event.target.value })} placeholder="Who this level is for and what it offers" /></Field>
-          <div className="form-grid three"><Field label="Listings"><input type="number" min="0" value={newLevel.listingAllowance} onChange={(event) => setNewLevel({ ...newLevel, listingAllowance: Number(event.target.value) })} /></Field><Field label="Images"><input type="number" min="0" value={newLevel.imageAllowance} onChange={(event) => setNewLevel({ ...newLevel, imageAllowance: Number(event.target.value) })} /></Field><Field label="Videos"><input type="number" min="0" value={newLevel.videoAllowance} onChange={(event) => setNewLevel({ ...newLevel, videoAllowance: Number(event.target.value) })} /></Field></div>
+          <div className="form-grid two"><Field label="Listings"><input type="number" min="0" value={newLevel.listingAllowance} onChange={(event) => setNewLevel({ ...newLevel, listingAllowance: Number(event.target.value) })} /></Field><Field label="Images"><input type="number" min="0" value={newLevel.imageAllowance} onChange={(event) => setNewLevel({ ...newLevel, imageAllowance: Number(event.target.value) })} /></Field><Field label="Videos"><input type="number" min="0" value={newLevel.videoAllowance} onChange={(event) => setNewLevel({ ...newLevel, videoAllowance: Number(event.target.value) })} /></Field><Field label="Search categories"><input type="number" min="0" value={newLevel.taxonomyAllowance} onChange={(event) => setNewLevel({ ...newLevel, taxonomyAllowance: Number(event.target.value) })} /></Field></div>
           <Field label="Level colour"><input type="color" value={newLevel.colour} onChange={(event) => setNewLevel({ ...newLevel, colour: event.target.value })} /></Field>
           <div className="modal-actions"><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={submitLevel}>Create level</Button></div>
         </div>
