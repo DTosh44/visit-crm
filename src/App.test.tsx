@@ -66,8 +66,8 @@ describe('Visit CRM', () => {
     window.history.pushState({}, '', '/listing-templates')
     renderApp()
     expect(screen.getByRole('heading', { name: 'Member listing templates.' })).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /^Review / })).toHaveLength(6)
-    fireEvent.click(screen.getByRole('button', { name: 'Review Vale Executive Travel' }))
+    expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(6)
+    fireEvent.click(screen.getByRole('button', { name: 'View Vale Executive Travel' }))
     expect(screen.getByRole('heading', { name: 'Services for your business' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Request a quote/ })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Visit website/ })).toBeInTheDocument()
@@ -97,10 +97,11 @@ describe('Visit CRM', () => {
     expect(screen.queryByRole('link', { name: /website|book/i })).not.toBeInTheDocument()
   })
 
-  it('moves safely from a standard listing to a template listing', async () => {
+  it('applies the approved tier template to every published member listing', async () => {
     window.history.pushState({}, '', '/place/list-002')
     renderApp()
     expect(screen.getByRole('heading', { name: 'The Keep Lodges', level: 1 })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Gallery' })).toBeInTheDocument()
     window.history.pushState({}, '', '/place/list-001')
     window.dispatchEvent(new PopStateEvent('popstate'))
     expect(await screen.findByRole('heading', { name: 'Valechester Castle', level: 1 })).toBeInTheDocument()
