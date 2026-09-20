@@ -1,6 +1,6 @@
 import {
-  BarChart3, Bell, Building2, ChevronDown, CircleDollarSign, ClipboardCheck, FilePenLine,
-  FileSignature, Gauge, Handshake, HelpCircle, ListTodo, Menu, Plus, Search, Settings,
+  Bell, Building2, ChevronDown, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
+  FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings,
   UsersRound, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -8,21 +8,25 @@ import { useCRM } from '../store'
 import type { Organisation, ViewKey } from '../types'
 import { classNames } from '../utils'
 import { Avatar } from './UI'
+import { BrandLogo } from './BrandLogo'
+import { tenant, type FeatureKey } from '../tenant'
+import { canAccessView, useAuth } from '../auth'
+import { useFeatures } from '../features'
 
-const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: string; icon: typeof Gauge }> }> = [
+const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: string; icon: typeof Gauge; feature?: FeatureKey }> }> = [
   { label: 'Workspace', items: [
     { key: 'dashboard', label: 'Dashboard', icon: Gauge },
-    { key: 'organisations', label: 'Organisations', icon: Building2 },
-    { key: 'pipeline', label: 'Sales pipeline', icon: Handshake },
-    { key: 'tasks', label: 'Tasks', icon: ListTodo },
+    { key: 'organisations', label: 'Organisations', icon: Building2, feature: 'organisations' },
+    { key: 'pipeline', label: 'Sales pipeline', icon: Handshake, feature: 'salesPipeline' },
+    { key: 'tasks', label: 'Tasks', icon: ListTodo, feature: 'tasks' },
   ] },
   { label: 'Membership', items: [
-    { key: 'memberships', label: 'Memberships', icon: UsersRound },
-    { key: 'agreements', label: 'Agreements', icon: FileSignature },
-    { key: 'billing', label: 'Billing', icon: CircleDollarSign },
+    { key: 'memberships', label: 'Memberships', icon: UsersRound, feature: 'memberships' },
+    { key: 'agreements', label: 'Agreements', icon: FileSignature, feature: 'agreements' },
+    { key: 'billing', label: 'Billing', icon: CircleDollarSign, feature: 'billing' },
   ] },
   { label: 'Website', items: [
-    { key: 'listings', label: 'Listings', icon: FilePenLine },
+    { key: 'listings', label: 'Listings', icon: FilePenLine, feature: 'listings' },
   ] },
   { label: 'Manage', items: [
     { key: 'settings', label: 'Settings', icon: Settings },
@@ -52,6 +56,8 @@ export function Layout({
   children: ReactNode
 }) {
   const { data } = useCRM()
+  const { user, signOut } = useAuth()
+  const { features } = useFeatures()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
@@ -92,14 +98,13 @@ export function Layout({
     <div className="app-shell">
       <aside className={classNames('sidebar', sidebarOpen && 'sidebar-open')}>
         <div className="brand">
-          <span className="brand-mark"><BarChart3 size={20} /></span>
-          <div><strong>Visit</strong><span>CRM</span></div>
+          <BrandLogo inverse />
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
 
         <button className="workspace-switcher">
-          <span className="workspace-logo">SE</span>
-          <span><small>Destination</small><strong>Shakespeare’s England</strong></span>
+          <span className="workspace-logo">VV</span>
+          <span><small>Destination</small><strong>{tenant.name}</strong></span>
           <ChevronDown size={15} />
         </button>
 
@@ -107,7 +112,7 @@ export function Layout({
           {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <span className="nav-label">{group.label}</span>
-              {group.items.map(({ key, label, icon: Icon }) => (
+              {group.items.filter((item) => (!item.feature || features[item.feature]) && canAccessView(user?.role, item.key)).map(({ key, label, icon: Icon }) => (
                 <button key={key} className={classNames('nav-item', view === key && 'active')} onClick={() => navigate(key)}>
                   <Icon size={18} strokeWidth={1.9} />
                   <span>{label}</span>
@@ -120,11 +125,12 @@ export function Layout({
         </nav>
 
         <div className="sidebar-footer">
+          <a className="view-site-link" href="/" target="_blank"><ExternalLink size={16} /><span>View visitor website</span></a>
           <button><HelpCircle size={17} /><span>Help & feedback</span></button>
           <div className="sidebar-user">
-            <Avatar name="Darren Tosh" size="sm" colour="#e2655f" />
-            <span><strong>Darren Tosh</strong><small>Administrator</small></span>
-            <ChevronDown size={14} />
+            <Avatar name={user?.name ?? ''} size="sm" colour={user?.colour} />
+            <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
+            <button onClick={() => void signOut()} aria-label="Sign out" title="Sign out"><LogOut size={14} /></button>
           </div>
         </div>
       </aside>
@@ -135,7 +141,7 @@ export function Layout({
         <header className="topbar">
           <div className="topbar-left">
             <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open navigation"><Menu size={21} /></button>
-            <span className="breadcrumb"><span>Visit CRM</span><i>/</i><strong>{pageNames[view]}</strong></span>
+            <span className="breadcrumb"><span>{tenant.name} CRM</span><i>/</i><strong>{pageNames[view]}</strong></span>
           </div>
           <div className="topbar-right">
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
@@ -147,9 +153,9 @@ export function Layout({
               {quickOpen && (
                 <div className="quick-menu">
                   <span>Quick create</span>
-                  <button onClick={() => { setQuickOpen(false); onAddOrganisation() }}><Building2 size={17} /><div><strong>Organisation</strong><small>Add a member or prospect</small></div></button>
-                  <button onClick={() => { setQuickOpen(false); onAddTask() }}><ClipboardCheck size={17} /><div><strong>Task</strong><small>Create a follow-up</small></div></button>
-                  <button onClick={() => { setQuickOpen(false); onAddInvoice() }}><CircleDollarSign size={17} /><div><strong>Invoice</strong><small>Raise a new invoice</small></div></button>
+                  {canAccessView(user?.role, 'organisations') && <button onClick={() => { setQuickOpen(false); onAddOrganisation() }}><Building2 size={17} /><div><strong>Organisation</strong><small>Add a member or prospect</small></div></button>}
+                  {canAccessView(user?.role, 'tasks') && <button onClick={() => { setQuickOpen(false); onAddTask() }}><ClipboardCheck size={17} /><div><strong>Task</strong><small>Create a follow-up</small></div></button>}
+                  {canAccessView(user?.role, 'billing') && <button onClick={() => { setQuickOpen(false); onAddInvoice() }}><CircleDollarSign size={17} /><div><strong>Invoice</strong><small>Raise a new invoice</small></div></button>}
                 </div>
               )}
             </div>

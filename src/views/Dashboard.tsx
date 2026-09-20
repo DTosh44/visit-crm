@@ -1,12 +1,15 @@
 import {
-  ArrowRight, Building2, CalendarClock, Check, CircleAlert, CircleDollarSign,
-  FileCheck2, FilePenLine, Mail, MoreHorizontal, PoundSterling, Sparkles, TrendingUp, UserPlus,
+  ArrowRight, BarChart3, Building2, CalendarClock, Check, CircleAlert, CircleDollarSign,
+  Eye, FileCheck2, FilePenLine, Mail, MoreHorizontal, PlayCircle, PoundSterling, Sparkles,
+  TrendingUp, UserPlus, UsersRound,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { useCRM } from '../store'
-import type { Organisation, ViewKey } from '../types'
+import type { Organisation, SocialMetric, ViewKey } from '../types'
 import { currency, dateLabel, formatDate, timeAgo } from '../utils'
 import { Avatar, Badge, Button, Progress, StatDelta } from '../components/UI'
+import { useAuth } from '../auth'
+import { useFeatures } from '../features'
 
 const activityIcons = {
   note: UserPlus,
@@ -17,14 +20,32 @@ const activityIcons = {
   task: Check,
 }
 
+const socialMetricPresentation: Record<SocialMetric['id'], { icon: typeof UsersRound; className: string }> = {
+  followers: { icon: UsersRound, className: 'followers' },
+  reach: { icon: Eye, className: 'reach' },
+  videoViews: { icon: PlayCircle, className: 'video' },
+  engagements: { icon: BarChart3, className: 'engage' },
+}
+
 export function Dashboard({ navigate, openOrganisation }: { navigate: (view: ViewKey) => void; openOrganisation: (org: Organisation) => void }) {
   const { data, toggleTask } = useCRM()
+  const { user } = useAuth()
+  const { features } = useFeatures()
   const openTasks = data.tasks.filter((task) => !task.completed)
   const overdueInvoices = data.invoices.filter((invoice) => invoice.status === 'Overdue')
   const unpaidTotal = data.invoices.filter((invoice) => invoice.status === 'Sent' || invoice.status === 'Overdue').reduce((total, invoice) => total + invoice.total, 0)
   const renewals = data.organisations.filter((org) => org.status === 'Renewing' || org.renewalDate.startsWith('2026-09') || org.renewalDate.startsWith('2026-10')).slice(0, 4)
   const membershipValue = data.organisations.filter((org) => org.status === 'Active' || org.status === 'Renewing').reduce((total, org) => total + org.annualValue, 0)
-  const [firstName] = 'Darren Tosh'.split(' ')
+  const [firstName] = (user?.name ?? 'there').split(' ')
+  const tierColours: Record<string, string> = { 'Tier 1': '#a86b78', 'Tier 2': '#7a9a83', 'Tier 3': '#f0785e', 'Tier 4': '#6d294f' }
+  const tiers = ['Tier 1','Tier 2','Tier 3','Tier 4'].map((name) => {
+    const level = data.levels.find((item) => item.name === name)
+    return { name, members: level?.members ?? 0, colour: tierColours[name] }
+  })
+  const tierTotal = tiers.reduce((sum, tier) => sum + tier.members, 0)
+  const socialMetrics = data.socialMetrics ?? []
+  const socialSource = socialMetrics[0]?.source ?? 'Connected social accounts'
+  const socialPeriod = socialMetrics[0]?.period ?? 'No reporting period available'
 
   const pipelineValue = useMemo(() => data.opportunities.filter((opp) => opp.stage !== 'Won').reduce((total, opp) => total + opp.value, 0), [data.opportunities])
 
@@ -34,7 +55,7 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
         <div>
           <span className="eyebrow">Sunday, 20 September</span>
           <h1>Good morning, {firstName}</h1>
-          <p>Here’s what needs your attention across Shakespeare’s England.</p>
+          <p>Here’s what needs your attention across Visit Valechester.</p>
         </div>
         <Button icon={Sparkles} variant="secondary" onClick={() => navigate('tasks')}>Plan my day</Button>
       </section>
@@ -49,7 +70,7 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
       <section className="stat-grid">
         <article className="stat-card">
           <div className="stat-card-top"><span className="stat-icon purple"><Building2 size={19} /></span><button aria-label="More options"><MoreHorizontal size={18} /></button></div>
-          <p>Active members</p><h2>99</h2><StatDelta value="+4.2%" label="vs last year" />
+          <p>Active members</p><h2>{tierTotal}</h2><StatDelta value="+4.2%" label="vs last year" />
         </article>
         <article className="stat-card">
           <div className="stat-card-top"><span className="stat-icon green"><CircleDollarSign size={19} /></span><button aria-label="More options"><MoreHorizontal size={18} /></button></div>
@@ -64,6 +85,26 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
           <p>Outstanding</p><h2>{currency.format(unpaidTotal)}</h2><StatDelta value={`${overdueInvoices.length} overdue`} label="need attention" positive={false} />
         </article>
       </section>
+
+      {(features.memberships || features.socialInsights) && <section className={`dashboard-insights-grid${features.memberships && features.socialInsights ? '' : ' single'}`}>
+        {features.memberships && <article className="panel tier-overview">
+          <header className="panel-header"><div><h3>Members by tier</h3><p>{tierTotal} paying members across four configurable levels</p></div><button className="text-button" onClick={() => navigate('memberships')}>Manage tiers <ArrowRight size={14} /></button></header>
+          <div className="tier-stack" aria-label="Membership tier proportions">{tiers.map((tier) => <span key={tier.name} style={{ width: `${tierTotal ? (tier.members / tierTotal) * 100 : 0}%`, background: tier.colour }} title={`${tier.name}: ${tier.members}`} />)}</div>
+          <div className="tier-counts">{tiers.map((tier) => <button key={tier.name} onClick={() => navigate('memberships')}><i style={{ background: tier.colour }} /><span><small>{tier.name}</small><strong>{tier.members}</strong><em>members</em></span></button>)}</div>
+        </article>}
+
+        {features.socialInsights && <article className="panel social-overview">
+          <header className="panel-header"><div><h3>Social performance</h3><p>{socialSource} figures used as demo data</p></div><span className="data-source-badge"><i />Imported</span></header>
+          <div className="social-metrics">
+            {socialMetrics.map((metric) => {
+              const presentation = socialMetricPresentation[metric.id]
+              const Icon = presentation.icon
+              return <div key={metric.id}><span className={`social-metric-icon ${presentation.className}`}><Icon size={17} /></span><p><small>{metric.label}</small><strong>{metric.displayValue}</strong><em>{metric.context}</em></p></div>
+            })}
+          </div>
+          <footer className="social-footer"><span>Reporting period: {socialPeriod}</span><button onClick={() => navigate('settings')}>Manage data sources <ArrowRight size={13} /></button></footer>
+        </article>}
+      </section>}
 
       <section className="dashboard-grid dashboard-grid-main">
         <article className="panel revenue-panel">

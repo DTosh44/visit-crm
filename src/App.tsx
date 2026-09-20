@@ -14,6 +14,10 @@ import { Organisations } from './views/Organisations'
 import { Pipeline } from './views/Pipeline'
 import { Settings } from './views/Settings'
 import { Tasks } from './views/Tasks'
+import { useAuth } from './auth'
+import { LoginPage } from './LoginPage'
+import { PublicSite } from './PublicSite'
+import { BrandLogo } from './components/BrandLogo'
 
 const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','billing','agreements','tasks','settings']
 
@@ -22,7 +26,7 @@ function initialView(): ViewKey {
   return views.includes(hash) ? hash : 'dashboard'
 }
 
-export default function App() {
+function CRMApp() {
   const { data } = useCRM()
   const [view, setViewState] = useState<ViewKey>(initialView)
   const [selectedOrganisationId, setSelectedOrganisationId] = useState<string | null>(null)
@@ -77,4 +81,14 @@ export default function App() {
       {modal === 'task' && <AddTaskModal onClose={() => setModal(null)} />}
     </Layout>
   )
+}
+
+export default function App() {
+  const { user, loading } = useAuth()
+  const isCRM = window.location.pathname.startsWith('/crm')
+
+  if (!isCRM) return <PublicSite />
+  if (loading) return <div className="auth-loading"><BrandLogo /><span>Opening your workspace…</span></div>
+  if (!user) return <LoginPage />
+  return <CRMApp />
 }

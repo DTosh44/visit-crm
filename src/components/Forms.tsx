@@ -7,7 +7,7 @@ import { Button, Field, Modal } from './UI'
 
 export function AddOrganisationModal({ onClose, onCreated }: { onClose: () => void; onCreated: (organisation: Organisation) => void }) {
   const { data, addOrganisation } = useCRM()
-  const [draft, setDraft] = useState<OrganisationDraft>({ name: '', type: 'Attraction', town: 'Stratford-upon-Avon', contactName: '', contactEmail: '', tier: 'Bronze', status: 'Prospect', nextAction: 'Arrange introductory call' })
+  const [draft, setDraft] = useState<OrganisationDraft>({ name: '', type: 'Attraction', town: 'Valechester', contactName: '', contactEmail: '', tier: 'Tier 1', status: 'Prospect', nextAction: 'Arrange introductory call' })
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!draft.name.trim()) return

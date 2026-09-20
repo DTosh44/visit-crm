@@ -175,6 +175,17 @@ export interface Activity {
   user: string
 }
 
+export interface SocialMetric {
+  id: 'followers' | 'reach' | 'videoViews' | 'engagements'
+  label: string
+  value: number
+  displayValue: string
+  context: string
+  source: string
+  period: string
+  updatedAt: string
+}
+
 export interface CRMData {
   organisations: Organisation[]
   contacts: Contact[]
@@ -187,6 +198,7 @@ export interface CRMData {
   tasks: CRMTask[]
   opportunities: Opportunity[]
   activities: Activity[]
+  socialMetrics: SocialMetric[]
 }
 
 export interface OrganisationDraft {

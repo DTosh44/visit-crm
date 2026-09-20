@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { demoData } from './data'
+import { supabase, useAuth } from './auth'
+import { tenant } from './tenant'
 import type {
   CRMData,
   InvoiceDraft,
@@ -12,7 +14,7 @@ import type {
   TaskDraft,
 } from './types'
 
-const STORAGE_KEY = 'visit-crm-demo-v1'
+const STORAGE_KEY = 'visit-valechester-crm-v1'
 
 interface CRMContextValue {
   data: CRMData
@@ -34,10 +36,83 @@ interface CRMContextValue {
 
 const CRMContext = createContext<CRMContextValue | null>(null)
 
+interface PublicListingRow {
+  id: string
+  organisation_id: string
+  name: string
+  category: string
+  town: string
+  status: Listing['status']
+  completeness: number
+  views: number
+  enquiries: number
+  short_description: string
+  description: string
+  website: string
+  booking_url: string
+  phone: string
+  email: string
+  opening_hours: string
+  facilities: string[]
+  image: string
+  updated_at: string
+}
+
+function fromPublicListing(row: PublicListingRow): Listing {
+  return {
+    id: row.id,
+    organisationId: row.organisation_id,
+    name: row.name,
+    category: row.category,
+    town: row.town,
+    status: row.status,
+    completeness: row.completeness,
+    views: row.views,
+    enquiries: row.enquiries,
+    shortDescription: row.short_description,
+    description: row.description,
+    website: row.website,
+    bookingUrl: row.booking_url,
+    phone: row.phone,
+    email: row.email,
+    openingHours: row.opening_hours,
+    facilities: row.facilities,
+    image: row.image,
+    lastUpdated: row.updated_at.slice(0, 10),
+  }
+}
+
+function toPublicListing(listing: Listing) {
+  return {
+    id: listing.id,
+    tenant_id: tenant.id,
+    organisation_id: listing.organisationId,
+    name: listing.name,
+    category: listing.category,
+    town: listing.town,
+    status: listing.status,
+    completeness: listing.completeness,
+    views: listing.views,
+    enquiries: listing.enquiries,
+    short_description: listing.shortDescription,
+    description: listing.description,
+    website: listing.website,
+    booking_url: listing.bookingUrl,
+    phone: listing.phone,
+    email: listing.email,
+    opening_hours: listing.openingHours,
+    facilities: listing.facilities,
+    image: listing.image,
+    published_at: listing.status === 'Published' ? new Date().toISOString() : null,
+    updated_at: new Date().toISOString(),
+  }
+}
+
 function readInitialData(): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? JSON.parse(stored) as CRMData : demoData
+    const parsed = stored ? JSON.parse(stored) as CRMData : demoData
+    return { ...parsed, socialMetrics: parsed.socialMetrics ?? demoData.socialMetrics }
   } catch {
     return demoData
   }
@@ -52,11 +127,50 @@ function todayISO() {
 }
 
 export function CRMProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [data, setData] = useState<CRMData>(readInitialData)
+  const [remoteReady, setRemoteReady] = useState(!supabase)
+
+  useEffect(() => {
+    const client = supabase
+    if (!client) return
+    let active = true
+    const hydrate = async () => {
+      setRemoteReady(false)
+      if (user) {
+        const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
+        if (active && state?.data) {
+          const remoteData = state.data as CRMData
+          setData({ ...remoteData, socialMetrics: remoteData.socialMetrics ?? demoData.socialMetrics })
+        }
+      } else {
+        const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')
+        if (active && listings?.length) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
+      }
+      if (active) setRemoteReady(true)
+    }
+    void hydrate()
+    return () => { active = false }
+  }, [user])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }, [data])
+
+  useEffect(() => {
+    const client = supabase
+    if (!client || !user || !remoteReady) return
+    const timer = window.setTimeout(() => {
+      void client.from('workspace_states').upsert({
+        tenant_id: tenant.id,
+        data,
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'tenant_id' })
+      void client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' })
+    }, 650)
+    return () => window.clearTimeout(timer)
+  }, [data, remoteReady, user])
 
   const value = useMemo<CRMContextValue>(() => ({
     data,
@@ -178,7 +292,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         ...current,
         invoices: [{
           id: id('inv'),
-          number: `SE-2026-${count}`,
+          number: `VV-2026-${count}`,
           organisationId: draft.organisationId,
           description: draft.description,
           issueDate: todayISO(),

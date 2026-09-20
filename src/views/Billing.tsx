@@ -43,7 +43,7 @@ export function Billing({ onCreate }: { onCreate: () => void }) {
         return <Drawer title={liveInvoice.number} subtitle={liveInvoice.description} onClose={() => setSelectedInvoice(null)} width="standard">
           <div className="invoice-detail-hero"><div><small>Amount due</small><h2>{currency.format(liveInvoice.status === 'Paid' ? 0 : liveInvoice.total)}</h2><Badge>{liveInvoice.status}</Badge></div>{liveInvoice.status !== 'Paid' && <Button icon={Check} onClick={() => markInvoicePaid(liveInvoice.id)}>Mark as paid</Button>}</div>
           <div className="invoice-sheet">
-            <header><div className="invoice-brand"><span><CircleDollarSign size={19} /></span><strong>Shakespeare’s England</strong></div><div><small>Invoice number</small><strong>{liveInvoice.number}</strong></div></header>
+            <header><div className="invoice-brand"><span><CircleDollarSign size={19} /></span><strong>Visit Valechester</strong></div><div><small>Invoice number</small><strong>{liveInvoice.number}</strong></div></header>
             <section><div><small>Billed to</small><strong>{org?.name}</strong><p>{org?.address}</p></div><div><small>Sent to</small><strong>{liveInvoice.sentTo || 'Not yet set'}</strong><p>Issue date: {formatDate(liveInvoice.issueDate)}<br />Due date: {formatDate(liveInvoice.dueDate)}</p></div></section>
             <table><thead><tr><th>Description</th><th>Net</th></tr></thead><tbody><tr><td>{liveInvoice.description}</td><td>{currency.format(liveInvoice.subtotal)}</td></tr></tbody><tfoot><tr><td>Subtotal</td><td>{currency.format(liveInvoice.subtotal)}</td></tr><tr><td>VAT (20%)</td><td>{currency.format(liveInvoice.vat)}</td></tr><tr><td>Total</td><td>{currency.format(liveInvoice.total)}</td></tr></tfoot></table>
           </div>
