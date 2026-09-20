@@ -171,12 +171,19 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
     return listing.searchTags.slice(0, allowance)
   }
   const towns = useMemo(()=>['All areas',...Array.from(new Set(published.map((listing)=>listing.town))).sort()], [published])
+  const membershipRank=(listing:Listing)=>{
+    const tier=data.organisations.find((organisation)=>organisation.id===listing.organisationId)?.tier
+    const level=data.levels.find((item)=>item.name===tier)
+    if(!level||level.price===0) return Number.MAX_SAFE_INTEGER
+    const index=data.levels.findIndex((item)=>item.id===level.id)
+    return index<0?Number.MAX_SAFE_INTEGER-1:index
+  }
   const results = published.filter((listing) => {
     const groupMatches = category === 'All' || categoryGroup(listing) === category
     const searchableTags = searchableTagsFor(listing)
     const filtersMatch=visitorFilterGroups.every((group)=>{const selected=activeFilters[group.id]??[];return !selected.length||selected.some((id)=>{const option=group.options.find((item)=>item.id===id);return Boolean(option&&matchesVisitorOption(listing,option,searchableTags))})})
     return groupMatches&&(town==='All areas'||listing.town===town)&&(!searchTerm||matchesVisitorQuery(listing,searchTerm,searchableTags))&&filtersMatch
-  })
+  }).sort((a,b)=>membershipRank(a)-membershipRank(b)||b.completeness-a.completeness||a.name.localeCompare(b.name))
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const target = window.location.hash

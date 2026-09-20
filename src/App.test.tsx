@@ -51,7 +51,7 @@ describe('Visit CRM', () => {
     renderApp()
     expect(screen.getByRole('heading', { name: /A town with stories/i })).toBeInTheDocument()
     expect(screen.getAllByText('Valechester Castle').length).toBeGreaterThan(0)
-    expect(screen.getByText('The Lantern House Hotel')).toBeInTheDocument()
+    expect(document.querySelectorAll('.site-card')).toHaveLength(12)
   })
 
   it('provides at least fifteen published businesses for every membership type', () => {
@@ -145,6 +145,23 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('checkbox',{name:/Couples & romantic visits/})).toBeChecked()
     expect(screen.queryByRole('heading',{name:'No exact matches yet'})).not.toBeInTheDocument()
     expect(screen.getByText(/places? match your choices/)).toBeInTheDocument()
+  })
+
+  it('orders public search results by membership level with free listings last', () => {
+    window.history.pushState({}, '', '/')
+    const {container}=renderApp()
+    const loadMore=screen.getByRole('button',{name:/Show more places/})
+    while(document.body.contains(loadMore)) fireEvent.click(loadMore)
+    const cards=Array.from(container.querySelectorAll('.site-card'))
+    const ranks=cards.map((card)=>{
+      const name=card.querySelector('h3')?.textContent
+      const listing=initialData.listings.find((item)=>item.name===name)
+      const tier=initialData.organisations.find((organisation)=>organisation.id===listing?.organisationId)?.tier
+      const level=initialData.levels.find((item)=>item.name===tier)
+      return !level||level.price===0?Number.MAX_SAFE_INTEGER:initialData.levels.findIndex((item)=>item.id===level.id)
+    })
+    expect(ranks).toEqual([...ranks].sort((a,b)=>a-b))
+    expect(ranks.at(-1)).toBe(Number.MAX_SAFE_INTEGER)
   })
 
   it('gives every generated member business useful sample search taxonomy', () => {
