@@ -141,8 +141,11 @@ function normalizeCRMData(parsed: CRMData): CRMData {
       return { ...level, imageAllowance: hasLegacyMedia ? baseline?.imageAllowance ?? level.imageAllowance : level.imageAllowance, videoAllowance: hasLegacyMedia ? baseline?.videoAllowance ?? level.videoAllowance : level.videoAllowance, taxonomyAllowance: level.taxonomyAllowance ?? baseline?.taxonomyAllowance ?? 6 }
     }),
     listings: normalized.listings.map((item) => {
-      const listing = { ...item, searchTags: item.searchTags ?? [] }
-      return { ...listing, visitorTaxonomy: item.visitorTaxonomy ?? visitorTaxonomyFor(listing), reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
+      const sampleBaseline=/^list-1\d\d$/.test(item.id)?initialData.listings.find((listing)=>listing.id===item.id):undefined
+      const searchTags=Array.from(new Set([...(item.searchTags??[]),...(sampleBaseline?.searchTags??[])]))
+      const listing = { ...item, searchTags }
+      const visitorTaxonomy=sampleBaseline?visitorTaxonomyFor({...listing,visitorTaxonomy:undefined}):item.visitorTaxonomy??visitorTaxonomyFor(listing)
+      return { ...listing, visitorTaxonomy, reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
     }),
   }
 }

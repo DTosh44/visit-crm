@@ -5,6 +5,27 @@ const images = ['castle', 'lodge', 'theatre', 'hotel', 'distillery', 'museum', '
 const firstNames = ['Avery', 'Billie', 'Cameron', 'Devon', 'Ellis', 'Frankie', 'Harper', 'Jules', 'Kit', 'Logan', 'Marley', 'Noel', 'Parker', 'Quinn']
 const lastNames = ['Ash', 'Bell', 'Clarke', 'Dean', 'Evans', 'Fox', 'Grant', 'Hall', 'Ives', 'Jones', 'Kent', 'Lane', 'Moss', 'North']
 
+const audienceTags = [
+  ['Couples','Romantic'], ['Great for families'], ['Suitable for groups'], ['Dog-friendly','Great for families'], ['Couples','Romantic'], ['Great for families'],
+]
+const occasionTags = [
+  ['Rainy-day activity','Indoor attraction'], ['Outdoor experience','Full-day experience'], ['Evening activity','Indoor attraction'], ['Outdoor experience','Peaceful'], ['Rainy-day activity','Indoor attraction'], ['Outdoor experience'],
+]
+const practicalTags = [
+  ['Accessible','Food available','Booking recommended'], ['Accessible','On-site parking'], ['Accessible','Food available'], ['Accessible','Free to visit'], ['Accessible','On-site parking','Booking recommended'], ['Accessible','Food available'],
+]
+
+function experienceTags(name:string, category:string) {
+  const value=`${name} ${category}`.toLowerCase()
+  if(/hotel|hall|rooms|retreat|apartments|resort|guesthouse/.test(value)) return ['Overnight stay']
+  if(/food|kitchen|pantry|café|brewery|table|bakes|deli|chocolate/.test(value)) return ['Food available']
+  if(/abbey|heritage|museum|castle|old mint|railway|trail/.test(value)) return ['Heritage','Interactive history']
+  if(/gallery|arts|theatre|cinema|studio/.test(value)) return ['Arts & culture']
+  if(/garden|park|wildlife|walking|cycle|kayak|woods|towpath|green|viewpoint/.test(value)) return ['Outdoor experience']
+  if(/books|antiques|vintage|gifts|florist|records|thread|pottery|artisan|map room/.test(value)) return ['Independent shopping']
+  return ['Local experience']
+}
+
 const tierSeeds = [
   { tier: 'Tier 1', needed: 13, price: 3919, type: 'Attraction', category: 'Landmarks & experiences', names: ['Valechester Abbey Estate','The Grand Vale Hotel','Royal Vale Racecourse','Valechester Science Centre','The Riverlight Theatre','Valechester Wildlife Park','The Foundry Arts Centre','Crown & Vale Resort','Valechester Heritage Railway','The Great Hall Experience','North Vale Adventure Park','Valechester Food Hall','The Old Mint Museum'] },
   { tier: 'Tier 2', needed: 12, price: 1321, type: 'Accommodation', category: 'Hotels & experiences', names: ['Willowmere Hall','The Market House Hotel','Eastgate Spa','River Vale Cruises','The Clocktower Rooms','Valechester Cookery School','The Assembly Rooms','Meadow & Mill Retreat','Castle Gate Apartments','The Artisan Quarter','Valechester Cycle Tours','The Glasshouse Venue'] },
@@ -48,7 +69,7 @@ tierSeeds.forEach((seed, tierIndex) => {
       website: `https://example.com/${slug}`, bookingUrl: seed.tier === 'Free Listing' ? '' : `https://example.com/${slug}/book`,
       phone: `01926 55${suffix}`, email: `${slug}@example.com`, openingHours: 'Open throughout the year; check ahead for seasonal times',
       facilities: ['Accessible information', 'Visitor information', index % 2 ? 'Food nearby' : 'Parking nearby'],
-      searchTags: [index % 2 ? 'Great for families' : 'Couples', index % 3 ? 'Outdoor experience' : 'Rainy-day activity', 'Accessible', town],
+      searchTags: Array.from(new Set([...audienceTags[index%audienceTags.length],...occasionTags[index%occasionTags.length],...practicalTags[index%practicalTags.length],...experienceTags(name,seed.category),town,'Year-round','Local favourite'])),
       reviewHighlights: ['Friendly welcome', 'Strong local character', 'Helpful visitor information'],
       goodToKnow: ['Check opening times before travelling', 'Contact the venue for specific access requirements'],
       lastUpdated: '2026-09-20', image: images[(index + tierIndex) % images.length],

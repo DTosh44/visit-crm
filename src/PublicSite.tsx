@@ -8,7 +8,7 @@ import { useFeatures } from './features'
 import { guides, imageLibrary, neighbourhoods } from './siteData'
 import { useCRM } from './store'
 import { tenant } from './tenant'
-import { matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
+import { filtersForVisitorQuery, matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
 import type { DestinationEvent, EventDraft, EventFormat, Listing } from './types'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
@@ -183,8 +183,9 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
     if (params.has('search')) window.setTimeout(() => { const input = document.querySelector<HTMLInputElement>('[aria-label="Search Valechester"]'); input?.focus(); input?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 50)
     else if (target) window.setTimeout(() => document.querySelector(target)?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [location])
-  const submitSearch = (event: FormEvent) => { event.preventDefault(); setSearchTerm(query); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
-  const quickSearch = (term: string) => { setQuery(term); setSearchTerm(term); document.querySelector('#discover')?.scrollIntoView({ behavior: 'smooth' }) }
+  const runSearch=(term:string)=>{setQuery(term);setSearchTerm(term);setActiveFilters(filtersForVisitorQuery(term));setVisibleCount(12);document.querySelector('#discover')?.scrollIntoView({behavior:'smooth'})}
+  const submitSearch = (event: FormEvent) => { event.preventDefault(); runSearch(query) }
+  const quickSearch = (term: string) => runSearch(term)
   const toggleFilter=(groupId:string,optionId:string)=>setActiveFilters((current)=>{const selected=current[groupId]??[];return {...current,[groupId]:selected.includes(optionId)?selected.filter((id)=>id!==optionId):[...selected,optionId]}})
   const activeOptions=visitorFilterGroups.flatMap((group)=>group.options.filter((option)=>(activeFilters[group.id]??[]).includes(option.id)).map((option)=>({...option,groupId:group.id})))
   const clearFilters=()=>{setActiveFilters({});setTown('All areas');setCategory('All')}

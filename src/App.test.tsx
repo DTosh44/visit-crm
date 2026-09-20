@@ -135,6 +135,25 @@ describe('Visit CRM', () => {
     expect(screen.getByLabelText('Selected filters')).toBeInTheDocument()
   })
 
+  it('turns a natural language search into visible filters with matching sample businesses', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    const search=screen.getByLabelText('Search Valechester')
+    fireEvent.change(search,{target:{value:'rainy day with my partner'}})
+    fireEvent.submit(search.closest('form')!)
+    expect(screen.getByRole('checkbox',{name:/A rainy day/})).toBeChecked()
+    expect(screen.getByRole('checkbox',{name:/Couples & romantic visits/})).toBeChecked()
+    expect(screen.queryByRole('heading',{name:'No exact matches yet'})).not.toBeInTheDocument()
+    expect(screen.getByText(/places? match your choices/)).toBeInTheDocument()
+  })
+
+  it('gives every generated member business useful sample search taxonomy', () => {
+    const generated=initialData.listings.filter((listing)=>/^list-1\d\d$/.test(listing.id))
+    expect(generated.length).toBeGreaterThan(70)
+    for(const listing of generated) expect(listing.searchTags.length,listing.name).toBeGreaterThanOrEqual(6)
+    expect(generated.filter((listing)=>listing.searchTags.includes('Rainy-day activity')&&listing.searchTags.includes('Romantic')).length).toBeGreaterThanOrEqual(10)
+  })
+
   it('lets a CRM user rename a membership level', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Memberships' }))

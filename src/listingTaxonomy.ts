@@ -14,7 +14,7 @@ export const visitorFilterGroups: VisitorFilterGroup[] = [
   ]},
   { id:'party', label:'Who are you visiting with?', prompt:'Find places that suit your group', options:[
     {id:'families',label:'Families',terms:['family','families','children','kids','under 5']},
-    {id:'couples',label:'Couples',terms:['couple','couples','romantic','date night']},
+    {id:'couples',label:'Couples & romantic visits',terms:['couple','couples','romantic','romance','date night','partner','partners','husband','wife']},
     {id:'groups',label:'Groups',terms:['group','groups','coach']},
     {id:'solo',label:'Solo visitors',terms:['solo','independent traveller']},
     {id:'dogs',label:'Dog friendly',terms:['dog','dogs','pet friendly','dog-friendly']},
@@ -63,7 +63,15 @@ export function matchesVisitorOption(listing: Listing, option: VisitorFilterOpti
   return option.terms.some((term)=>text.includes(term.toLowerCase()))
 }
 
-const ignoredSearchWords=new Set(['a','an','and','day','days','for','in','of','the','to','with','want','looking'])
+const ignoredSearchWords=new Set(['a','an','and','day','days','for','in','me','my','of','our','the','to','with','want','looking'])
+
+export function filtersForVisitorQuery(query:string) {
+  const normalized=` ${query.toLowerCase().replace(/[^a-z0-9-]+/g,' ').replace(/\s+/g,' ').trim()} `
+  return Object.fromEntries(visitorFilterGroups.map((group)=>[group.id,group.options.filter((option)=>option.terms.some((term)=>{
+    const clean=term.toLowerCase().replace(/[^a-z0-9-]+/g,' ').replace(/\s+/g,' ').trim()
+    return normalized.includes(` ${clean} `)||clean.split(' ').some((word)=>word.length>4&&normalized.includes(` ${word} `))
+  })).map((option)=>option.id)]).filter(([,ids])=>ids.length)) as Record<string,string[]>
+}
 export function matchesVisitorQuery(listing: Listing, query: string, allowedSearchTags: string[]) {
   const text=listingTaxonomyText(listing,allowedSearchTags)
   const words=query.toLowerCase().split(/\s+/).map((word)=>word.replace(/[^a-z0-9-]/g,'')).filter((word)=>word&&!ignoredSearchWords.has(word))
