@@ -30,7 +30,7 @@ function ListingCard({ listing, featured = false }: { listing: Listing; featured
   return (
     <article className={`site-card${featured ? ' site-card-featured' : ''}`}>
       <button className="site-card-image" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}>
-        <img src={image} alt="" />
+        <img src={image} alt="" loading="lazy" decoding="async" />
         <span className="site-card-category">{categoryGroup(listing)}</span>
         <span className="site-card-save"><Heart size={18} /></span>
       </button>
@@ -87,13 +87,13 @@ function HomePage() {
     <SiteHeader />
     <main>
       <section className="site-hero">
-        <img src={imageLibrary.hero} alt="Historic rooftops and riverside landmarks in Valechester" />
+        <img src={imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
         <div className="site-hero-content"><span className="site-eyebrow">Find your kind of remarkable</span><h1>A town with stories<br />in every direction.</h1><p>{tenant.strapline}</p>
           <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="What would you like to discover?" aria-label="Search Valechester" /><button>Search</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => { setQuery('family'); setSearchTerm('family') }}>Family days</button><button onClick={() => { setQuery('free'); setSearchTerm('free') }}>Free things</button><button onClick={() => { setQuery('heritage'); setSearchTerm('heritage') }}>Heritage</button></div>
         </div>
-        <span className="site-hero-credit">Valechester from Castle Hill</span>
+        <span className="site-hero-credit">An afternoon beside the River Vale</span>
       </section>
 
       <section className="site-intro site-container"><span className="site-eyebrow plum">Welcome to Valechester</span><div><h2>Historic at heart.<br /><em>Independent by nature.</em></h2><p>{tenant.description} Come for the landmark sights, stay for the unexpected finds—and make the story your own.</p></div></section>
@@ -105,11 +105,11 @@ function HomePage() {
         {!results.length && <div className="site-no-results"><Search size={25} /><h3>No exact matches yet</h3><p>Try a broader search or explore all of Valechester.</p><button onClick={() => { setQuery(''); setSearchTerm(''); setCategory('All') }}>Show everything</button></div>}
       </section>
 
-      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{events.map((event) => <article key={event.id}><img src={event.image} alt="" /><div className="site-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.place}</p></div></article>)}</div></div></section>}
+      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{events.map((event) => <article key={event.id}><img src={event.image} alt="" loading="lazy" decoding="async" /><div className="site-date"><strong>{event.day}</strong><span>{event.month}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.place}</p></div></article>)}</div></div></section>}
 
-      {features.itineraries && <section className="site-ideas site-container" id="ideas"><header className="site-section-heading"><div><span className="site-eyebrow plum">Ideas worth travelling for</span><h2>Follow your curiosity</h2></div><button>All guides & itineraries <ArrowRight size={16} /></button></header><div className="site-guide-grid">{guides.map((guide) => <article key={guide.title}><img src={guide.image} alt="" /><div><span>{guide.eyebrow}</span><h3>{guide.title}</h3><p>{guide.description}</p><button>Read the guide <ArrowRight size={15} /></button></div></article>)}</div></section>}
+      {features.itineraries && <section className="site-ideas site-container" id="ideas"><header className="site-section-heading"><div><span className="site-eyebrow plum">Ideas worth travelling for</span><h2>Follow your curiosity</h2></div><button>All guides & itineraries <ArrowRight size={16} /></button></header><div className="site-guide-grid">{guides.map((guide) => <article key={guide.title}><img src={guide.image} alt="" loading="lazy" decoding="async" /><div><span>{guide.eyebrow}</span><h3>{guide.title}</h3><p>{guide.description}</p><button>Read the guide <ArrowRight size={15} /></button></div></article>)}</div></section>}
 
-      <section className="site-neighbourhoods"><div className="site-container"><div className="site-section-heading inverse"><div><span className="site-eyebrow">Pick a neighbourhood</span><h2>Three sides of the same story</h2></div></div><div className="site-neighbourhood-grid">{neighbourhoods.map((place) => <article key={place.name}><img src={place.image} alt="" /><div><h3>{place.name}</h3><p>{place.detail}</p><button aria-label={`Explore ${place.name}`}><ArrowRight size={18} /></button></div></article>)}</div></div></section>
+      <section className="site-neighbourhoods"><div className="site-container"><div className="site-section-heading inverse"><div><span className="site-eyebrow">Pick a neighbourhood</span><h2>Three sides of the same story</h2></div></div><div className="site-neighbourhood-grid">{neighbourhoods.map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async" /><div><h3>{place.name}</h3><p>{place.detail}</p><button aria-label={`Explore ${place.name}`}><ArrowRight size={18} /></button></div></article>)}</div></div></section>
 
       <section className="site-planner site-container" id="plan"><div><span className="planner-icon"><Sparkles size={24} /></span><span className="site-eyebrow plum">Made for your kind of trip</span><h2>Not sure where to start?</h2><p>Tell us who’s coming, what you love and how long you have. We’ll shape a Valechester itinerary around you.</p><button>Build my itinerary <ArrowRight size={17} /></button></div><aside id="accessibility"><span><TrainFront size={21} /><strong>42 mins</strong><small>by direct train from Birmingham</small></span><span><Accessibility size={21} /><strong>Accessible</strong><small>routes and venue details</small></span><span><Clock3 size={21} /><strong>2–3 days</strong><small>to see the town at its best</small></span></aside></section>
 
