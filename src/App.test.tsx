@@ -35,6 +35,20 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
   })
 
+  it('filters organisations by location, health and type while keeping every match scrollable', () => {
+    const {container}=renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
+    const scrollRegion=screen.getByLabelText('Organisation results. Scroll to view all matching organisations.')
+    expect(scrollRegion).toHaveClass('organisation-table-scroll')
+    expect(scrollRegion.querySelectorAll('tbody tr')).toHaveLength(initialData.organisations.length)
+    fireEvent.change(screen.getByLabelText('Filter by location'),{target:{value:'Castle Quarter'}})
+    fireEvent.change(screen.getByLabelText('Filter by organisation type'),{target:{value:'Attraction'}})
+    const expected=initialData.organisations.filter((organisation)=>organisation.town==='Castle Quarter'&&organisation.type==='Attraction')
+    expect(container.querySelectorAll('.organisations-table tbody tr')).toHaveLength(expected.length)
+    expect(screen.getByLabelText('Filter by health')).toBeInTheDocument()
+    expect(screen.getByText(`Showing all ${expected.length} matching organisations from ${initialData.organisations.length} records`)).toBeInTheDocument()
+  })
+
   it('opens and completes a task', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: /Tasks/ }))

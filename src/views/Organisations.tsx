@@ -9,19 +9,30 @@ import { downloadCsv, openEmail } from '../actions'
 export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (organisation: Organisation) => void }) {
   const { data, updateOrganisation, addOrganisation, deleteOrganisation, deduplicateOrganisations } = useCRM()
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('All')
+  const [status, setStatus] = useState('All statuses')
   const [tier, setTier] = useState('All levels')
+  const [location,setLocation]=useState('All locations')
+  const [health,setHealth]=useState('All health')
+  const [organisationType,setOrganisationType]=useState('All types')
   const [selected, setSelected] = useState<string[]>([])
+
+  const locations=useMemo(()=>Array.from(new Set(data.organisations.map((org)=>org.town).filter(Boolean))).sort(),[data.organisations])
+  const organisationTypes=useMemo(()=>Array.from(new Set(data.organisations.map((org)=>org.type).filter(Boolean))).sort(),[data.organisations])
+  const activeFilterCount=[status!=='All statuses',tier!=='All levels',location!=='All locations',health!=='All health',organisationType!=='All types'].filter(Boolean).length
+  const resetFilters=()=>{setStatus('All statuses');setTier('All levels');setLocation('All locations');setHealth('All health');setOrganisationType('All types');setQuery('')}
 
   const organisations = useMemo(() => {
     const search = query.trim().toLowerCase()
     return data.organisations.filter((org) => {
       const matchesSearch = !search || [org.name, org.town, org.type, org.tier, ...org.tags].join(' ').toLowerCase().includes(search)
-      const matchesStatus = status === 'All' || org.status === status
+      const matchesStatus = status === 'All statuses' || org.status === status
       const matchesTier = tier === 'All levels' || org.tier === tier
-      return matchesSearch && matchesStatus && matchesTier
+      const matchesLocation=location==='All locations'||org.town===location
+      const matchesHealth=health==='All health'||org.health===health
+      const matchesType=organisationType==='All types'||org.type===organisationType
+      return matchesSearch && matchesStatus && matchesTier && matchesLocation && matchesHealth && matchesType
     })
-  }, [data.organisations, query, status, tier])
+  }, [data.organisations, health, location, organisationType, query, status, tier])
 
   const toggleAll = () => setSelected(selected.length === organisations.length ? [] : organisations.map((org) => org.id))
   const toggle = (id: string) => setSelected((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])
@@ -43,19 +54,16 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
       </section>
 
       <section className="panel data-panel">
-        <div className="table-toolbar">
+        <div className="table-toolbar organisation-toolbar">
           <div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organisations..." /></div>
-          <div className="toolbar-filters">
-            <label className="select-wrap"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option>All</option><option>Active</option><option>Renewing</option><option>Prospect</option><option>Free listing</option><option>Lapsed</option></select><ChevronDown size={14} /></label>
-            <label className="select-wrap"><select value={tier} onChange={(event) => setTier(event.target.value)}><option>All levels</option>{data.levels.map((level) => <option key={level.id}>{level.name}</option>)}</select><ChevronDown size={14} /></label>
-            <button className="filter-button" onClick={()=>{setStatus('All');setTier('All levels');setQuery('')}}><SlidersHorizontal size={16} /> Reset filters</button>
-          </div>
+          <span className="organisation-result-count"><strong>{organisations.length}</strong> matching {organisations.length===1?'organisation':'organisations'}</span>
         </div>
+        <div className="organisation-filter-bar"><span className="filter-bar-title"><Filter size={15}/>Filters{activeFilterCount>0&&<em>{activeFilterCount}</em>}</span><label className="select-wrap"><select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option>All statuses</option><option>Active</option><option>Renewing</option><option>Prospect</option><option>Free listing</option><option>Lapsed</option></select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by membership level" value={tier} onChange={(event) => setTier(event.target.value)}><option>All levels</option>{data.levels.map((level) => <option key={level.id}>{level.name}</option>)}</select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by location" value={location} onChange={(event) => setLocation(event.target.value)}><option>All locations</option>{locations.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by health" value={health} onChange={(event)=>setHealth(event.target.value)}><option>All health</option><option>Happy</option><option>OK</option><option>Needs attention</option></select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by organisation type" value={organisationType} onChange={(event)=>setOrganisationType(event.target.value)}><option>All types</option>{organisationTypes.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><button className="filter-button" onClick={resetFilters} disabled={!query&&activeFilterCount===0}><SlidersHorizontal size={16}/>Reset</button></div>
 
         {selected.length > 0 && <div className="bulk-bar"><strong>{selected.length} selected</strong><button onClick={()=>openEmail(data.contacts.filter((contact)=>selected.includes(contact.organisationId)&&contact.primary).map((contact)=>contact.email),'Message from Visit Valechester')}><Mail size={15} /> Send email</button><button onClick={()=>{const owner=window.prompt('Assign owner');if(owner)selected.forEach((id)=>updateOrganisation(id,{owner}))}}>Assign owner</button><button onClick={()=>{const next=window.prompt('Status: Active, Renewing, Prospect, Free listing or Lapsed');if(next&&['Active','Renewing','Prospect','Free listing','Lapsed'].includes(next))selected.forEach((id)=>updateOrganisation(id,{status:next as Organisation['status']}))}}>Change status</button><button className="bulk-clear" onClick={() => setSelected([])}>Clear</button></div>}
 
         {organisations.length ? (
-          <div className="table-scroll">
+          <div className="table-scroll organisation-table-scroll" tabIndex={0} aria-label="Organisation results. Scroll to view all matching organisations.">
             <table className="data-table organisations-table">
               <thead><tr><th className="checkbox-cell"><input type="checkbox" checked={selected.length === organisations.length && organisations.length > 0} onChange={toggleAll} /></th><th>Organisation</th><th>Membership</th><th>Health</th><th>Location</th><th>Renewal</th><th>Value</th><th>Owner</th><th /></tr></thead>
               <tbody>{organisations.map((org) => {
@@ -74,8 +82,8 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
               })}</tbody>
             </table>
           </div>
-        ) : <EmptyState icon={Search} title="No organisations found" description="Try changing the search or filters." action={<Button variant="secondary" onClick={() => { setQuery(''); setStatus('All'); setTier('All levels') }}>Clear filters</Button>} />}
-        <footer className="table-footer"><span>Showing {organisations.length} of {data.organisations.length} organisations</span><span>All matching records are shown</span></footer>
+        ) : <EmptyState icon={Search} title="No organisations found" description="Try changing the search or filters." action={<Button variant="secondary" onClick={resetFilters}>Clear filters</Button>} />}
+        <footer className="table-footer"><span>Showing all {organisations.length} matching organisations from {data.organisations.length} records</span><span>Scroll the table to see every result</span></footer>
       </section>
     </div>
   )
