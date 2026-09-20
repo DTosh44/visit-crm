@@ -62,6 +62,17 @@ describe('Visit CRM', () => {
     }
   })
 
+  it('provides one reviewable best-practice listing template for every membership type', () => {
+    window.history.pushState({}, '', '/listing-templates')
+    renderApp()
+    expect(screen.getByRole('heading', { name: 'Member listing templates.' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Review / })).toHaveLength(6)
+    fireEvent.click(screen.getByRole('button', { name: 'Review Vale Executive Travel' }))
+    expect(screen.getByRole('heading', { name: 'Services for your business' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Request a quote/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Visit website/ })).toBeInTheDocument()
+  })
+
   it('shows fifty editable events in the CMS', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Events' }))
