@@ -23,7 +23,7 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Good morning, Alex')).toBeInTheDocument()
     expect(screen.getByText('Membership income')).toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()
-    expect(screen.getByText('Members by tier')).toBeInTheDocument()
+    expect(screen.getByText('Members by level')).toBeInTheDocument()
     expect(screen.getByText('Visitor review trends')).toBeInTheDocument()
     expect(screen.getByText('5.8m')).toBeInTheDocument()
   })
@@ -73,7 +73,7 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('link', { name: /Visit website/ })).toBeInTheDocument()
   })
 
-  it('gives the Strategic listing the complete visitor planning template', () => {
+  it('gives the highest level listing the complete visitor planning template', () => {
     window.history.pushState({}, '', '/place/list-001')
     renderApp()
     for (const heading of ['Gallery', 'At a glance', 'What visitors say', 'Accessibility information', 'Facilities', 'Opening information', 'Location and contact', 'Awards and accreditations', 'Make it part of your trip']) {
@@ -83,7 +83,7 @@ describe('Visit CRM', () => {
     expect(document.querySelector<HTMLElement>('.template-place-page')?.style.getPropertyValue('--template-accent')).toBe('#a86b78')
   })
 
-  it('shows the complete Tier 1 visitor and search taxonomy without naming the tier', () => {
+  it('shows the complete core listing visitor and search taxonomy without naming the level', () => {
     window.history.pushState({}, '', '/place/list-009')
     renderApp()
     expect(screen.getByRole('heading', { name: 'Visitor information' })).toBeInTheDocument()
@@ -91,7 +91,7 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('heading', { name: 'Search filters' })).toBeInTheDocument()
     expect(screen.getByText('Independent shopping')).toBeInTheDocument()
     expect(screen.getByText('Wet-weather planners')).toBeInTheDocument()
-    expect(screen.queryByText(/Bronze|Tier 1/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Tier 4/i)).not.toBeInTheDocument()
   })
 
   it('lets CRM users configure taxonomy allowances and review sites', () => {
@@ -108,10 +108,10 @@ describe('Visit CRM', () => {
     expect(screen.getByPlaceholderText('https://')).toBeInTheDocument()
   })
 
-  it('uses the public package names and keeps a Free Listing basic and unlinked', () => {
+  it('uses configurable level names and keeps a Free Listing basic and unlinked', () => {
     window.history.pushState({}, '', '/listing-templates')
     const { unmount } = renderApp()
-    for (const packageName of ['Strategic', 'Gold', 'Silver', 'Bronze', 'Free Listing']) {
+    for (const packageName of ['Tier 1', 'Tier 2', 'Tier 3', 'Tier 4', 'Supplier', 'Free Listing']) {
       expect(screen.getByText(packageName)).toBeInTheDocument()
     }
     unmount()
@@ -122,6 +122,26 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('heading', { name: 'Business information' })).toBeInTheDocument()
     expect(screen.getByText('Elegant public gardens following the curve of the River Vale.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /website|book/i })).not.toBeInTheDocument()
+  })
+
+  it('lets a visitor combine human questions when refining search results', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    expect(screen.getByText('What would you like to do?')).toBeInTheDocument()
+    expect(screen.getByText('Who are you visiting with?')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('History & heritage'))
+    fireEvent.click(screen.getByText('Families'))
+    expect(screen.getByText(/places? match your choices/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Selected filters')).toBeInTheDocument()
+  })
+
+  it('lets a CRM user rename a membership level', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Memberships' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit level' })[0])
+    fireEvent.change(screen.getByLabelText('Level name'), { target: { value: 'Premier Partner' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save level' }))
+    expect(screen.getByRole('heading', { name: 'Premier Partner' })).toBeInTheDocument()
   })
 
   it('applies the approved tier template to every published member listing', async () => {

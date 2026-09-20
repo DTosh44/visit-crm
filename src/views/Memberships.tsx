@@ -1,16 +1,17 @@
 import { Archive, Check, ChevronRight, CirclePlus, Layers3, MoreHorizontal, Plus, Settings2, UsersRound } from 'lucide-react'
 import { useState } from 'react'
 import { useCRM } from '../store'
-import type { Organisation } from '../types'
+import type { MembershipLevel, Organisation } from '../types'
 import { currency, formatDate } from '../utils'
 import { Avatar, Badge, Button, Field, Modal, PageHeader, Progress, Tabs } from '../components/UI'
 
 type MembershipTab = 'Overview' | 'Benefits' | 'Renewals'
 
 export function Memberships({ openOrganisation }: { openOrganisation: (organisation: Organisation) => void }) {
-  const { data, addLevel } = useCRM()
+  const { data, addLevel, updateLevel } = useCRM()
   const [tab, setTab] = useState<MembershipTab>('Overview')
   const [addOpen, setAddOpen] = useState(false)
+  const [editingLevel, setEditingLevel] = useState<MembershipLevel|null>(null)
   const [newLevel, setNewLevel] = useState({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0, taxonomyAllowance: 6 })
   const activeTotal = data.levels.reduce((sum, level) => sum + level.members, 0)
   const paidTotal = data.levels.filter((level)=>level.price>0).reduce((sum,level)=>sum+level.members,0)
@@ -47,7 +48,7 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
             <div className="level-price"><strong>{level.price ? currency.format(level.price) : '£0'}</strong><span>ex VAT / year</span></div>
             <div className="level-usage"><div><span>Members</span><strong>{level.members}</strong></div><Progress value={Math.min(100, level.members * 2)} colour={level.colour} /></div>
             <ul><li><Check size={14} />{level.listingAllowance} website {level.listingAllowance === 1 ? 'listing' : 'listings'}</li><li><Check size={14} />Up to {level.imageAllowance} images</li><li><Check size={14} />Up to {level.taxonomyAllowance} searchable categories</li><li><Check size={14} />{level.benefits.length} tracked benefits</li></ul>
-            <footer><Button variant="secondary" size="sm">Edit level</Button><button aria-label={`Open ${level.name}`}><ChevronRight size={18} /></button></footer>
+            <footer><Button variant="secondary" size="sm" onClick={()=>setEditingLevel({...level})}>Edit level</Button><button aria-label={`Open ${level.name}`}><ChevronRight size={18} /></button></footer>
           </article>)}
         </section>
         <section className="panel membership-composition">
@@ -78,6 +79,15 @@ export function Memberships({ openOrganisation }: { openOrganisation: (organisat
           <div className="form-grid two"><Field label="Listings"><input type="number" min="0" value={newLevel.listingAllowance} onChange={(event) => setNewLevel({ ...newLevel, listingAllowance: Number(event.target.value) })} /></Field><Field label="Images"><input type="number" min="0" value={newLevel.imageAllowance} onChange={(event) => setNewLevel({ ...newLevel, imageAllowance: Number(event.target.value) })} /></Field><Field label="Videos"><input type="number" min="0" value={newLevel.videoAllowance} onChange={(event) => setNewLevel({ ...newLevel, videoAllowance: Number(event.target.value) })} /></Field><Field label="Search categories"><input type="number" min="0" value={newLevel.taxonomyAllowance} onChange={(event) => setNewLevel({ ...newLevel, taxonomyAllowance: Number(event.target.value) })} /></Field></div>
           <Field label="Level colour"><input type="color" value={newLevel.colour} onChange={(event) => setNewLevel({ ...newLevel, colour: event.target.value })} /></Field>
           <div className="modal-actions"><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={submitLevel}>Create level</Button></div>
+        </div>
+      </Modal>}
+      {editingLevel&&<Modal title={`Edit ${editingLevel.name}`} subtitle="Names, prices and search allowances are specific to this destination workspace." onClose={()=>setEditingLevel(null)}>
+        <div className="form-stack">
+          <div className="form-grid two"><Field label="Level name"><input autoFocus value={editingLevel.name} onChange={(event)=>setEditingLevel({...editingLevel,name:event.target.value})}/></Field><Field label="Annual price (ex VAT)"><input type="number" min="0" value={editingLevel.price} onChange={(event)=>setEditingLevel({...editingLevel,price:Number(event.target.value)})}/></Field></div>
+          <Field label="Description"><textarea rows={3} value={editingLevel.description} onChange={(event)=>setEditingLevel({...editingLevel,description:event.target.value})}/></Field>
+          <div className="form-grid two"><Field label="Listings"><input type="number" min="0" value={editingLevel.listingAllowance} onChange={(event)=>setEditingLevel({...editingLevel,listingAllowance:Number(event.target.value)})}/></Field><Field label="Images"><input type="number" min="0" value={editingLevel.imageAllowance} onChange={(event)=>setEditingLevel({...editingLevel,imageAllowance:Number(event.target.value)})}/></Field><Field label="Videos"><input type="number" min="0" value={editingLevel.videoAllowance} onChange={(event)=>setEditingLevel({...editingLevel,videoAllowance:Number(event.target.value)})}/></Field><Field label="Search categories"><input type="number" min="0" value={editingLevel.taxonomyAllowance} onChange={(event)=>setEditingLevel({...editingLevel,taxonomyAllowance:Number(event.target.value)})}/></Field></div>
+          <Field label="Level colour"><input type="color" value={editingLevel.colour} onChange={(event)=>setEditingLevel({...editingLevel,colour:event.target.value})}/></Field>
+          <div className="modal-actions"><Button variant="secondary" onClick={()=>setEditingLevel(null)}>Cancel</Button><Button onClick={()=>{if(!editingLevel.name.trim())return;updateLevel(editingLevel.id,editingLevel);setEditingLevel(null)}}>Save level</Button></div>
         </div>
       </Modal>}
     </div>
