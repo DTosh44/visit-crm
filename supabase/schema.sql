@@ -73,10 +73,13 @@ create table public.public_listings (
   opening_hours text not null default '',
   facilities jsonb not null default '[]'::jsonb,
   image text not null default '',
+  media jsonb not null default '[]'::jsonb,
   published_at timestamptz,
   updated_at timestamptz not null default now(),
   primary key (tenant_id, id)
 );
+
+alter table public.public_listings add column if not exists media jsonb not null default '[]'::jsonb;
 
 -- Event organisers use standard Supabase Auth accounts. Events can be submitted
 -- by any authenticated organiser and are deliberately independent of membership.
@@ -186,6 +189,19 @@ alter table public.event_organisers enable row level security;
 alter table public.events enable row level security;
 alter table public.social_metrics enable row level security;
 alter table public.audit_log enable row level security;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('listing-media', 'listing-media', true, 10485760, array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=true, file_size_limit=10485760, allowed_mime_types=excluded.allowed_mime_types;
+
+create policy "public reads listing media" on storage.objects
+  for select using (bucket_id='listing-media');
+create policy "members upload listing media" on storage.objects
+  for insert with check (bucket_id='listing-media' and public.is_tenant_member(((storage.foldername(name))[1])::uuid));
+create policy "members update listing media" on storage.objects
+  for update using (bucket_id='listing-media' and public.is_tenant_member(((storage.foldername(name))[1])::uuid));
+create policy "members delete listing media" on storage.objects
+  for delete using (bucket_id='listing-media' and public.is_tenant_member(((storage.foldername(name))[1])::uuid));
 
 create policy "members read tenant" on public.tenants
   for select using (public.is_tenant_member(id));

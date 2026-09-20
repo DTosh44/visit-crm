@@ -89,6 +89,16 @@ export interface BenefitUse {
   updatedAt?: string
 }
 
+export interface ListingMedia {
+  id: string
+  type: 'image' | 'video'
+  url: string
+  title?: string
+  alt?: string
+  caption?: string
+  storagePath?: string
+}
+
 export interface Listing {
   id: string
   organisationId: string
@@ -114,6 +124,7 @@ export interface Listing {
   goodToKnow: string[]
   lastUpdated: string
   image: string
+  media?: ListingMedia[]
 }
 
 export interface DestinationEvent {

@@ -108,6 +108,26 @@ describe('Visit CRM', () => {
     expect(screen.getByPlaceholderText('https://')).toBeInTheDocument()
   })
 
+  it('lets CRM editors manage listing images and hosted videos', () => {
+    const {container}=renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Listings'}))
+    fireEvent.change(screen.getByPlaceholderText('Search listings...'),{target:{value:'Valechester Castle'}})
+    fireEvent.click(screen.getAllByRole('button',{name:'Edit'})[0])
+    fireEvent.click(screen.getByRole('tab',{name:'Media'}))
+    expect(screen.getByText('1/10 images · 0/2 videos')).toBeInTheDocument()
+    const upload=container.querySelector<HTMLInputElement>('input[type="file"][multiple]')
+    expect(upload).toHaveAttribute('accept','image/jpeg,image/png,image/webp')
+    fireEvent.click(screen.getByRole('button',{name:'Add video'}))
+    fireEvent.change(screen.getByLabelText('Video title'),{target:{value:'Castle highlights'}})
+    fireEvent.change(screen.getByLabelText('Video URL'),{target:{value:'https://vimeo.com/123456'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save draft'}))
+    fireEvent.click(screen.getByRole('button',{name:'Close'}))
+    fireEvent.click(screen.getAllByRole('button',{name:'Edit'})[0])
+    fireEvent.click(screen.getByRole('tab',{name:'Media'}))
+    expect(screen.getByDisplayValue('Castle highlights')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://vimeo.com/123456')).toBeInTheDocument()
+  })
+
   it('uses configurable level names and keeps a Free Listing basic and unlinked', () => {
     window.history.pushState({}, '', '/listing-templates')
     const { unmount } = renderApp()

@@ -62,6 +62,11 @@ function categoryGroup(listing: Listing) {
   return 'Things to do'
 }
 
+function mediaUrl(value:string) {
+  if(!value) return imageLibrary.hero
+  return imageLibrary[value]??value
+}
+
 function siteNavigate(path: string) {
   window.history.pushState({}, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
@@ -89,7 +94,7 @@ function ListingCard({ listing, savedIds, toggleSaved }: { listing: Listing } & 
   const { data } = useCRM()
   const tier = data.organisations.find((item) => item.id === listing.organisationId)?.tier ?? 'Free Listing'
   const levelId = data.levels.find((item)=>item.name===tier)?.id
-  const image = imageLibrary[listing.image] ?? imageLibrary.hero
+  const image = mediaUrl(listing.image)
   const saved = savedIds.includes(listing.id)
   return (
     <article className="site-card">
@@ -384,7 +389,7 @@ function PlanPage({ listings, actions }: { listings: Listing[]; actions: Visitor
     setPlan(ranked.slice(0, Math.min(days * 2, ranked.length)).map((item) => item.listing))
     window.setTimeout(() => document.querySelector('#your-plan')?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
-  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow="Trip planner" title="Shape your Valechester." description="Choose the pace and the things you enjoy. We’ll turn published destination listings into a practical starting itinerary." image={imageLibrary.hero} /><section className="planner-builder site-container"><form onSubmit={buildPlan}><div><label>Who’s coming?<select value={group} onChange={(event) => setGroup(event.target.value)}><option>Solo traveller</option><option>Couple</option><option>Family</option><option>Friends</option></select></label><label>How long?<select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={1}>One day</option><option value={2}>Two days</option><option value={3}>Three days</option></select></label></div><fieldset><legend>What sounds good?</legend><div>{Object.keys(interestMatchers).map((interest) => <label key={interest} className={interests.includes(interest) ? 'selected' : ''}><input type="checkbox" checked={interests.includes(interest)} onChange={() => toggleInterest(interest)} />{interest}</label>)}</div></fieldset><button type="submit">Build my trip <Sparkles size={17} /></button></form>{plan.length > 0 && <section id="your-plan" className="generated-plan" aria-live="polite"><header><span className="site-eyebrow plum">Made for a {group.toLowerCase()}</span><h2>Your Valechester itinerary</h2><p>{days} {days === 1 ? 'day' : 'days'} · {interests.join(' · ')}</p></header>{Array.from({ length: days }, (_, day) => { const dayStops = plan.slice(day * 2, day * 2 + 2); return dayStops.length > 0 && <div className="plan-day" key={day}><h3>Day {day + 1}</h3>{dayStops.map((listing, index) => <article key={listing.id}><span>{index === 0 ? 'Morning' : 'Afternoon'}</span><img src={imageLibrary[listing.image] ?? imageLibrary.hero} alt="" /><div><small>{listing.town}</small><h4>{listing.name}</h4><p>{listing.shortDescription}</p><button onClick={() => siteNavigate(`/place/${listing.id}`)}>View place <ArrowRight size={14} /></button></div><button className={`plan-save${actions.savedIds.includes(listing.id) ? ' saved' : ''}`} onClick={() => actions.toggleSaved(listing)} aria-label={`${actions.savedIds.includes(listing.id) ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={17} fill={actions.savedIds.includes(listing.id) ? 'currentColor' : 'none'} /></button></article>)}</div> })}</section>}</section></main></PublicShell>
+  return <PublicShell savedCount={actions.savedIds.length}><main><PageIntro eyebrow="Trip planner" title="Shape your Valechester." description="Choose the pace and the things you enjoy. We’ll turn published destination listings into a practical starting itinerary." image={imageLibrary.hero} /><section className="planner-builder site-container"><form onSubmit={buildPlan}><div><label>Who’s coming?<select value={group} onChange={(event) => setGroup(event.target.value)}><option>Solo traveller</option><option>Couple</option><option>Family</option><option>Friends</option></select></label><label>How long?<select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={1}>One day</option><option value={2}>Two days</option><option value={3}>Three days</option></select></label></div><fieldset><legend>What sounds good?</legend><div>{Object.keys(interestMatchers).map((interest) => <label key={interest} className={interests.includes(interest) ? 'selected' : ''}><input type="checkbox" checked={interests.includes(interest)} onChange={() => toggleInterest(interest)} />{interest}</label>)}</div></fieldset><button type="submit">Build my trip <Sparkles size={17} /></button></form>{plan.length > 0 && <section id="your-plan" className="generated-plan" aria-live="polite"><header><span className="site-eyebrow plum">Made for a {group.toLowerCase()}</span><h2>Your Valechester itinerary</h2><p>{days} {days === 1 ? 'day' : 'days'} · {interests.join(' · ')}</p></header>{Array.from({ length: days }, (_, day) => { const dayStops = plan.slice(day * 2, day * 2 + 2); return dayStops.length > 0 && <div className="plan-day" key={day}><h3>Day {day + 1}</h3>{dayStops.map((listing, index) => <article key={listing.id}><span>{index === 0 ? 'Morning' : 'Afternoon'}</span><img src={mediaUrl(listing.image)} alt="" /><div><small>{listing.town}</small><h4>{listing.name}</h4><p>{listing.shortDescription}</p><button onClick={() => siteNavigate(`/place/${listing.id}`)}>View place <ArrowRight size={14} /></button></div><button className={`plan-save${actions.savedIds.includes(listing.id) ? ' saved' : ''}`} onClick={() => actions.toggleSaved(listing)} aria-label={`${actions.savedIds.includes(listing.id) ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={17} fill={actions.savedIds.includes(listing.id) ? 'currentColor' : 'none'} /></button></article>)}</div> })}</section>}</section></main></PublicShell>
 }
 
 interface ListingTemplateProfile {
@@ -423,7 +428,7 @@ function ListingTemplatesPage({ listings, actions }: { listings: Listing[]; acti
 }
 
 function LegacyListingPage({ listing, actions, tier }: { listing: Listing; actions: VisitorActions; tier: string }) {
-  const image = imageLibrary[listing.image] ?? imageLibrary.hero
+  const image = mediaUrl(listing.image)
   const [enquiring, setEnquiring] = useState(false)
   const [sent, setSent] = useState(false)
   const saved = actions.savedIds.includes(listing.id)
@@ -441,7 +446,7 @@ function ListingPage({ listing, actions }: { listing: Listing; actions: VisitorA
 }
 
 function TemplateListingPage({ listing, actions, tier, profile }: { listing: Listing; actions: VisitorActions; tier: string; profile: ListingTemplateProfile }) {
-  const image = imageLibrary[listing.image] ?? imageLibrary.hero
+  const image = mediaUrl(listing.image)
   const [enquiring, setEnquiring] = useState(false)
   const [sent, setSent] = useState(false)
   const saved = actions.savedIds.includes(listing.id)
@@ -459,7 +464,9 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
       </section>
     </main>
   </PublicShell>
-  const galleryPool = Array.from(new Set([image,imageLibrary.hero,imageLibrary.gardens,imageLibrary.restaurant,imageLibrary.theatre,imageLibrary.hotel,imageLibrary.museum,imageLibrary.park,imageLibrary.books,imageLibrary.lodge]))
+  const managedImages=(listing.media??[]).filter((item)=>item.type==='image').map((item)=>mediaUrl(item.url))
+  const videos=(listing.media??[]).filter((item)=>item.type==='video'&&item.url).slice(0,profile.videoCount)
+  const galleryPool = Array.from(new Set([image,...managedImages,imageLibrary.hero,imageLibrary.gardens,imageLibrary.restaurant,imageLibrary.theatre,imageLibrary.hotel,imageLibrary.museum,imageLibrary.park,imageLibrary.books,imageLibrary.lodge]))
   const gallery = galleryPool.slice(0,Math.min(profile.imageCount,5))
   const directions=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${listing.name}, ${listing.town}, Valechester`)}`
   const actionLabel = profile.action==='quote'?'Request a quote':'Make an enquiry'
@@ -471,7 +478,7 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
       <div className="place-breadcrumb site-container"><button onClick={() => siteNavigate('/')}>Home</button><span>/</span><button onClick={() => siteNavigate('/#discover')}>{categoryGroup(listing)}</button><span>/</span><strong>{listing.name}</strong></div>
       <section className="place-hero"><img src={image} alt={listing.name} /><div className="place-hero-copy site-container"><span className="site-eyebrow">{listing.category}</span><h1>{listing.name}</h1><p><MapPin size={16} />{listing.town}</p></div></section>
       {profile.showPlanningSummary&&<div className="place-planning-summary"><div className="site-container"><span><strong>Best for</strong><small>{listing.searchTags.slice(0,2).join(' · ')}</small></span><span><strong>Allow</strong><small>{profile.levelId==='level-001'?'Half a day or more':'Around two hours'}</small></span><span><strong>Plan ahead</strong><small>{listing.goodToKnow[0]}</small></span></div></div>}
-      {profile.imageCount>1&&<section className="member-media site-container"><header><div><span className="site-eyebrow plum">See the experience</span><h2>Gallery</h2></div><small>{profile.imageCount} images{profile.videoCount?` · ${profile.videoCount} ${profile.videoCount===1?'video':'videos'}`:''}</small></header><div className={`member-media-grid media-count-${gallery.length}`}>{gallery.map((src,index)=><img key={src} src={src} alt={`${listing.name} gallery view ${index+1}`}/>)}</div>{profile.videoCount>0&&<button className="member-video"><PlayCircle size={22}/><span><strong>Watch {listing.name}</strong><small>{profile.videoCount} video feature{profile.videoCount===1?'':'s'} available</small></span><ArrowRight size={16}/></button>}</section>}
+      {profile.imageCount>1&&<section className="member-media site-container"><header><div><span className="site-eyebrow plum">See the experience</span><h2>Gallery</h2></div><small>{gallery.length} images{videos.length?` · ${videos.length} ${videos.length===1?'video':'videos'}`:''}</small></header><div className={`member-media-grid media-count-${gallery.length}`}>{gallery.map((src,index)=>{const managed=(listing.media??[]).find((item)=>item.type==='image'&&mediaUrl(item.url)===src);return <img key={src} src={src} alt={managed?.alt||`${listing.name} gallery view ${index+1}`}/>})}</div>{videos.map((video)=><a className="member-video" href={video.url} target="_blank" rel="noreferrer" key={video.id}><PlayCircle size={22}/><span><strong>{video.title||`Watch ${listing.name}`}</strong><small>Open video</small></span><ArrowRight size={16}/></a>)}</section>}
       {profile.showAtGlance&&<section className="listing-at-glance"><div className="site-container"><header><span className="site-eyebrow plum">Visitor essentials</span><h2>At a glance</h2></header><dl><div><dt>Location</dt><dd>{listing.town}, Valechester</dd></div><div><dt>Experience</dt><dd>{listing.category}</dd></div><div><dt>Booking</dt><dd>{listing.bookingUrl?'Online booking available':'Check directly before visiting'}</dd></div><div><dt>Opening information</dt><dd>{listing.openingHours}</dd></div></dl></div></section>}
       <div className="place-layout site-container">
         <article>

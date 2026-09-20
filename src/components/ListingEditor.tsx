@@ -1,23 +1,35 @@
-import { Check, Globe2, Image, Info, Link2, MapPin, Plus, Save, Send, Sparkles, Trash2, UploadCloud } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowDown, ArrowUp, Check, Film, Globe2, Image, Info, Link2, MapPin, Plus, Save, Send, Sparkles, Star, Trash2, UploadCloud } from 'lucide-react'
+import { useState, type ChangeEvent, type DragEvent } from 'react'
+import { supabase } from '../auth'
 import { useCRM } from '../store'
-import type { Listing } from '../types'
+import { imageLibrary } from '../siteData'
+import { tenant } from '../tenant'
+import type { Listing, ListingMedia } from '../types'
 import { visitorTaxonomyFor } from '../listingTaxonomy'
 import { Badge, Button, Drawer, Field, Progress, Tabs } from './UI'
 
 type EditorTab = 'Content' | 'Visitor taxonomy' | 'Review sites' | 'Contact & links' | 'Facilities' | 'Media' | 'Preview'
+
+function listingMediaUrl(value:string) { return imageLibrary[value]??value??imageLibrary.hero }
+function fileDataUrl(file:File) { return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('The image could not be read.'));reader.readAsDataURL(file)}) }
 
 export function ListingEditor({ listing, onClose }: { listing: Listing; onClose: () => void }) {
   const { data, updateListing, publishListing } = useCRM()
   const [tab, setTab] = useState<EditorTab>('Content')
   const [draft, setDraft] = useState(listing)
   const [saved, setSaved] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [mediaError, setMediaError] = useState('')
   const organisation = data.organisations.find((item) => item.id === listing.organisationId)
   const membershipLevel = data.levels.find((item) => item.name === organisation?.tier)
   const taxonomyAllowance = membershipLevel?.taxonomyAllowance ?? 0
   const mediaAllowance = membershipLevel
     ? `${membershipLevel.imageAllowance} image${membershipLevel.imageAllowance === 1 ? '' : 's'}${membershipLevel.videoAllowance ? ` and ${membershipLevel.videoAllowance} video${membershipLevel.videoAllowance === 1 ? '' : 's'}` : ''}`
     : 'Media allowance unavailable'
+  const media=draft.media?.length?draft.media:[{id:`media-${draft.id}-hero`,type:'image' as const,url:draft.image,alt:draft.name,caption:''}]
+  const images=media.filter((item)=>item.type==='image')
+  const videos=media.filter((item)=>item.type==='video')
+  const mediaEnabled=Boolean(membershipLevel&&membershipLevel.id!=='level-006')
 
   const set = <K extends keyof Listing>(key: K, value: Listing[K]) => setDraft((current) => ({ ...current, [key]: value }))
   const save = () => {
@@ -30,6 +42,52 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
     publishListing(listing.id)
     onClose()
   }
+  const storeImage=async(file:File)=>{
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error(`${file.name} is not a JPG, PNG or WebP image.`)
+    if(file.size>10*1024*1024) throw new Error(`${file.name} is larger than 10 MB.`)
+    if(supabase){
+      const safeName=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,'-')
+      const storagePath=`${tenant.id}/${listing.id}/${Date.now()}-${safeName}`
+      const {error}=await supabase.storage.from('listing-media').upload(storagePath,file,{contentType:file.type,upsert:false})
+      if(error) throw error
+      return {url:supabase.storage.from('listing-media').getPublicUrl(storagePath).data.publicUrl,storagePath}
+    }
+    if(file.size>2*1024*1024) throw new Error('Connect Supabase Storage to upload images over 2 MB. Smaller files are stored in this demo workspace.')
+    return {url:await fileDataUrl(file),storagePath:undefined}
+  }
+  const addImages=async(files:File[])=>{
+    if(!mediaEnabled||!membershipLevel)return
+    const remaining=membershipLevel.imageAllowance-images.length
+    if(remaining<=0){setMediaError(`This listing has reached its allowance of ${membershipLevel.imageAllowance} images.`);return}
+    const selected=files.slice(0,remaining)
+    if(files.length>remaining)setMediaError(`${remaining} more ${remaining===1?'image is':'images are'} available on this membership level.`);else setMediaError('')
+    setUploading(true)
+    try{
+      const uploaded:ListingMedia[]=[]
+      for(const file of selected){const stored=await storeImage(file);uploaded.push({id:`media-${Date.now()}-${uploaded.length}`,type:'image',url:stored.url,storagePath:stored.storagePath,alt:file.name.replace(/\.[^.]+$/,''),caption:''})}
+      setDraft((current)=>({...current,media:[...(current.media?.length?current.media:media),...uploaded],image:current.image||uploaded[0]?.url||''}))
+    }catch(error){setMediaError(error instanceof Error?error.message:'The images could not be uploaded.')}finally{setUploading(false)}
+  }
+  const onFiles=(event:ChangeEvent<HTMLInputElement>)=>{void addImages(Array.from(event.target.files??[]));event.target.value=''}
+  const onDrop=(event:DragEvent<HTMLLabelElement>)=>{event.preventDefault();void addImages(Array.from(event.dataTransfer.files))}
+  const replaceImage=async(item:ListingMedia,file?:File)=>{
+    if(!file)return
+    setUploading(true);setMediaError('')
+    try{const stored=await storeImage(file);setDraft((current)=>({...current,image:current.image===item.url?stored.url:current.image,media:(current.media??media).map((entry)=>entry.id===item.id?{...entry,url:stored.url,storagePath:stored.storagePath}:entry)}))}catch(error){setMediaError(error instanceof Error?error.message:'The image could not be replaced.')}finally{setUploading(false)}
+  }
+  const removeMedia=(item:ListingMedia)=>{
+    const next=media.filter((entry)=>entry.id!==item.id)
+    const nextHero=draft.image===item.url?(next.find((entry)=>entry.type==='image')?.url??''):draft.image
+    setDraft((current)=>({...current,media:next,image:nextHero}))
+    if(item.storagePath&&supabase)void supabase.storage.from('listing-media').remove([item.storagePath])
+  }
+  const moveImage=(item:ListingMedia,direction:-1|1)=>{
+    const currentIndex=media.findIndex((entry)=>entry.id===item.id);let target=currentIndex+direction
+    while(target>=0&&target<media.length&&media[target].type!=='image')target+=direction
+    if(target<0||target>=media.length)return
+    const next=[...media];[next[currentIndex],next[target]]=[next[target],next[currentIndex]];set('media',next)
+  }
+  const updateMedia=(itemId:string,changes:Partial<ListingMedia>)=>set('media',media.map((item)=>item.id===itemId?{...item,...changes}:item))
 
   return (
     <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={onClose}>
@@ -84,15 +142,21 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
             })}</div>
           </div>}
 
-          {tab === 'Media' && <div className="form-stack">
-            <div className={`media-hero image-${draft.image}`}><span><Image size={28} /><strong>Current hero image</strong><small>Recommended 1600 × 900px</small></span></div>
-            <button className="upload-zone" disabled={!membershipLevel?.imageAllowance}><UploadCloud size={25} /><strong>Upload images</strong><span>Drag and drop JPG, PNG or WebP files, or browse</span><small>{membershipLevel?.imageAllowance ? `Up to ${mediaAllowance} on the ${organisation?.tier} membership level` : 'This membership level does not include listing media'}</small></button>
-            <div className="info-note"><Info size={17} /><p>Only upload images the organisation owns or has permission to use. Record image rights before publishing.</p></div>
+          {tab === 'Media' && <div className="form-stack listing-media-manager">
+            <div className="media-manager-heading"><div><h3 className="form-title">Images and video</h3><p className="form-description">Upload, replace and order listing imagery, then add hosted video links.</p></div><span>{images.length}/{membershipLevel?.imageAllowance??0} images · {videos.length}/{membershipLevel?.videoAllowance??0} videos</span></div>
+            {!mediaEnabled?<div className="media-unavailable"><Image size={24}/><div><strong>Visit Valechester branded imagery is used for this listing</strong><p>This membership level does not include business images or video.</p></div></div>:<>
+              {images.length>0&&<div className="media-hero" style={{backgroundImage:`url("${listingMediaUrl(draft.image||images[0].url)}")`,backgroundSize:'cover',backgroundPosition:'center'}}><span><Star size={24}/><strong>Hero image</strong><small>{images.find((item)=>item.url===draft.image)?.alt||draft.name}</small></span></div>}
+              <section className="media-manager-section"><header><div><strong>Image library</strong><small>The hero image appears on cards and at the top of the listing.</small></div></header><div className="listing-media-grid">{images.map((item,index)=><article key={item.id} className={draft.image===item.url?'is-hero':''}><div className="listing-media-thumb"><img src={listingMediaUrl(item.url)} alt={item.alt||''}/>{draft.image===item.url&&<span><Star size={11}/>Hero</span>}</div><div className="listing-media-fields"><label>Alternative text<input value={item.alt??''} onChange={(event)=>updateMedia(item.id,{alt:event.target.value})} placeholder="Describe the image"/></label><label>Caption<input value={item.caption??''} onChange={(event)=>updateMedia(item.id,{caption:event.target.value})} placeholder="Optional caption"/></label></div><footer><div><button type="button" onClick={()=>moveImage(item,-1)} disabled={index===0} aria-label={`Move ${item.alt||'image'} up`}><ArrowUp size={14}/></button><button type="button" onClick={()=>moveImage(item,1)} disabled={index===images.length-1} aria-label={`Move ${item.alt||'image'} down`}><ArrowDown size={14}/></button></div><div><label className="media-replace">Replace<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event)=>void replaceImage(item,event.target.files?.[0])}/></label>{draft.image!==item.url&&<button type="button" onClick={()=>set('image',item.url)}>Set as hero</button>}<button type="button" className="danger" onClick={()=>removeMedia(item)} aria-label={`Remove ${item.alt||'image'}`}><Trash2 size={14}/></button></div></footer></article>)}</div></section>
+              <label className={`upload-zone${uploading?' busy':''}`} onDragOver={(event)=>event.preventDefault()} onDrop={onDrop} aria-disabled={uploading||images.length>=(membershipLevel?.imageAllowance??0)}><input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onFiles} disabled={uploading||images.length>=(membershipLevel?.imageAllowance??0)}/><UploadCloud size={25}/><strong>{uploading?'Uploading images…':'Upload images'}</strong><span>Drag and drop JPG, PNG or WebP files, or browse</span><small>Up to 10 MB each · {mediaAllowance} on the {organisation?.tier} membership level</small></label>
+              {mediaError&&<div className="media-error" role="alert">{mediaError}</div>}
+              <section className="media-manager-section video-manager"><header><div><strong>Hosted videos</strong><small>Add a YouTube, Vimeo, Mux or other public video URL.</small></div>{videos.length<(membershipLevel?.videoAllowance??0)&&<Button variant="secondary" size="sm" icon={Plus} onClick={()=>set('media',[...media,{id:`video-${Date.now()}`,type:'video',url:'',title:`Watch ${draft.name}`}])}>Add video</Button>}</header>{membershipLevel?.videoAllowance?<div className="video-editor-list">{videos.map((item)=><article key={item.id}><Film size={20}/><Field label="Video title"><input value={item.title??''} onChange={(event)=>updateMedia(item.id,{title:event.target.value})}/></Field><Field label="Video URL"><input type="url" value={item.url} placeholder="https://" onChange={(event)=>updateMedia(item.id,{url:event.target.value})}/></Field><button type="button" onClick={()=>removeMedia(item)} aria-label={`Remove ${item.title||'video'}`}><Trash2 size={16}/></button></article>)}</div>:<p className="media-empty">Video is not included with this membership level.</p>}</section>
+            </>}
+            <div className="info-note"><Info size={17}/><p>Only upload media the organisation owns or has permission to use. Images are delivered from managed storage when Supabase is connected. Hosted video platforms handle streaming and playback quality.</p></div>
           </div>}
 
           {tab === 'Preview' && <div className="website-preview">
             <div className="preview-browser"><span /><span /><span /><p>visitvalechester.co.uk/place/{draft.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}</p></div>
-            <div className={`preview-hero image-${draft.image}`}><div><Badge tone="purple">{draft.category}</Badge><h2>{draft.name}</h2><p><MapPin size={15} />{draft.town}</p></div></div>
+            <div className="preview-hero" style={{backgroundImage:`url("${listingMediaUrl(draft.image)}")`,backgroundSize:'cover',backgroundPosition:'center'}}><div><Badge tone="purple">{draft.category}</Badge><h2>{draft.name}</h2><p><MapPin size={15} />{draft.town}</p></div></div>
             <div className="preview-content"><main><p className="preview-lead">{draft.shortDescription}</p><p>{draft.description}</p><h3>Facilities</h3><div className="preview-facilities">{draft.facilities.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></main><aside><h3>Plan your visit</h3><p><strong>Opening hours</strong>{draft.openingHours}</p><p><strong>Contact</strong>{draft.phone}<br />{draft.email}</p>{draft.bookingUrl && <Button>Book now</Button>}<Button variant="secondary" icon={Globe2}>Visit website</Button></aside></div>
           </div>}
         </div>

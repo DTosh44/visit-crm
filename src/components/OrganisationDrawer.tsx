@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
+import { imageLibrary } from '../siteData'
 import type { Listing, Organisation } from '../types'
 import { currency, formatDate, timeAgo } from '../utils'
 import { Avatar, Badge, Button, Drawer, Progress, Tabs } from './UI'
@@ -122,7 +123,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
       {tab === 'Listings' && <div className="org-tab-content">
         <div className="section-heading"><div><h3>Website listings</h3><p>Edit and publish this organisation’s public content from its CRM record.</p></div><Button icon={Plus} size="sm">Add listing</Button></div>
         <div className="org-listing-grid">{listings.map((listing) => <article className="org-listing-card" key={listing.id}>
-          <div className={`listing-image image-${listing.image}`}><span>{listing.category}</span></div>
+          <div className="listing-image" style={{backgroundImage:`url("${imageLibrary[listing.image]??listing.image}")`}}><span>{listing.category}</span></div>
           <div className="org-listing-body"><div><Badge>{listing.status}</Badge><span>{listing.completeness}% complete</span></div><h3>{listing.name}</h3><p>{listing.shortDescription}</p><div className="listing-card-stats"><span><Globe2 size={14} />{listing.views.toLocaleString()} views</span><span><MessageSquarePlus size={14} />{listing.enquiries} clicks</span></div></div>
           <footer><span>Updated {formatDate(listing.lastUpdated, { day: 'numeric', month: 'short' })}</span><Button variant="secondary" size="sm" icon={Edit3} onClick={() => onEditListing(listing)}>Edit listing</Button></footer>
         </article>)}</div>

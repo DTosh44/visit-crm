@@ -63,6 +63,7 @@ interface PublicListingRow {
   opening_hours: string
   facilities: string[]
   image: string
+  media?: Listing['media']
   updated_at: string
 }
 
@@ -86,6 +87,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     openingHours: row.opening_hours,
     facilities: row.facilities,
     image: row.image,
+    media: row.media ?? [],
     lastUpdated: row.updated_at.slice(0, 10),
     searchTags: [], reviewHighlights: [], goodToKnow: [],
   }
@@ -112,6 +114,7 @@ function toPublicListing(listing: Listing) {
     opening_hours: listing.openingHours,
     facilities: listing.facilities,
     image: listing.image,
+    media: listing.media ?? [],
     published_at: listing.status === 'Published' ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   }
@@ -145,7 +148,8 @@ function normalizeCRMData(parsed: CRMData): CRMData {
       const searchTags=Array.from(new Set([...(item.searchTags??[]),...(sampleBaseline?.searchTags??[])]))
       const listing = { ...item, searchTags }
       const visitorTaxonomy=sampleBaseline?visitorTaxonomyFor({...listing,visitorTaxonomy:undefined}):item.visitorTaxonomy??visitorTaxonomyFor(listing)
-      return { ...listing, visitorTaxonomy, reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
+      const media=item.media?.length?item.media:[{id:`media-${item.id}-hero`,type:'image' as const,url:item.image,alt:item.name,caption:''}]
+      return { ...listing, media, visitorTaxonomy, reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
     }),
   }
 }

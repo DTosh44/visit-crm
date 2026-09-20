@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { Listing } from '../types'
 import { formatDate } from '../utils'
+import { imageLibrary } from '../siteData'
 import { Badge, Button, PageHeader, Progress } from '../components/UI'
 
 export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
@@ -41,7 +42,7 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
           {listings.map((listing) => {
             const org = data.organisations.find((item) => item.id === listing.organisationId)
             return <article className="listing-card" key={listing.id}>
-              <div className={`listing-image image-${listing.image}`}><div><Badge>{listing.status}</Badge><button className="icon-button"><MoreHorizontal size={17} /></button></div><span>{listing.category}</span></div>
+              <div className="listing-image" style={{backgroundImage:`url("${imageLibrary[listing.image]??listing.image}")`}}><div><Badge>{listing.status}</Badge><button className="icon-button"><MoreHorizontal size={17} /></button></div><span>{listing.category}</span></div>
               <div className="listing-card-content">
                 <small>{org?.name}</small><h3>{listing.name}</h3><p>{listing.shortDescription}</p>
                 <div className="listing-completeness"><div><span>Completeness</span><strong>{listing.completeness}%</strong></div><Progress value={listing.completeness} colour={listing.completeness >= 85 ? '#278362' : '#d28d30'} /></div>
