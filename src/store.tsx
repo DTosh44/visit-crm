@@ -16,7 +16,7 @@ import type {
   TaskDraft,
 } from './types'
 
-const STORAGE_KEY = 'visit-valechester-crm-v2'
+const STORAGE_KEY = 'visit-valechester-crm-v3'
 
 interface CRMContextValue {
   data: CRMData
