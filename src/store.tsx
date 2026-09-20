@@ -117,11 +117,17 @@ function toPublicListing(listing: Listing) {
 }
 
 function normalizeCRMData(parsed: CRMData): CRMData {
+  const legacyMediaAllowances: Record<string, [number, number]> = { 'Tier 4':[30,5], 'Tier 3':[20,3], 'Tier 2':[12,1], 'Tier 1':[6,0], 'Free Listing':[1,0] }
   return {
     ...parsed,
     events: (parsed.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })),
     socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics,
-    levels: (parsed.levels ?? initialData.levels).map((level) => ({ ...level, taxonomyAllowance: level.taxonomyAllowance ?? initialData.levels.find((item) => item.name === level.name)?.taxonomyAllowance ?? 6 })),
+    levels: (parsed.levels ?? initialData.levels).map((level) => {
+      const baseline = initialData.levels.find((item) => item.name === level.name)
+      const legacy = legacyMediaAllowances[level.name]
+      const hasLegacyMedia = Boolean(legacy && level.imageAllowance === legacy[0] && level.videoAllowance === legacy[1])
+      return { ...level, imageAllowance: hasLegacyMedia ? baseline?.imageAllowance ?? level.imageAllowance : level.imageAllowance, videoAllowance: hasLegacyMedia ? baseline?.videoAllowance ?? level.videoAllowance : level.videoAllowance, taxonomyAllowance: level.taxonomyAllowance ?? baseline?.taxonomyAllowance ?? 6 }
+    }),
     listings: parsed.listings.map((item) => {
       const listing = { ...item, searchTags: item.searchTags ?? [] }
       return { ...listing, visitorTaxonomy: item.visitorTaxonomy ?? visitorTaxonomyFor(listing), reviewHighlights: item.reviewHighlights ?? [], reviewSites: item.reviewSites ?? [], goodToKnow: item.goodToKnow ?? [] }
