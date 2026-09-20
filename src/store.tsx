@@ -5,6 +5,8 @@ import { supabase, useAuth } from './auth'
 import { tenant } from './tenant'
 import type {
   CRMData,
+  DestinationEvent,
+  EventDraft,
   InvoiceDraft,
   Listing,
   MembershipLevel,
@@ -14,7 +16,7 @@ import type {
   TaskDraft,
 } from './types'
 
-const STORAGE_KEY = 'visit-valechester-crm-v1'
+const STORAGE_KEY = 'visit-valechester-crm-v2'
 
 interface CRMContextValue {
   data: CRMData
@@ -22,6 +24,10 @@ interface CRMContextValue {
   updateOrganisation: (id: string, changes: Partial<Organisation>) => void
   updateListing: (id: string, changes: Partial<Listing>) => void
   publishListing: (id: string) => void
+  createEvent: (draft: EventDraft) => DestinationEvent
+  updateEvent: (id: string, changes: Partial<DestinationEvent>) => void
+  publishEvent: (id: string) => void
+  deleteEvent: (id: string) => void
   moveOpportunity: (id: string, stage: PipelineStage) => void
   markInvoicePaid: (id: string) => void
   toggleInvoiceReminders: (id: string) => void
@@ -113,7 +119,7 @@ function readInitialData(): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? JSON.parse(stored) as CRMData : initialData
-    return { ...parsed, socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
+    return { ...parsed, events: parsed.events ?? initialData.events, socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
   } catch {
     return initialData
   }
@@ -142,7 +148,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
         if (active && state?.data) {
           const remoteData = state.data as CRMData
-          setData({ ...remoteData, socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
+          setData({ ...remoteData, events: remoteData.events ?? initialData.events, socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
         }
       } else {
         const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')
@@ -251,6 +257,25 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         }, ...current.activities],
       }))
     },
+    createEvent: (draft) => {
+      const event: DestinationEvent = { ...draft, id: id('event'), lastUpdated: todayISO() }
+      setData((current) => ({
+        ...current,
+        events: [event, ...current.events],
+        activities: [{ id: id('act'), type: 'event', title: 'Event submitted', detail: `${event.title} was submitted for review.`, timestamp: new Date().toISOString(), user: draft.submittedBy || user?.name || 'Event organiser' }, ...current.activities],
+      }))
+      return event
+    },
+    updateEvent: (eventId, changes) => setData((current) => ({
+      ...current,
+      events: current.events.map((item) => item.id === eventId ? { ...item, ...changes, lastUpdated: todayISO() } : item),
+      activities: [{ id: id('act'), type: 'event', title: 'Event updated', detail: `${current.events.find((item) => item.id === eventId)?.title ?? 'Event'} was updated.`, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities],
+    })),
+    publishEvent: (eventId) => setData((current) => ({
+      ...current,
+      events: current.events.map((item) => item.id === eventId ? { ...item, status: 'Published', lastUpdated: todayISO() } : item),
+    })),
+    deleteEvent: (eventId) => setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) })),
     moveOpportunity: (opportunityId, stage) => {
       setData((current) => ({
         ...current,

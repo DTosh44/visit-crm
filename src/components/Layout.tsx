@@ -1,6 +1,6 @@
 import {
   Bell, Building2, ChevronDown, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
-  FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings,
+  FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings, CalendarDays,
   UsersRound, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -27,6 +27,7 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
   ] },
   { label: 'Website', items: [
     { key: 'listings', label: 'Listings', icon: FilePenLine, feature: 'listings' },
+    { key: 'events', label: 'Events', icon: CalendarDays, feature: 'events' },
   ] },
   { label: 'Manage', items: [
     { key: 'settings', label: 'Settings', icon: Settings },
@@ -35,7 +36,7 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
 
 const pageNames: Record<ViewKey, string> = {
   dashboard: 'Dashboard', organisations: 'Organisations', pipeline: 'Sales pipeline', memberships: 'Memberships',
-  listings: 'Listings', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', settings: 'Settings',
+  listings: 'Listings', events: 'Events', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', settings: 'Settings',
 }
 
 export function Layout({

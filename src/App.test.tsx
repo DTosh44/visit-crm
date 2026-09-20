@@ -4,6 +4,7 @@ import App from './App'
 import { CRMProvider } from './store'
 import { AuthProvider } from './auth'
 import { FeatureProvider } from './features'
+import { initialData } from './data'
 
 function renderApp() {
   return render(<AuthProvider><FeatureProvider><CRMProvider><App /></CRMProvider></FeatureProvider></AuthProvider>)
@@ -50,7 +51,23 @@ describe('Visit CRM', () => {
     renderApp()
     expect(screen.getByRole('heading', { name: /A town with stories/i })).toBeInTheDocument()
     expect(screen.getAllByText('Valechester Castle').length).toBeGreaterThan(0)
-    expect(screen.queryByText('The Lantern House Hotel')).not.toBeInTheDocument()
+    expect(screen.getByText('The Lantern House Hotel')).toBeInTheDocument()
+  })
+
+  it('provides at least fifteen published businesses for every membership type', () => {
+    const publishedOrganisations = new Set(initialData.listings.filter((listing) => listing.status === 'Published').map((listing) => listing.organisationId))
+    for (const level of initialData.levels) {
+      const count = initialData.organisations.filter((organisation) => organisation.tier === level.name && publishedOrganisations.has(organisation.id)).length
+      expect(count, level.name).toBeGreaterThanOrEqual(15)
+    }
+  })
+
+  it('shows fifty editable events in the CMS', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Events' }))
+    expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument()
+    expect(screen.getByText('Showing 50 of 50 events')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Valechester After Dark' })).toBeInTheDocument()
   })
 
   it('saves a place and opens the saved places page', () => {

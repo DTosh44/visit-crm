@@ -78,6 +78,44 @@ create table public.public_listings (
   primary key (tenant_id, id)
 );
 
+-- Event organisers use standard Supabase Auth accounts. Events can be submitted
+-- by any authenticated organiser and are deliberately independent of membership.
+create table public.event_organisers (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null,
+  organisation_name text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.events (
+  id text primary key,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  organisation_id text,
+  submitted_by uuid references auth.users(id) on delete set null,
+  submitted_by_label text not null default '',
+  title text not null,
+  category text not null,
+  description text not null,
+  start_date date not null,
+  end_date date not null,
+  start_time time not null,
+  end_time time not null,
+  venue_name text not null,
+  address text not null,
+  town text not null,
+  postcode text not null,
+  price text not null default 'Free',
+  booking_url text not null default '',
+  contact_name text not null,
+  contact_email text not null,
+  image text not null default 'theatre',
+  accessibility text not null default '',
+  status text not null default 'In review' check (status in ('Published','Draft','In review','Changes requested')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 -- Normalised metrics are ready for scheduled social API imports. The current
 -- local workspace also keeps a copy in workspace_states so it works without credentials.
 create table public.social_metrics (
@@ -143,6 +181,8 @@ alter table public.profiles enable row level security;
 alter table public.workspace_states enable row level security;
 alter table public.user_preferences enable row level security;
 alter table public.public_listings enable row level security;
+alter table public.event_organisers enable row level security;
+alter table public.events enable row level security;
 alter table public.social_metrics enable row level security;
 alter table public.audit_log enable row level security;
 
@@ -178,6 +218,23 @@ create policy "members create listings" on public.public_listings
 create policy "members update listings" on public.public_listings
   for update using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
 create policy "members delete listings" on public.public_listings
+  for delete using (public.is_tenant_member(tenant_id));
+
+create policy "organisers read own profile" on public.event_organisers
+  for select using (user_id = auth.uid());
+create policy "organisers create own profile" on public.event_organisers
+  for insert with check (user_id = auth.uid());
+create policy "organisers update own profile" on public.event_organisers
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create policy "public reads published events" on public.events
+  for select using (status = 'Published' or submitted_by = auth.uid() or public.is_tenant_member(tenant_id));
+create policy "organisers submit events" on public.events
+  for insert with check (submitted_by = auth.uid() or public.is_tenant_member(tenant_id));
+create policy "organisers update own unpublished events" on public.events
+  for update using ((submitted_by = auth.uid() and status <> 'Published') or public.is_tenant_member(tenant_id))
+  with check ((submitted_by = auth.uid() and status <> 'Published') or public.is_tenant_member(tenant_id));
+create policy "members delete events" on public.events
   for delete using (public.is_tenant_member(tenant_id));
 
 create policy "members read social metrics" on public.social_metrics

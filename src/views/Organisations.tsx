@@ -24,17 +24,20 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
 
   const toggleAll = () => setSelected(selected.length === organisations.length ? [] : organisations.map((org) => org.id))
   const toggle = (id: string) => setSelected((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])
+  const activeMembers = data.organisations.filter((org) => (org.status === 'Active' || org.status === 'Renewing') && org.tier !== 'Free Listing').length
+  const healthCount = (health: Organisation['health']) => data.organisations.filter((org) => org.health === health).length
+  const freeListings = data.organisations.filter((org) => org.tier === 'Free Listing').length
 
   return (
     <div>
       <PageHeader eyebrow="CRM" title="Organisations" description="Manage members, prospects, contacts and every relationship in one place." actions={<><Button variant="secondary" icon={Download}>Export</Button><Button icon={Plus} onClick={onAdd}>Add organisation</Button></>} />
 
       <section className="summary-strip organisation-summary">
-        <div><span className="summary-icon purple"><Building2 size={18} /></span><p><strong>99</strong><small>Active members</small></p></div>
-        <div><span className="summary-dot green" /><p><strong>77</strong><small>Happy</small></p></div>
-        <div><span className="summary-dot amber" /><p><strong>17</strong><small>OK</small></p></div>
-        <div><span className="summary-dot red" /><p><strong>5</strong><small>Need attention</small></p></div>
-        <div><p><strong>47</strong><small>Free listings</small></p></div>
+        <div><span className="summary-icon purple"><Building2 size={18} /></span><p><strong>{activeMembers}</strong><small>Active members</small></p></div>
+        <div><span className="summary-dot green" /><p><strong>{healthCount('Happy')}</strong><small>Happy</small></p></div>
+        <div><span className="summary-dot amber" /><p><strong>{healthCount('OK')}</strong><small>OK</small></p></div>
+        <div><span className="summary-dot red" /><p><strong>{healthCount('Needs attention')}</strong><small>Need attention</small></p></div>
+        <div><p><strong>{freeListings}</strong><small>Free listings</small></p></div>
       </section>
 
       <section className="panel data-panel">

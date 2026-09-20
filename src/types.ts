@@ -4,6 +4,7 @@ export type ViewKey =
   | 'pipeline'
   | 'memberships'
   | 'listings'
+  | 'events'
   | 'billing'
   | 'agreements'
   | 'tasks'
@@ -16,6 +17,7 @@ export type InvoiceStatus = 'Draft' | 'Sent' | 'Overdue' | 'Paid' | 'Void'
 export type AgreementStatus = 'Draft' | 'Sent' | 'Viewed' | 'Signed' | 'Declined' | 'Expired'
 export type TaskPriority = 'High' | 'Medium' | 'Low'
 export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won'
+export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
 
 export interface Contact {
   id: string
@@ -110,6 +112,31 @@ export interface Listing {
   image: string
 }
 
+export interface DestinationEvent {
+  id: string
+  title: string
+  category: string
+  description: string
+  startDate: string
+  endDate: string
+  startTime: string
+  endTime: string
+  venueName: string
+  address: string
+  town: string
+  postcode: string
+  price: string
+  bookingUrl: string
+  contactName: string
+  contactEmail: string
+  image: string
+  accessibility: string
+  status: EventStatus
+  submittedBy: string
+  organisationId?: string
+  lastUpdated: string
+}
+
 export interface Invoice {
   id: string
   number: string
@@ -171,7 +198,7 @@ export interface Opportunity {
 export interface Activity {
   id: string
   organisationId?: string
-  type: 'note' | 'email' | 'invoice' | 'listing' | 'agreement' | 'task'
+  type: 'note' | 'email' | 'invoice' | 'listing' | 'event' | 'agreement' | 'task'
   title: string
   detail: string
   timestamp: string
@@ -196,6 +223,7 @@ export interface CRMData {
   benefits: Benefit[]
   benefitUsage: BenefitUse[]
   listings: Listing[]
+  events: DestinationEvent[]
   invoices: Invoice[]
   agreements: Agreement[]
   tasks: CRMTask[]
@@ -230,3 +258,5 @@ export interface TaskDraft {
   priority: TaskPriority
   category: CRMTask['category']
 }
+
+export type EventDraft = Omit<DestinationEvent, 'id' | 'lastUpdated'>

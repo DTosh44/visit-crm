@@ -13,13 +13,6 @@ export const imageLibrary: Record<string, string> = {
   park: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=84',
 }
 
-export const events = [
-  { id: 'event-1', day: '26', month: 'SEP', title: 'Valechester After Dark', place: 'Castle Quarter', category: 'Festival', time: '6pm–10pm', price: 'Free', description: 'Lantern trails, live stories and late opening across the old town.', image: imageLibrary.castle },
-  { id: 'event-2', day: '03', month: 'OCT', title: 'Harvest & Makers Market', place: 'Market Square', category: 'Food & drink', time: '10am–4pm', price: 'Free', description: 'Meet growers, bakers and independent makers from across the Vale.', image: imageLibrary.restaurant },
-  { id: 'event-3', day: '17', month: 'OCT', title: 'Light on the River', place: 'Riverside Gardens', category: 'Family', time: '5pm–9pm', price: 'From £6', description: 'An illuminated riverside walk with music, food and family activities.', image: imageLibrary.park },
-  { id: 'event-4', day: '22', month: 'OCT', title: 'New Voices Weekend', place: 'Riverside Playhouse', category: 'Culture', time: 'Various times', price: 'From £12', description: 'Three days of new theatre, comedy and talks beside the River Vale.', image: imageLibrary.theatre },
-]
-
 export const guides = [
   {
     slug: 'perfect-day',
