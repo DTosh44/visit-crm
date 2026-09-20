@@ -7,10 +7,11 @@ import { Avatar, Badge, Button, Drawer, PageHeader } from '../components/UI'
 import { downloadCsv, openEmail, printHtml } from '../actions'
 
 export function Billing({ onCreate }: { onCreate: () => void }) {
-  const { data, markInvoicePaid, toggleInvoiceReminders, sendInvoice } = useCRM()
+  const { data, markInvoicePaid, toggleInvoiceReminders, sendInvoice, runInvoiceReminders } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All statuses')
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [reminderMessage,setReminderMessage]=useState('')
   const invoices = useMemo(() => data.invoices.filter((invoice) => {
     const org = data.organisations.find((item) => item.id === invoice.organisationId)
     return (!query || [invoice.number, invoice.description, org?.name].join(' ').toLowerCase().includes(query.toLowerCase())) && (status === 'All statuses' || invoice.status === status)
@@ -21,7 +22,8 @@ export function Billing({ onCreate }: { onCreate: () => void }) {
 
   return (
     <div>
-      <PageHeader eyebrow="Finance" title="Billing" description="Raise invoices, track payment and manage automatic reminders." actions={<><Button variant="secondary" icon={Download} onClick={()=>downloadCsv('invoices.csv',[['Invoice','Organisation','Issued','Due','Net','VAT','Total','Status'],...invoices.map((invoice)=>[invoice.number,data.organisations.find((org)=>org.id===invoice.organisationId)?.name,invoice.issueDate,invoice.dueDate,invoice.subtotal,invoice.vat,invoice.total,invoice.status])])}>Export</Button><Button icon={Plus} onClick={onCreate}>New invoice</Button></>} />
+      <PageHeader eyebrow="Finance" title="Billing" description="Raise invoices, track payment and manage automatic reminders." actions={<><Button variant="secondary" icon={PlayCircle} onClick={()=>{const count=runInvoiceReminders();setReminderMessage(count?`${count} reminder${count===1?'':'s'} queued.`:'No reminders are due.');window.setTimeout(()=>setReminderMessage(''),3000)}}>Run reminders</Button><Button variant="secondary" icon={Download} onClick={()=>downloadCsv('invoices.csv',[['Invoice','Organisation','Issued','Due','Net','VAT','Total','Status'],...invoices.map((invoice)=>[invoice.number,data.organisations.find((org)=>org.id===invoice.organisationId)?.name,invoice.issueDate,invoice.dueDate,invoice.subtotal,invoice.vat,invoice.total,invoice.status])])}>Export</Button><Button icon={Plus} onClick={onCreate}>New invoice</Button></>} />
+      {reminderMessage&&<div className="inline-success" role="status">{reminderMessage}</div>}
       <section className="billing-stats">
         <article><span className="stat-icon green"><Check size={18} /></span><div><p>Paid this year</p><h3>{currency.format(totalPaid)}</h3><small>2 invoices in this model</small></div></article>
         <article><span className="stat-icon blue"><CircleDollarSign size={18} /></span><div><p>Outstanding</p><h3>{currency.format(totalOutstanding)}</h3><small>{data.invoices.filter((item) => ['Sent','Overdue'].includes(item.status)).length} invoices</small></div></article>

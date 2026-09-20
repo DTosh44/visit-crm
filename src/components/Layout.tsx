@@ -1,7 +1,7 @@
 import {
-  Bell, Building2, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
+  Bell, BarChart3, BookOpen, Building2, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
   FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings, CalendarDays,
-  UsersRound, X,
+  Inbox as InboxIcon, UsersRound, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useCRM } from '../store'
@@ -28,6 +28,11 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
   { label: 'Website', items: [
     { key: 'listings', label: 'Listings', icon: FilePenLine, feature: 'listings' },
     { key: 'events', label: 'Events', icon: CalendarDays, feature: 'events' },
+    { key: 'content', label: 'Guides, itineraries & trails', icon: BookOpen, feature: 'itineraries' },
+    { key: 'inbox', label: 'Website inbox', icon: InboxIcon },
+  ] },
+  { label: 'Reporting', items: [
+    { key: 'insights', label: 'Reviews & social insights', icon: BarChart3, feature: 'reviewIntelligence' },
   ] },
   { label: 'Manage', items: [
     { key: 'settings', label: 'Settings', icon: Settings },
@@ -36,7 +41,7 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
 
 const pageNames: Record<ViewKey, string> = {
   dashboard: 'Dashboard', organisations: 'Organisations', pipeline: 'Sales pipeline', memberships: 'Memberships',
-  listings: 'Listings', events: 'Events', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', settings: 'Settings',
+  listings: 'Listings', events: 'Events', content: 'Guides, itineraries & trails', inbox: 'Website inbox', insights: 'Reviews & social insights', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', settings: 'Settings',
 }
 
 export function Layout({
@@ -62,6 +67,7 @@ export function Layout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
+  const [notificationsOpen,setNotificationsOpen]=useState(false)
   const [query, setQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
@@ -93,6 +99,12 @@ export function Layout({
       return [org.name,org.town,org.type,org.tier,...org.tags,...contacts.flatMap((contact)=>[contact.name,contact.email]),...listings.flatMap((listing)=>[listing.name,listing.category,listing.town])].join(' ').toLowerCase().includes(term)
     }).slice(0, 7)
   }, [data.contacts,data.listings,data.organisations, query])
+  const notifications=useMemo(()=>{const today=new Date().toISOString().slice(0,10);return[
+    ...data.tasks.filter((task)=>!task.completed&&task.dueDate<=today).map((task)=>({id:`task-${task.id}`,title:task.title,detail:task.dueDate<today?'Task is overdue':'Task is due today',view:'tasks' as ViewKey})),
+    ...data.invoices.filter((invoice)=>invoice.status==='Overdue').map((invoice)=>({id:`invoice-${invoice.id}`,title:`${invoice.number} is overdue`,detail:'Payment follow-up required',view:'billing' as ViewKey})),
+    ...data.events.filter((event)=>event.status==='In review').map((event)=>({id:`event-${event.id}`,title:event.title,detail:'Event is awaiting review',view:'events' as ViewKey})),
+    ...data.agreements.filter((agreement)=>agreement.status==='Sent').map((agreement)=>({id:`agreement-${agreement.id}`,title:agreement.number,detail:'Agreement is waiting for signature',view:'agreements' as ViewKey})),
+  ].slice(0,12)},[data.agreements,data.events,data.invoices,data.tasks])
 
   const navigate = (key: ViewKey) => {
     setView(key)
@@ -151,7 +163,7 @@ export function Layout({
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
               <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
             </button>
-            <button className="icon-button notification-button" aria-label="Notifications" onClick={()=>navigate('tasks')} title={`${data.tasks.filter((task)=>!task.completed).length} open tasks`}><Bell size={19} /><i /></button>
+            <div className="notification-wrap"><button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div className="notification-panel"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div><button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
             <div className="quick-wrap">
               <button className="button button-primary button-md" onClick={() => setQuickOpen((value) => !value)}><Plus size={17} />Add new</button>
               {quickOpen && (

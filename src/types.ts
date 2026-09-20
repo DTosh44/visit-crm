@@ -5,6 +5,9 @@ export type ViewKey =
   | 'memberships'
   | 'listings'
   | 'events'
+  | 'content'
+  | 'inbox'
+  | 'insights'
   | 'billing'
   | 'agreements'
   | 'tasks'
@@ -19,6 +22,7 @@ export type TaskPriority = 'High' | 'Medium' | 'Low'
 export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won'
 export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
 export type EventFormat = 'One-off and short run' | 'Ongoing events' | 'Online events'
+export type EventRecurrence = 'None' | 'Daily' | 'Weekly' | 'Monthly'
 
 export interface Contact {
   id: string
@@ -150,6 +154,8 @@ export interface DestinationEvent {
   status: EventStatus
   submittedBy: string
   moderationNote?: string
+  recurrence?: EventRecurrence
+  recurrenceUntil?: string
   organisationId?: string
   lastUpdated: string
 }
@@ -212,6 +218,26 @@ export interface Opportunity {
   daysInStage: number
 }
 
+export interface ContentPage {
+  id: string
+  type: 'Guide' | 'Itinerary' | 'Trail'
+  title: string
+  slug: string
+  summary: string
+  body: string
+  image: string
+  status: 'Draft' | 'Published'
+  updatedAt: string
+}
+
+export interface WebsiteSubmission {
+  id: string
+  kind: string
+  payload: Record<string, unknown>
+  createdAt: string
+  status: 'New' | 'In progress' | 'Resolved'
+}
+
 export interface Activity {
   id: string
   organisationId?: string
@@ -247,6 +273,8 @@ export interface CRMData {
   opportunities: Opportunity[]
   activities: Activity[]
   socialMetrics: SocialMetric[]
+  contentPages: ContentPage[]
+  submissions: WebsiteSubmission[]
   workspace: WorkspaceSettings
 }
 

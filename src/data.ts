@@ -216,6 +216,12 @@ export const initialData: CRMData = {
     { id: 'videoViews', label: 'Video views', value: 22500000, displayValue: '22.5m', context: 'Across social channels', source: 'Visit Valechester', period: 'Latest supplied annual figures', updatedAt: '2026-08-19' },
     { id: 'engagements', label: 'Engagements', value: 801000, displayValue: '801k', context: 'Reactions and actions', source: 'Visit Valechester', period: 'Latest supplied annual figures', updatedAt: '2026-08-19' },
   ],
+  contentPages: [
+    {id:'content-001',type:'Guide',title:'A rainy day in Valechester',slug:'rainy-day-valechester',summary:'Indoor culture, food and family ideas for wet-weather visits.',body:'Start with the Museum of Motion, pause for lunch in Market Vale and finish with a performance at Riverside Playhouse.',image:'museum',status:'Published',updatedAt:'2026-09-20'},
+    {id:'content-002',type:'Itinerary',title:'48 hours in Valechester',slug:'48-hours-in-valechester',summary:'A two-day introduction to the castle, riverside and independent quarter.',body:'Day one explores Castle Quarter and Market Vale. Day two follows the river to the gallery and park.',image:'castle',status:'Draft',updatedAt:'2026-09-20'},
+    {id:'content-003',type:'Trail',title:'Castle Quarter heritage trail',slug:'castle-quarter-heritage-trail',summary:'A self-guided walk through the oldest streets in Valechester.',body:'Follow the signed route from Market Gate to the castle walls, abbey gardens and river viewpoint.',image:'gardens',status:'Published',updatedAt:'2026-09-20'},
+  ],
+  submissions: [],
   workspace: {
     destinationName: 'Visit Valechester', legalName: 'Valechester Visitor Economy Partnership',
     strapline: 'Past, present, perfectly placed.', contactEmail: 'hello@visitvalechester.example',

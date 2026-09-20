@@ -21,9 +21,9 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 const roleViews: Record<UserRole, string[]> = {
-  Administrator: ['dashboard','organisations','pipeline','memberships','listings','events','billing','agreements','tasks','settings'],
-  'Membership manager': ['dashboard','organisations','pipeline','memberships','listings','events','agreements','tasks'],
-  'Content editor': ['dashboard','organisations','listings','events','tasks'],
+  Administrator: ['dashboard','organisations','pipeline','memberships','listings','events','content','inbox','insights','billing','agreements','tasks','settings'],
+  'Membership manager': ['dashboard','organisations','pipeline','memberships','listings','events','content','inbox','insights','agreements','tasks'],
+  'Content editor': ['dashboard','organisations','listings','events','content','inbox','insights','tasks'],
   'Finance user': ['dashboard','organisations','billing','tasks'],
 }
 export function canAccessView(role: UserRole | undefined, view: string) { return role ? roleViews[role].includes(view) : false }

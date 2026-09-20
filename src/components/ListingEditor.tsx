@@ -20,6 +20,8 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [mediaError, setMediaError] = useState('')
+  const [aiLoading,setAiLoading]=useState(false)
+  const [aiError,setAiError]=useState('')
   const organisation = data.organisations.find((item) => item.id === listing.organisationId)
   const membershipLevel = data.levels.find((item) => item.name === organisation?.tier)
   const taxonomyAllowance = membershipLevel?.taxonomyAllowance ?? 0
@@ -88,11 +90,16 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
     const next=[...media];[next[currentIndex],next[target]]=[next[target],next[currentIndex]];set('media',next)
   }
   const updateMedia=(itemId:string,changes:Partial<ListingMedia>)=>set('media',media.map((item)=>item.id===itemId?{...item,...changes}:item))
-  const suggestCopy=()=>setDraft((current)=>{
+  const suggestCopy=async()=>{
+    setAiLoading(true);setAiError('')
+    if(supabase){const {data:result,error}=await supabase.functions.invoke('generate-listing-copy',{body:{name:draft.name,town:draft.town,category:draft.category,shortDescription:draft.shortDescription,description:draft.description,facilities:draft.facilities,searchTags:draft.searchTags}});if(!error&&result?.shortDescription&&result?.description){setDraft((current)=>({...current,shortDescription:result.shortDescription,description:result.description}));setAiLoading(false);return}if(error)setAiError(error.message)}
+    setDraft((current)=>{
     const short=current.shortDescription.trim()||`Discover ${current.name} in ${current.town}, with practical information to help you plan your visit.`
     const description=current.description.trim()||`${current.name} offers visitors a memorable experience in ${current.town}. Check opening information, accessibility and facilities before travelling, then book ahead where recommended.`
     return {...current,shortDescription:short.charAt(0).toUpperCase()+short.slice(1),description:description.charAt(0).toUpperCase()+description.slice(1)}
   })
+    setAiLoading(false)
+  }
 
   return (
     <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={onClose}>
@@ -105,7 +112,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
       <div className="listing-editor-body">
         <div className="editor-main">
           {tab === 'Content' && <div className="form-stack">
-            <div className="ai-helper"><span><Sparkles size={18} /></span><div><strong>Improve this listing copy</strong><p>Fill missing visitor-focused copy while preserving approved business details.</p></div><Button variant="secondary" size="sm" onClick={suggestCopy}>Suggest improvements</Button></div>
+            <div className="ai-helper"><span><Sparkles size={18} /></span><div><strong>Improve this listing copy</strong><p>{aiError||'Fill missing visitor-focused copy while preserving approved business details.'}</p></div><Button variant="secondary" size="sm" disabled={aiLoading} onClick={()=>void suggestCopy()}>{aiLoading?'Writing…':'Suggest improvements'}</Button></div>
             <div className="form-grid two">
               <Field label="Listing name"><input value={draft.name} onChange={(event) => set('name', event.target.value)} /></Field>
               <Field label="Category"><select value={draft.category} onChange={(event) => set('category', event.target.value)}><option>Attractions</option><option>Castles & heritage</option><option>Accommodation</option><option>Hotels</option><option>Experiences</option><option>Museums</option><option>Galleries</option><option>Restaurants</option><option>Shopping</option><option>Parks & gardens</option><option>Theatre</option></select></Field>

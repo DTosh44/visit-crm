@@ -15,13 +15,16 @@ import { Pipeline } from './views/Pipeline'
 import { Settings } from './views/Settings'
 import { Tasks } from './views/Tasks'
 import { Events } from './views/Events'
+import { Content } from './views/Content'
+import { Inbox } from './views/Inbox'
+import { Insights } from './views/Insights'
 import { useAuth } from './auth'
 import { canAccessView } from './auth'
 import { LoginPage } from './LoginPage'
 import { PublicSite } from './PublicSite'
 import { BrandLogo } from './components/BrandLogo'
 
-const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','events','billing','agreements','tasks','settings']
+const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -75,6 +78,9 @@ function CRMApp() {
       {activeView === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
       {activeView === 'listings' && <Listings onEdit={openListing} />}
       {activeView === 'events' && <Events />}
+      {activeView === 'content' && <Content />}
+      {activeView === 'inbox' && <Inbox />}
+      {activeView === 'insights' && <Insights />}
       {activeView === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
       {activeView === 'agreements' && <Agreements />}
       {activeView === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}

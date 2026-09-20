@@ -1,14 +1,14 @@
 import {
   ArrowUpRight, Calendar, Check, CheckCircle2, CircleDollarSign, Clock3,
   Edit3, ExternalLink, FileSignature, Globe2, ListChecks, Mail, MapPin, MessageSquarePlus,
-  Phone, Plus, UsersRound,
+  Phone, Plus, Trash2, UsersRound,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import { imageLibrary } from '../siteData'
-import type { Listing, Organisation } from '../types'
+import type { Contact, Listing, Organisation } from '../types'
 import { currency, formatDate, timeAgo } from '../utils'
-import { Avatar, Badge, Button, Drawer, Progress, Tabs } from './UI'
+import { Avatar, Badge, Button, Drawer, Field, Modal, Progress, Tabs } from './UI'
 import { downloadFile, openEmail } from '../actions'
 
 type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
@@ -18,10 +18,11 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   onClose: () => void
   onEditListing: (listing: Listing) => void
 }) {
-  const { data, updateOrganisation, incrementBenefit, markInvoicePaid, addContact, updateContact, addActivity, createListing, createInvoice, createAgreement } = useCRM()
+  const { data, updateOrganisation, incrementBenefit, markInvoicePaid, addContact, updateContact, deleteContact, addActivity, createListing, createInvoice, createAgreement } = useCRM()
   const [tab, setTab] = useState<OrgTab>('Overview')
   const [editing, setEditing] = useState(false)
   const [draftNotes, setDraftNotes] = useState(organisation.notes)
+  const [contactDraft,setContactDraft]=useState<(Contact & {isNew?:boolean})|null>(null)
   const contacts = data.contacts.filter((item) => item.organisationId === organisation.id)
   const listings = data.listings.filter((item) => item.organisationId === organisation.id)
   const invoices = data.invoices.filter((item) => item.organisationId === organisation.id)
@@ -87,13 +88,13 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
       </div>}
 
       {tab === 'Contacts' && <div className="org-tab-content">
-        <div className="section-heading"><div><h3>Business contacts</h3><p>Choose recipients explicitly for invoices, agreements and member updates.</p></div><Button icon={Plus} size="sm" onClick={()=>{const name=window.prompt('Contact name');const email=window.prompt('Email address');if(name&&email)addContact({organisationId:organisation.id,name,jobTitle:'',email,phone:'',roles:['General'],primary:contacts.length===0,portalAccess:false})}}>Add contact</Button></div>
+        <div className="section-heading"><div><h3>Business contacts</h3><p>Choose recipients explicitly for invoices, agreements and member updates.</p></div><Button icon={Plus} size="sm" onClick={()=>setContactDraft({id:'',organisationId:organisation.id,name:'',jobTitle:'',email:'',phone:'',roles:['General'],primary:contacts.length===0,portalAccess:false,isNew:true})}>Add contact</Button></div>
         <div className="contact-card-grid">{contacts.map((contact) => <article className="contact-card" key={contact.id}>
           <header><Avatar name={contact.name} colour={organisation.colour} /></header>
           <h3>{contact.name}</h3><p>{contact.jobTitle || 'Role not set'}</p>
           <div className="role-tags">{contact.roles.map((role) => <Badge key={role} tone="blue">{role}</Badge>)}</div>
           <dl><div><Mail size={14} /><a href={`mailto:${contact.email}`}>{contact.email}</a></div><div><Phone size={14} /><span>{contact.phone || 'Not set'}</span></div></dl>
-          <footer><span className={contact.portalAccess ? 'portal-on' : ''}><i />{contact.portalAccess ? 'Portal access' : 'No portal access'}</span><Button variant="ghost" size="sm" onClick={()=>{const name=window.prompt('Contact name',contact.name);const email=window.prompt('Email',contact.email);if(name&&email)updateContact(contact.id,{name,email})}}>Edit</Button></footer>
+          <footer><span className={contact.portalAccess ? 'portal-on' : ''}><i />{contact.portalAccess ? 'Portal access' : 'No portal access'}</span><span><Button variant="ghost" size="sm" onClick={()=>setContactDraft({...contact})}>Edit</Button><button className="icon-button danger" onClick={()=>{if(window.confirm(`Delete ${contact.name}?`))deleteContact(contact.id)}} aria-label={`Delete ${contact.name}`}><Trash2 size={15}/></button></span></footer>
         </article>)}</div>
       </div>}
 
@@ -150,6 +151,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
         <div className="section-heading"><div><h3>Activity history</h3><p>A complete record of key interactions and changes.</p></div><Button icon={MessageSquarePlus} size="sm" onClick={()=>{const detail=window.prompt('Note');if(detail)addActivity(organisation.id,'Note added',detail)}}>Add note</Button></div>
         <div className="timeline">{activities.map((activity) => <div className="timeline-item" key={activity.id}><span className={`timeline-icon ${activity.type}`}><CheckCircle2 size={15} /></span><div><header><strong>{activity.title}</strong><time>{timeAgo(activity.timestamp)}</time></header><p>{activity.detail}</p><small>{activity.user}</small></div></div>)}</div>
       </div>}
+      {contactDraft&&<Modal title={contactDraft.isNew?'Add contact':'Edit contact'} subtitle="Contact details and communication permissions." onClose={()=>setContactDraft(null)} width="sm"><form className="form-stack" onSubmit={(event)=>{event.preventDefault();const {isNew,id,...values}=contactDraft;if(isNew)addContact(values);else updateContact(id,values);setContactDraft(null)}}><div className="form-grid two"><Field label="Name"><input required value={contactDraft.name} onChange={(e)=>setContactDraft({...contactDraft,name:e.target.value})}/></Field><Field label="Job title"><input value={contactDraft.jobTitle} onChange={(e)=>setContactDraft({...contactDraft,jobTitle:e.target.value})}/></Field><Field label="Email"><input required type="email" value={contactDraft.email} onChange={(e)=>setContactDraft({...contactDraft,email:e.target.value})}/></Field><Field label="Phone"><input value={contactDraft.phone} onChange={(e)=>setContactDraft({...contactDraft,phone:e.target.value})}/></Field></div><Field label="Roles (comma separated)"><input value={contactDraft.roles.join(', ')} onChange={(e)=>setContactDraft({...contactDraft,roles:e.target.value.split(',').map((v)=>v.trim()).filter(Boolean)})}/></Field><label className="settings-checkbox"><input type="checkbox" checked={contactDraft.primary} onChange={(e)=>setContactDraft({...contactDraft,primary:e.target.checked})}/><span><strong>Primary contact</strong><small>Use this person by default for the organisation.</small></span></label><label className="settings-checkbox"><input type="checkbox" checked={contactDraft.portalAccess} onChange={(e)=>setContactDraft({...contactDraft,portalAccess:e.target.checked})}/><span><strong>Portal access</strong><small>Allow this contact to use member services.</small></span></label><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setContactDraft(null)}>Cancel</Button><Button type="submit">Save contact</Button></div></form></Modal>}
     </Drawer>
   )
 }

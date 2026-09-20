@@ -3,13 +3,17 @@ create table if not exists public.public_submissions (
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   kind text not null,
   payload jsonb not null default '{}'::jsonb,
+  status text not null default 'New' check (status in ('New','In progress','Resolved')),
   created_at timestamptz not null default now()
 );
+alter table public.public_submissions add column if not exists status text not null default 'New' check (status in ('New','In progress','Resolved'));
 alter table public.public_submissions enable row level security;
 drop policy if exists "anyone creates public submissions" on public.public_submissions;
 create policy "anyone creates public submissions" on public.public_submissions for insert with check (true);
 drop policy if exists "tenant members read submissions" on public.public_submissions;
 create policy "tenant members read submissions" on public.public_submissions for select using (public.is_tenant_member(tenant_id));
+drop policy if exists "tenant members update submissions" on public.public_submissions;
+create policy "tenant members update submissions" on public.public_submissions for update using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
 
 drop policy if exists "public reads active tenant configuration" on public.tenants;
 create policy "public reads active tenant configuration" on public.tenants for select using (active=true);
@@ -32,3 +36,24 @@ drop policy if exists "Owners update event media" on storage.objects;
 create policy "Owners update event media" on storage.objects for update to authenticated using (bucket_id='event-media' and owner_id=auth.uid()::text);
 drop policy if exists "Owners delete event media" on storage.objects;
 create policy "Owners delete event media" on storage.objects for delete to authenticated using (bucket_id='event-media' and owner_id=auth.uid()::text);
+
+alter table public.events add column if not exists recurrence text not null default 'None' check (recurrence in ('None','Daily','Weekly','Monthly'));
+alter table public.events add column if not exists recurrence_until date;
+
+create table if not exists public.public_content (
+  id text not null,
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  type text not null check (type in ('Guide','Itinerary','Trail')),
+  title text not null,
+  slug text not null,
+  summary text not null default '',
+  body text not null default '',
+  image text not null default 'hero',
+  status text not null default 'Draft' check (status in ('Draft','Published')),
+  updated_at timestamptz not null default now(),
+  primary key (tenant_id,id),
+  unique (tenant_id,type,slug)
+);
+alter table public.public_content enable row level security;
+create policy "public reads published content" on public.public_content for select using (status='Published');
+create policy "tenant members manage content" on public.public_content for all using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));

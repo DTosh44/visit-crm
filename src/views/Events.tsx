@@ -3,7 +3,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { imageLibrary } from '../siteData'
 import { useCRM } from '../store'
-import type { DestinationEvent, EventDraft, EventFormat, EventStatus } from '../types'
+import type { DestinationEvent, EventDraft, EventFormat, EventRecurrence, EventStatus } from '../types'
 import { Badge, Button, EmptyState, PageHeader } from '../components/UI'
 
 const categories = ['Music & Shows','Festivals & Seasonal','Food & Drink','Family','Arts & Culture','Talks & Workshops','Tours & Heritage','Outdoors & Sport','Wellbeing','Social']
@@ -11,7 +11,7 @@ const formats: EventFormat[] = ['One-off and short run','Ongoing events','Online
 const blankEvent = (submittedBy: string): EventDraft => ({
   title:'', category:'Festivals & Seasonal', format:'One-off and short run', description:'', startDate:'2026-10-01', endDate:'2026-10-01', startTime:'10:00', endTime:'16:00',
   venueName:'', address:'', town:'Valechester', postcode:'', price:'Free', bookingUrl:'', contactName:'', contactEmail:'',
-  image:'theatre', accessibility:'', status:'Draft', submittedBy,
+  image:'theatre', accessibility:'', status:'Draft', submittedBy, recurrence:'None', recurrenceUntil:'',
 })
 
 function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: () => void }) {
@@ -33,6 +33,8 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
       <label>End date<input required type="date" value={draft.endDate} onChange={(e)=>set('endDate',e.target.value)}/></label>
       <label>Start time<input required type="time" value={draft.startTime} onChange={(e)=>set('startTime',e.target.value)}/></label>
       <label>End time<input required type="time" value={draft.endTime} onChange={(e)=>set('endTime',e.target.value)}/></label>
+      <label>Repeats<select value={draft.recurrence??'None'} onChange={(e)=>set('recurrence',e.target.value as EventRecurrence)}><option>None</option><option>Daily</option><option>Weekly</option><option>Monthly</option></select></label>
+      {(draft.recurrence??'None')!=='None'&&<label>Repeat until<input required type="date" min={draft.startDate} value={draft.recurrenceUntil??draft.endDate} onChange={(e)=>set('recurrenceUntil',e.target.value)}/></label>}
       <label className="event-field-wide">Venue name<input required value={draft.venueName} onChange={(e)=>set('venueName',e.target.value)} placeholder="Any venue — membership is not required"/></label>
       <label>Town or area<input required value={draft.town} onChange={(e)=>set('town',e.target.value)}/></label>
       <label>Postcode<input required value={draft.postcode} onChange={(e)=>set('postcode',e.target.value)}/></label>

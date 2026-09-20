@@ -115,6 +115,9 @@ create table public.events (
   contact_email text not null,
   image text not null default 'theatre',
   accessibility text not null default '',
+  recurrence text not null default 'None' check (recurrence in ('None','Daily','Weekly','Monthly')),
+  recurrence_until date,
+  moderation_note text not null default '',
   status text not null default 'In review' check (status in ('Published','Draft','In review','Changes requested')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

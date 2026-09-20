@@ -1,17 +1,18 @@
-import { CalendarDays, Check, ChevronDown, Circle, ListTodo, Plus, Search, UserRound } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, Circle, Edit3, ListTodo, Plus, Search, Trash2, UserRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { CRMTask, Organisation } from '../types'
 import { dateLabel } from '../utils'
-import { Avatar, Badge, Button, PageHeader } from '../components/UI'
+import { Avatar, Badge, Button, Field, Modal, PageHeader } from '../components/UI'
 
 export function Tasks({ onAdd, openOrganisation }: { onAdd: () => void; openOrganisation: (organisation: Organisation) => void }) {
-  const { data, toggleTask } = useCRM()
+  const { data, toggleTask, updateTask, deleteTask } = useCRM()
   const [query, setQuery] = useState('')
   const [assignee, setAssignee] = useState('All team')
   const [showCompleted, setShowCompleted] = useState(false)
   const [priority,setPriority]=useState('All priorities')
   const [collapsed,setCollapsed]=useState<string[]>([])
+  const [editing,setEditing]=useState<CRMTask|null>(null)
   const todayValue=new Date().toISOString().slice(0,10)
   const tasks = useMemo(() => data.tasks.filter((task) => {
     const org = data.organisations.find((item) => item.id === task.organisationId)
@@ -48,11 +49,13 @@ export function Tasks({ onAdd, openOrganisation }: { onAdd: () => void; openOrga
               <span className="task-assignee"><Avatar name={task.assignee} size="sm" />{task.assignee}</span>
               <span className={`task-due ${dateLabel(task.dueDate).includes('overdue') ? 'overdue' : ''}`}><CalendarDays size={14} />{task.dueTime ? `${dateLabel(task.dueDate)}, ${task.dueTime}` : dateLabel(task.dueDate)}</span>
               <Badge>{task.priority}</Badge>
+              <span className="event-row-actions"><button className="icon-button" onClick={()=>setEditing(task)} aria-label={`Edit ${task.title}`}><Edit3 size={15}/></button><button className="icon-button danger" onClick={()=>{if(window.confirm(`Delete ${task.title}?`))deleteTask(task.id)}} aria-label={`Delete ${task.title}`}><Trash2 size={15}/></button></span>
             </div>
           })}
         </section>)}</div>
         {!tasks.length && <div className="inline-empty">No tasks match these filters.</div>}
       </section>
+      {editing&&<Modal title="Edit task" subtitle="Update ownership, timing and priority." onClose={()=>setEditing(null)} width="sm"><form className="form-stack" onSubmit={(event)=>{event.preventDefault();updateTask(editing.id,editing);setEditing(null)}}><Field label="Task"><input required value={editing.title} onChange={(e)=>setEditing({...editing,title:e.target.value})}/></Field><Field label="Organisation"><select value={editing.organisationId??''} onChange={(e)=>setEditing({...editing,organisationId:e.target.value||undefined})}><option value="">No organisation</option>{data.organisations.map((org)=><option value={org.id} key={org.id}>{org.name}</option>)}</select></Field><div className="form-grid two"><Field label="Due date"><input type="date" value={editing.dueDate} onChange={(e)=>setEditing({...editing,dueDate:e.target.value})}/></Field><Field label="Due time"><input type="time" value={editing.dueTime??''} onChange={(e)=>setEditing({...editing,dueTime:e.target.value})}/></Field><Field label="Priority"><select value={editing.priority} onChange={(e)=>setEditing({...editing,priority:e.target.value as CRMTask['priority']})}><option>High</option><option>Medium</option><option>Low</option></select></Field><Field label="Assignee"><input value={editing.assignee} onChange={(e)=>setEditing({...editing,assignee:e.target.value})}/></Field><Field label="Category"><select value={editing.category} onChange={(e)=>setEditing({...editing,category:e.target.value as CRMTask['category']})}><option>Follow-up</option><option>Renewal</option><option>Content</option><option>Finance</option><option>General</option></select></Field></div><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setEditing(null)}>Cancel</Button><Button type="submit">Save task</Button></div></form></Modal>}
     </div>
   )
 }

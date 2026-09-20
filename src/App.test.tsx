@@ -249,6 +249,29 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('button', { name: 'Edit Valechester After Dark' })).toBeInTheDocument()
   })
 
+  it('opens the website inbox and content publishing workspace', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Website inbox'}))
+    expect(screen.getByRole('heading',{name:'Inbox'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Guides, itineraries & trails'}))
+    expect(screen.getByRole('heading',{name:'Guides, itineraries and trails'})).toBeInTheDocument()
+    expect(screen.getByText('A rainy day in Valechester')).toBeInTheDocument()
+  })
+
+  it('publishes CMS inspiration through visitor routes', () => {
+    window.history.pushState({},'', '/guides/rainy-day-valechester')
+    renderApp()
+    expect(screen.getByRole('heading',{name:'A rainy day in Valechester'})).toBeInTheDocument()
+    expect(screen.getByText(/Start with the Museum of Motion/)).toBeInTheDocument()
+  })
+
+  it('opens an actionable workspace notification centre', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Notifications'}))
+    expect(screen.getByText(/requiring attention/)).toBeInTheDocument()
+    expect(screen.getAllByText(/awaiting review|overdue|due today|waiting for signature/i).length).toBeGreaterThan(0)
+  })
+
   it('saves a place and opens the saved places page', () => {
     window.history.pushState({}, '', '/')
     renderApp()

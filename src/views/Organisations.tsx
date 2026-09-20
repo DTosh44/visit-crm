@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Download, Filter, Mail, MoreHorizontal, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { Building2, ChevronDown, Download, Filter, Mail, Merge, Plus, Search, SlidersHorizontal, Trash2, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { Organisation } from '../types'
@@ -7,7 +7,7 @@ import { Avatar, Badge, Button, EmptyState, PageHeader } from '../components/UI'
 import { downloadCsv, openEmail } from '../actions'
 
 export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (organisation: Organisation) => void }) {
-  const { data, updateOrganisation } = useCRM()
+  const { data, updateOrganisation, addOrganisation, deleteOrganisation, deduplicateOrganisations } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
   const [tier, setTier] = useState('All levels')
@@ -28,10 +28,11 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
   const activeMembers = data.organisations.filter((org) => (org.status === 'Active' || org.status === 'Renewing') && org.tier !== 'Free Listing').length
   const healthCount = (health: Organisation['health']) => data.organisations.filter((org) => org.health === health).length
   const freeListings = data.organisations.filter((org) => org.tier === 'Free Listing').length
+  const importCsv=async(file?:File)=>{if(!file)return;const lines=(await file.text()).split(/\r?\n/).filter(Boolean);const headers=lines.shift()?.split(',').map((value)=>value.trim().toLowerCase())??[];for(const line of lines){const values=line.split(',').map((value)=>value.trim().replace(/^"|"$/g,''));const row=Object.fromEntries(headers.map((header,index)=>[header,values[index]??'']));if(!row.name)continue;addOrganisation({name:row.name,type:row.type||'Attractions',town:row.town||'Valechester',contactName:row.contactname||row['contact name']||'Primary contact',contactEmail:row.contactemail||row['contact email']||'',tier:data.levels.some((level)=>level.name===row.tier)?row.tier:data.levels[0]?.name??'Free Listing',status:(['Active','Renewing','Prospect','Free listing','Lapsed'].includes(row.status)?row.status:'Prospect') as Organisation['status'],nextAction:row.nextaction||row['next action']||'Review imported record'})}}
 
   return (
     <div>
-      <PageHeader eyebrow="CRM" title="Organisations" description="Manage members, prospects, contacts and every relationship in one place." actions={<><Button variant="secondary" icon={Download} onClick={()=>downloadCsv('organisations.csv',[['Organisation','Type','Town','Membership','Status','Owner','Renewal','Annual value'],...organisations.map((org)=>[org.name,org.type,org.town,org.tier,org.status,org.owner,org.renewalDate,org.annualValue])])}>Export</Button><Button icon={Plus} onClick={onAdd}>Add organisation</Button></>} />
+      <PageHeader eyebrow="CRM" title="Organisations" description="Manage members, prospects, contacts and every relationship in one place." actions={<><label className="button button-secondary button-md"><Upload size={17}/>Import CSV<input hidden type="file" accept=".csv,text/csv" onChange={(e)=>void importCsv(e.target.files?.[0])}/></label><Button variant="secondary" icon={Merge} onClick={()=>{const count=deduplicateOrganisations();window.alert(count?`${count} duplicate organisation${count===1?'':'s'} removed.`:'No duplicates found.')}}>Deduplicate</Button><Button variant="secondary" icon={Download} onClick={()=>downloadCsv('organisations.csv',[['Organisation','Type','Town','Membership','Status','Owner','Renewal','Annual value'],...organisations.map((org)=>[org.name,org.type,org.town,org.tier,org.status,org.owner,org.renewalDate,org.annualValue])])}>Export</Button><Button icon={Plus} onClick={onAdd}>Add organisation</Button></>} />
 
       <section className="summary-strip organisation-summary">
         <div><span className="summary-icon purple"><Building2 size={18} /></span><p><strong>{activeMembers}</strong><small>Active members</small></p></div>
@@ -68,7 +69,7 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
                   <td><span>{org.renewalDate ? formatDate(org.renewalDate, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span></td>
                   <td><strong>{org.annualValue ? currency.format(org.annualValue) : 'Free'}</strong></td>
                   <td><span className="owner-cell"><Avatar name={org.owner} size="sm" />{org.owner.split(' ')[0]}</span></td>
-                  <td><button className="icon-button" onClick={(event) => event.stopPropagation()} aria-label="More"><MoreHorizontal size={17} /></button></td>
+                  <td><button className="icon-button danger" onClick={(event) => {event.stopPropagation();if(window.confirm(`Delete ${org.name} and its linked records?`))deleteOrganisation(org.id)}} aria-label={`Delete ${org.name}`}><Trash2 size={17} /></button></td>
                 </tr>
               })}</tbody>
             </table>
