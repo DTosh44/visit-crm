@@ -6,6 +6,16 @@ import { currency, formatDate } from '../utils'
 import { Avatar, Badge, Button, EmptyState, PageHeader } from '../components/UI'
 import { downloadCsv, openEmail } from '../actions'
 
+const filterVisibilityKey = 'visit-valechester-organisation-filters-visible'
+
+function initialFilterVisibility() {
+  try {
+    return window.localStorage.getItem(filterVisibilityKey) !== 'false'
+  } catch {
+    return true
+  }
+}
+
 export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (organisation: Organisation) => void }) {
   const { data, updateOrganisation, addOrganisation, deleteOrganisation, deduplicateOrganisations } = useCRM()
   const [query, setQuery] = useState('')
@@ -14,12 +24,14 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
   const [location,setLocation]=useState('All locations')
   const [health,setHealth]=useState('All health')
   const [organisationType,setOrganisationType]=useState('All types')
+  const [filtersVisible,setFiltersVisible]=useState(initialFilterVisibility)
   const [selected, setSelected] = useState<string[]>([])
 
   const locations=useMemo(()=>Array.from(new Set(data.organisations.map((org)=>org.town).filter(Boolean))).sort(),[data.organisations])
   const organisationTypes=useMemo(()=>Array.from(new Set(data.organisations.map((org)=>org.type).filter(Boolean))).sort(),[data.organisations])
   const activeFilterCount=[status!=='All statuses',tier!=='All levels',location!=='All locations',health!=='All health',organisationType!=='All types'].filter(Boolean).length
   const resetFilters=()=>{setStatus('All statuses');setTier('All levels');setLocation('All locations');setHealth('All health');setOrganisationType('All types');setQuery('')}
+  const toggleFilterVisibility=()=>setFiltersVisible((visible)=>{const next=!visible;try{window.localStorage.setItem(filterVisibilityKey,String(next))}catch{/* Browser storage may be unavailable. */}return next})
 
   const organisations = useMemo(() => {
     const search = query.trim().toLowerCase()
@@ -53,12 +65,15 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
         <div><p><strong>{freeListings}</strong><small>Free listings</small></p></div>
       </section>
 
-      <section className="panel data-panel">
+      <section className={`panel data-panel organisation-directory ${filtersVisible?'filters-open':'filters-closed'}`}>
         <div className="table-toolbar organisation-toolbar">
           <div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organisations..." /></div>
-          <span className="organisation-result-count"><strong>{organisations.length}</strong> matching {organisations.length===1?'organisation':'organisations'}</span>
+          <div className="organisation-toolbar-actions">
+            <span className="organisation-result-count"><strong>{organisations.length}</strong> matching {organisations.length===1?'organisation':'organisations'}</span>
+            <button className={`filter-visibility-button ${filtersVisible?'active':''}`} type="button" onClick={toggleFilterVisibility} aria-label={`${filtersVisible?'Hide filters':'Show filters'}${activeFilterCount>0?`, ${activeFilterCount} active`:''}`} aria-expanded={filtersVisible} aria-controls="organisation-filters"><SlidersHorizontal size={15}/>{filtersVisible?'Hide filters':'Show filters'}{activeFilterCount>0&&<em aria-hidden="true">{activeFilterCount}</em>}</button>
+          </div>
         </div>
-        <div className="organisation-filter-bar"><span className="filter-bar-title"><Filter size={15}/>Filters{activeFilterCount>0&&<em>{activeFilterCount}</em>}</span><label className="select-wrap"><select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option>All statuses</option><option>Active</option><option>Renewing</option><option>Prospect</option><option>Free listing</option><option>Lapsed</option></select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by membership level" value={tier} onChange={(event) => setTier(event.target.value)}><option>All levels</option>{data.levels.map((level) => <option key={level.id}>{level.name}</option>)}</select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by location" value={location} onChange={(event) => setLocation(event.target.value)}><option>All locations</option>{locations.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by health" value={health} onChange={(event)=>setHealth(event.target.value)}><option>All health</option><option>Happy</option><option>OK</option><option>Needs attention</option></select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by organisation type" value={organisationType} onChange={(event)=>setOrganisationType(event.target.value)}><option>All types</option>{organisationTypes.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><button className="filter-button" onClick={resetFilters} disabled={!query&&activeFilterCount===0}><SlidersHorizontal size={16}/>Reset</button></div>
+        {filtersVisible&&<div id="organisation-filters" className="organisation-filter-bar"><span className="filter-bar-title"><Filter size={15}/>Filters{activeFilterCount>0&&<em>{activeFilterCount}</em>}</span><label className="select-wrap"><select aria-label="Filter by status" value={status} onChange={(event) => setStatus(event.target.value)}><option>All statuses</option><option>Active</option><option>Renewing</option><option>Prospect</option><option>Free listing</option><option>Lapsed</option></select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by membership level" value={tier} onChange={(event) => setTier(event.target.value)}><option>All levels</option>{data.levels.map((level) => <option key={level.id}>{level.name}</option>)}</select><ChevronDown size={14} /></label><label className="select-wrap"><select aria-label="Filter by location" value={location} onChange={(event) => setLocation(event.target.value)}><option>All locations</option>{locations.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by health" value={health} onChange={(event)=>setHealth(event.target.value)}><option>All health</option><option>Happy</option><option>OK</option><option>Needs attention</option></select><ChevronDown size={14}/></label><label className="select-wrap"><select aria-label="Filter by organisation type" value={organisationType} onChange={(event)=>setOrganisationType(event.target.value)}><option>All types</option>{organisationTypes.map((item)=><option key={item}>{item}</option>)}</select><ChevronDown size={14}/></label><button className="filter-button" onClick={resetFilters} disabled={!query&&activeFilterCount===0}><SlidersHorizontal size={16}/>Reset</button></div>}
 
         {selected.length > 0 && <div className="bulk-bar"><strong>{selected.length} selected</strong><button onClick={()=>openEmail(data.contacts.filter((contact)=>selected.includes(contact.organisationId)&&contact.primary).map((contact)=>contact.email),'Message from Visit Valechester')}><Mail size={15} /> Send email</button><button onClick={()=>{const owner=window.prompt('Assign owner');if(owner)selected.forEach((id)=>updateOrganisation(id,{owner}))}}>Assign owner</button><button onClick={()=>{const next=window.prompt('Status: Active, Renewing, Prospect, Free listing or Lapsed');if(next&&['Active','Renewing','Prospect','Free listing','Lapsed'].includes(next))selected.forEach((id)=>updateOrganisation(id,{status:next as Organisation['status']}))}}>Change status</button><button className="bulk-clear" onClick={() => setSelected([])}>Clear</button></div>}
 

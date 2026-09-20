@@ -49,6 +49,21 @@ describe('Visit CRM', () => {
     expect(screen.getByText(`Showing all ${expected.length} matching organisations from ${initialData.organisations.length} records`)).toBeInTheDocument()
   })
 
+  it('hides and restores organisation filters without clearing active filters', () => {
+    const {container}=renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
+    fireEvent.change(screen.getByLabelText('Filter by location'),{target:{value:'Castle Quarter'}})
+    const expected=initialData.organisations.filter((organisation)=>organisation.town==='Castle Quarter')
+    expect(container.querySelectorAll('.organisations-table tbody tr')).toHaveLength(expected.length)
+    fireEvent.click(screen.getByRole('button',{name:/Hide filters/}))
+    expect(screen.queryByLabelText('Filter by location')).not.toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Show filters, 1 active'})).toHaveAttribute('aria-expanded','false')
+    expect(container.querySelectorAll('.organisations-table tbody tr')).toHaveLength(expected.length)
+    expect(localStorage.getItem('visit-valechester-organisation-filters-visible')).toBe('false')
+    fireEvent.click(screen.getByRole('button',{name:/Show filters/}))
+    expect(screen.getByLabelText('Filter by location')).toHaveValue('Castle Quarter')
+  })
+
   it('opens and completes a task', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: /Tasks/ }))
