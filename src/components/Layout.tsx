@@ -142,7 +142,7 @@ export function Layout({
 
         <div className="sidebar-footer">
           <a className="view-site-link" href="/" target="_blank"><ExternalLink size={16} /><span>View visitor website</span></a>
-          <a href={`mailto:${data.workspace.contactEmail}?subject=${encodeURIComponent('CRM help and feedback')}`}><HelpCircle size={17} /><span>Help & feedback</span></a>
+          <a className="help-feedback-link" href={`mailto:${data.workspace.contactEmail}?subject=${encodeURIComponent('CRM help and feedback')}`}><HelpCircle size={17} /><span>Help & feedback</span></a>
           <div className="sidebar-user">
             <Avatar name={user?.name ?? ''} size="sm" colour={user?.colour} />
             <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
