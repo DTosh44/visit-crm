@@ -149,6 +149,7 @@ export interface DestinationEvent {
   accessibility: string
   status: EventStatus
   submittedBy: string
+  moderationNote?: string
   organisationId?: string
   lastUpdated: string
 }
@@ -246,6 +247,29 @@ export interface CRMData {
   opportunities: Opportunity[]
   activities: Activity[]
   socialMetrics: SocialMetric[]
+  workspace: WorkspaceSettings
+}
+
+export interface WorkspaceSettings {
+  destinationName: string
+  legalName: string
+  strapline: string
+  contactEmail: string
+  address: string
+  timezone: string
+  currency: string
+  financialYearStart: string
+  membershipYearStart: string
+  primaryColour: string
+  accentColour: string
+  supportingColour: string
+  visitorVolume: number
+  visitorSpend: number
+  overnightStays: number
+  bankBalance?: number
+  bankProvider?: string
+  accountingProvider?: string
+  reviewProvider?: string
 }
 
 export interface OrganisationDraft {

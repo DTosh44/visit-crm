@@ -8,11 +8,15 @@ import type {
   CRMData,
   DestinationEvent,
   EventDraft,
+  Agreement,
+  Benefit,
+  Contact,
   InvoiceDraft,
   Listing,
   MembershipLevel,
   Organisation,
   OrganisationDraft,
+  Opportunity,
   PipelineStage,
   TaskDraft,
 } from './types'
@@ -23,6 +27,10 @@ interface CRMContextValue {
   data: CRMData
   addOrganisation: (draft: OrganisationDraft) => Organisation
   updateOrganisation: (id: string, changes: Partial<Organisation>) => void
+  addContact: (contact: Omit<Contact, 'id'>) => void
+  updateContact: (id: string, changes: Partial<Contact>) => void
+  addActivity: (organisationId: string | undefined, title: string, detail: string) => void
+  createListing: (organisationId: string, name: string) => Listing
   updateListing: (id: string, changes: Partial<Listing>) => void
   publishListing: (id: string) => void
   createEvent: (draft: EventDraft) => DestinationEvent
@@ -30,15 +38,20 @@ interface CRMContextValue {
   publishEvent: (id: string) => void
   deleteEvent: (id: string) => void
   moveOpportunity: (id: string, stage: PipelineStage) => void
+  addOpportunity: (opportunity: Omit<Opportunity, 'id' | 'daysInStage'>) => void
   markInvoicePaid: (id: string) => void
   toggleInvoiceReminders: (id: string) => void
   sendInvoice: (id: string) => void
   createInvoice: (draft: InvoiceDraft) => void
+  createAgreement: (agreement: Omit<Agreement, 'id' | 'number' | 'createdAt'>) => void
+  updateAgreement: (id: string, changes: Partial<Agreement>) => void
   toggleTask: (id: string) => void
   createTask: (draft: TaskDraft) => void
   incrementBenefit: (organisationId: string, benefitId: string, allowance: number) => void
   addLevel: (level: Omit<MembershipLevel, 'id' | 'members'>) => void
   updateLevel: (id: string, changes: Partial<MembershipLevel>) => void
+  addBenefit: (benefit: Omit<Benefit, 'id'>) => void
+  updateWorkspace: (changes: Partial<CRMData['workspace']>) => void
   resetWorkspace: () => void
 }
 
@@ -66,6 +79,10 @@ interface PublicListingRow {
   media?: Listing['media']
   updated_at: string
 }
+
+type EventRow = {id:string;organisation_id?:string;submitted_by_label:string;title:string;category:string;format:DestinationEvent['format'];description:string;start_date:string;end_date:string;start_time:string;end_time:string;venue_name:string;address:string;town:string;postcode:string;price:string;booking_url:string;contact_name:string;contact_email:string;image:string;accessibility:string;status:DestinationEvent['status'];moderation_note?:string;updated_at:string}
+function fromEventRow(row:EventRow):DestinationEvent{return{id:row.id,organisationId:row.organisation_id,title:row.title,category:row.category,format:row.format,description:row.description,startDate:row.start_date,endDate:row.end_date,startTime:row.start_time.slice(0,5),endTime:row.end_time.slice(0,5),venueName:row.venue_name,address:row.address,town:row.town,postcode:row.postcode,price:row.price,bookingUrl:row.booking_url,contactName:row.contact_name,contactEmail:row.contact_email,image:row.image,accessibility:row.accessibility,status:row.status,submittedBy:row.submitted_by_label,moderationNote:row.moderation_note,lastUpdated:row.updated_at.slice(0,10)}}
+function toEventRow(event:DestinationEvent,submittedBy?:string){return{id:event.id,tenant_id:tenant.id,organisation_id:event.organisationId??null,submitted_by:submittedBy??null,submitted_by_label:event.submittedBy,title:event.title,category:event.category,format:event.format,description:event.description,start_date:event.startDate,end_date:event.endDate,start_time:event.startTime,end_time:event.endTime,venue_name:event.venueName,address:event.address,town:event.town,postcode:event.postcode,price:event.price,booking_url:event.bookingUrl,contact_name:event.contactName,contact_email:event.contactEmail,image:event.image,accessibility:event.accessibility,status:event.status,moderation_note:event.moderationNote??'',updated_at:new Date().toISOString()}}
 
 function fromPublicListing(row: PublicListingRow): Listing {
   return {
@@ -135,6 +152,7 @@ function normalizeCRMData(parsed: CRMData): CRMData {
   const legacyMediaAllowances: Record<string, [number, number]> = { 'level-001':[30,5], 'level-002':[20,3], 'level-003':[12,1], 'level-004':[6,0], 'level-006':[1,0] }
   return {
     ...normalized,
+    workspace: normalized.workspace ?? initialData.workspace,
     events: (normalized.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })),
     socialMetrics: normalized.socialMetrics ?? initialData.socialMetrics,
     levels: normalized.levels.map((level) => {
@@ -189,9 +207,12 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           const remoteData = state.data as CRMData
           setData(normalizeCRMData(remoteData))
         }
+        const {data:events}=await client.from('events').select('*').eq('tenant_id',tenant.id)
+        if(active&&events?.length)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
       } else {
-        const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')
+        const [{ data: listings },{data:events}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id)])
         if (active && listings?.length) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
+        if(active&&events?.length)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
       }
       if (active) setRemoteReady(true)
     }
@@ -201,6 +222,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    document.documentElement.style.setProperty('--tenant-primary',data.workspace.primaryColour)
+    document.documentElement.style.setProperty('--tenant-accent',data.workspace.accentColour)
+    document.documentElement.style.setProperty('--tenant-sage',data.workspace.supportingColour)
   }, [data])
 
   useEffect(() => {
@@ -274,6 +298,15 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         organisations: current.organisations.map((item) => item.id === organisationId ? { ...item, ...changes } : item),
       }))
     },
+    addContact: (contact) => setData((current) => ({ ...current, contacts: [{ ...contact, id: id('con') }, ...current.contacts] })),
+    updateContact: (contactId, changes) => setData((current) => ({ ...current, contacts: current.contacts.map((item) => item.id === contactId ? { ...item, ...changes } : item) })),
+    addActivity: (organisationId, title, detail) => setData((current) => ({ ...current, activities: [{ id: id('act'), organisationId, type: 'note', title, detail, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities] })),
+    createListing: (organisationId, name) => {
+      const organisation = data.organisations.find((item) => item.id === organisationId)
+      const listing: Listing = { id: id('list'), organisationId, name, category: organisation?.type ?? 'Attractions', town: organisation?.town ?? '', status: 'Draft', completeness: 20, views: 0, enquiries: 0, shortDescription: '', description: '', website: organisation?.website ?? '', bookingUrl: '', phone: '', email: '', openingHours: '', facilities: [], searchTags: [], visitorTaxonomy: [], reviewHighlights: [], reviewSites: [], goodToKnow: [], lastUpdated: todayISO(), image: 'hero', media: [] }
+      setData((current) => ({ ...current, listings: [listing, ...current.listings], organisations: current.organisations.map((item) => item.id === organisationId ? { ...item, listings: item.listings + 1 } : item) }))
+      return listing
+    },
     updateListing: (listingId, changes) => {
       setData((current) => ({
         ...current,
@@ -303,18 +336,19 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         events: [event, ...current.events],
         activities: [{ id: id('act'), type: 'event', title: 'Event submitted', detail: `${event.title} was submitted for review.`, timestamp: new Date().toISOString(), user: draft.submittedBy || user?.name || 'Event organiser' }, ...current.activities],
       }))
+      const client=supabase;if(client)void client.auth.getUser().then(({data:auth})=>client.from('events').insert(toEventRow(event,auth.user?.id)))
       return event
     },
-    updateEvent: (eventId, changes) => setData((current) => ({
+    updateEvent: (eventId, changes) => { setData((current) => ({
       ...current,
       events: current.events.map((item) => item.id === eventId ? { ...item, ...changes, lastUpdated: todayISO() } : item),
       activities: [{ id: id('act'), type: 'event', title: 'Event updated', detail: `${current.events.find((item) => item.id === eventId)?.title ?? 'Event'} was updated.`, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities],
-    })),
-    publishEvent: (eventId) => setData((current) => ({
+    }));if(supabase){const event=data.events.find((item)=>item.id===eventId);if(event)void supabase.from('events').update(toEventRow({...event,...changes,lastUpdated:todayISO()})).eq('id',eventId)}},
+    publishEvent: (eventId) => {setData((current) => ({
       ...current,
       events: current.events.map((item) => item.id === eventId ? { ...item, status: 'Published', lastUpdated: todayISO() } : item),
-    })),
-    deleteEvent: (eventId) => setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) })),
+    }));if(supabase)void supabase.from('events').update({status:'Published',updated_at:new Date().toISOString()}).eq('id',eventId)},
+    deleteEvent: (eventId) => {setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) }));if(supabase)void supabase.from('events').delete().eq('id',eventId)},
     moveOpportunity: (opportunityId, stage) => {
       setData((current) => ({
         ...current,
@@ -323,6 +357,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         } : item),
       }))
     },
+    addOpportunity: (opportunity) => setData((current) => ({ ...current, opportunities: [{ ...opportunity, id: id('opp'), daysInStage: 0 }, ...current.opportunities] })),
     markInvoicePaid: (invoiceId) => {
       setData((current) => {
         const invoice = current.invoices.find((item) => item.id === invoiceId)
@@ -374,6 +409,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         }, ...current.invoices],
       }))
     },
+    createAgreement: (agreement) => setData((current) => ({ ...current, agreements: [{ ...agreement, id: id('agr'), number: `AGR-${new Date().getFullYear()}-${String(current.agreements.length + 113).padStart(3, '0')}`, createdAt: todayISO() }, ...current.agreements] })),
+    updateAgreement: (agreementId, changes) => setData((current) => ({ ...current, agreements: current.agreements.map((item) => item.id === agreementId ? { ...item, ...changes } : item) })),
     toggleTask: (taskId) => {
       setData((current) => ({
         ...current,
@@ -416,11 +453,13 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         }
       })
     },
+    addBenefit: (benefit) => setData((current) => ({ ...current, benefits: [...current.benefits, { ...benefit, id: id('benefit') }] })),
+    updateWorkspace: (changes) => setData((current) => ({ ...current, workspace: { ...current.workspace, ...changes } })),
     resetWorkspace: () => {
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [data])
+  }), [data,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }

@@ -88,6 +88,11 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
     const next=[...media];[next[currentIndex],next[target]]=[next[target],next[currentIndex]];set('media',next)
   }
   const updateMedia=(itemId:string,changes:Partial<ListingMedia>)=>set('media',media.map((item)=>item.id===itemId?{...item,...changes}:item))
+  const suggestCopy=()=>setDraft((current)=>{
+    const short=current.shortDescription.trim()||`Discover ${current.name} in ${current.town}, with practical information to help you plan your visit.`
+    const description=current.description.trim()||`${current.name} offers visitors a memorable experience in ${current.town}. Check opening information, accessibility and facilities before travelling, then book ahead where recommended.`
+    return {...current,shortDescription:short.charAt(0).toUpperCase()+short.slice(1),description:description.charAt(0).toUpperCase()+description.slice(1)}
+  })
 
   return (
     <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={onClose}>
@@ -100,7 +105,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
       <div className="listing-editor-body">
         <div className="editor-main">
           {tab === 'Content' && <div className="form-stack">
-            <div className="ai-helper"><span><Sparkles size={18} /></span><div><strong>Improve this listing with AI</strong><p>Polish the copy while preserving approved business details.</p></div><Button variant="secondary" size="sm">Suggest improvements</Button></div>
+            <div className="ai-helper"><span><Sparkles size={18} /></span><div><strong>Improve this listing copy</strong><p>Fill missing visitor-focused copy while preserving approved business details.</p></div><Button variant="secondary" size="sm" onClick={suggestCopy}>Suggest improvements</Button></div>
             <div className="form-grid two">
               <Field label="Listing name"><input value={draft.name} onChange={(event) => set('name', event.target.value)} /></Field>
               <Field label="Category"><select value={draft.category} onChange={(event) => set('category', event.target.value)}><option>Attractions</option><option>Castles & heritage</option><option>Accommodation</option><option>Hotels</option><option>Experiences</option><option>Museums</option><option>Galleries</option><option>Restaurants</option><option>Shopping</option><option>Parks & gardens</option><option>Theatre</option></select></Field>
@@ -157,7 +162,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
           {tab === 'Preview' && <div className="website-preview">
             <div className="preview-browser"><span /><span /><span /><p>visitvalechester.co.uk/place/{draft.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}</p></div>
             <div className="preview-hero" style={{backgroundImage:`url("${listingMediaUrl(draft.image)}")`,backgroundSize:'cover',backgroundPosition:'center'}}><div><Badge tone="purple">{draft.category}</Badge><h2>{draft.name}</h2><p><MapPin size={15} />{draft.town}</p></div></div>
-            <div className="preview-content"><main><p className="preview-lead">{draft.shortDescription}</p><p>{draft.description}</p><h3>Facilities</h3><div className="preview-facilities">{draft.facilities.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></main><aside><h3>Plan your visit</h3><p><strong>Opening hours</strong>{draft.openingHours}</p><p><strong>Contact</strong>{draft.phone}<br />{draft.email}</p>{draft.bookingUrl && <Button>Book now</Button>}<Button variant="secondary" icon={Globe2}>Visit website</Button></aside></div>
+            <div className="preview-content"><main><p className="preview-lead">{draft.shortDescription}</p><p>{draft.description}</p><h3>Facilities</h3><div className="preview-facilities">{draft.facilities.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></main><aside><h3>Plan your visit</h3><p><strong>Opening hours</strong>{draft.openingHours}</p><p><strong>Contact</strong>{draft.phone}<br />{draft.email}</p>{draft.bookingUrl && <Button onClick={()=>window.open(draft.bookingUrl,'_blank','noopener,noreferrer')}>Book now</Button>}{draft.website&&<Button variant="secondary" icon={Globe2} onClick={()=>window.open(draft.website,'_blank','noopener,noreferrer')}>Visit website</Button>}</aside></div>
           </div>}
         </div>
 

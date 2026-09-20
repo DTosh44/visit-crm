@@ -1,17 +1,19 @@
-import { CalendarDays, CircleDollarSign, Filter, GripVertical, MoreHorizontal, Plus, Search, TrendingUp, UserRound } from 'lucide-react'
+import { CalendarDays, CircleDollarSign, GripVertical, Plus, Search, TrendingUp, UserRound } from 'lucide-react'
 import { useMemo, useState, type DragEvent } from 'react'
 import { useCRM } from '../store'
 import type { PipelineStage } from '../types'
 import { currency, dateLabel } from '../utils'
-import { Avatar, Badge, Button, PageHeader } from '../components/UI'
+import { Avatar, Badge, Button, Field, Modal, PageHeader } from '../components/UI'
 
 const stages: PipelineStage[] = ['New lead', 'Qualified', 'Proposal', 'Decision', 'Won']
 const stageColours: Record<PipelineStage, string> = { 'New lead': '#6b7788', Qualified: '#3773b9', Proposal: '#6858ce', Decision: '#d28d30', Won: '#278362' }
 
 export function Pipeline() {
-  const { data, moveOpportunity } = useCRM()
+  const { data, moveOpportunity, addOpportunity } = useCRM()
   const [query, setQuery] = useState('')
   const [dragOver, setDragOver] = useState<PipelineStage | null>(null)
+  const [adding,setAdding]=useState(false)
+  const [draft,setDraft]=useState({organisationName:'',contactName:'',stage:'New lead' as PipelineStage,proposedLevel:data.levels[0]?.name??'',value:data.levels[0]?.price??0,probability:15,source:'Website enquiry',nextAction:'Arrange discovery call',nextActionDate:new Date().toISOString().slice(0,10),owner:'Morgan Lee'})
   const opportunities = useMemo(() => data.opportunities.filter((item) => item.organisationName.toLowerCase().includes(query.toLowerCase())), [data.opportunities, query])
   const totalValue = opportunities.filter((item) => item.stage !== 'Won').reduce((sum, item) => sum + item.value, 0)
   const weightedValue = opportunities.filter((item) => item.stage !== 'Won').reduce((sum, item) => sum + item.value * item.probability / 100, 0)
@@ -25,7 +27,7 @@ export function Pipeline() {
 
   return (
     <div className="pipeline-page">
-      <PageHeader eyebrow="Sales" title="Membership pipeline" description="Move prospective members from first conversation to onboarding." actions={<><Button variant="secondary" icon={Filter}>Filters</Button><Button icon={Plus}>Add opportunity</Button></>} />
+      <PageHeader eyebrow="Sales" title="Membership pipeline" description="Move prospective members from first conversation to onboarding." actions={<Button icon={Plus} onClick={()=>setAdding(true)}>Add opportunity</Button>} />
 
       <section className="pipeline-summary">
         <div><span className="summary-icon purple"><CircleDollarSign size={18} /></span><p><small>Open pipeline</small><strong>{currency.format(totalValue)}</strong></p></div>
@@ -43,7 +45,7 @@ export function Pipeline() {
             <header style={{ '--stage-colour': stageColours[stage] } as React.CSSProperties}><div><i /><strong>{stage}</strong><span>{items.length}</span></div><small>{currency.format(value)}</small></header>
             <div className="kanban-cards">
               {items.map((item) => <article className="opportunity-card" key={item.id} draggable onDragStart={(event) => { event.dataTransfer.setData('opportunityId', item.id); event.dataTransfer.effectAllowed = 'move' }}>
-                <div className="opportunity-top"><Badge tone={stage === 'Won' ? 'green' : 'grey'}>{item.proposedLevel}</Badge><button className="icon-button"><MoreHorizontal size={16} /></button></div>
+                <div className="opportunity-top"><Badge tone={stage === 'Won' ? 'green' : 'grey'}>{item.proposedLevel}</Badge></div>
                 <h3>{item.organisationName}</h3>
                 <p className="opportunity-contact"><UserRound size={14} />{item.contactName}</p>
                 <div className="opportunity-value"><strong>{currency.format(item.value)}</strong><span>{item.probability}% probability</span></div>
@@ -52,12 +54,13 @@ export function Pipeline() {
                 <footer><span className="source-tag">{item.source}</span><span><Avatar name={item.owner} size="sm" />{item.daysInStage}d</span><GripVertical size={16} /></footer>
               </article>)}
               {!items.length && <div className="kanban-empty"><p>Drop an opportunity here</p></div>}
-              <button className="kanban-add"><Plus size={15} />Add opportunity</button>
+              <button className="kanban-add" onClick={()=>{setDraft((current)=>({...current,stage}));setAdding(true)}}><Plus size={15} />Add opportunity</button>
             </div>
           </div>
         })}
       </section>
       <p className="drag-hint"><GripVertical size={14} />Drag cards between stages to update the sales pipeline.</p>
+      {adding&&<Modal title="Add opportunity" subtitle="Create a prospect and place it in the membership pipeline." onClose={()=>setAdding(false)}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();addOpportunity(draft);setAdding(false)}}><div className="form-grid two"><Field label="Organisation"><input required autoFocus value={draft.organisationName} onChange={(e)=>setDraft({...draft,organisationName:e.target.value})}/></Field><Field label="Contact"><input required value={draft.contactName} onChange={(e)=>setDraft({...draft,contactName:e.target.value})}/></Field><Field label="Stage"><select value={draft.stage} onChange={(e)=>setDraft({...draft,stage:e.target.value as PipelineStage})}>{stages.map((stage)=><option key={stage}>{stage}</option>)}</select></Field><Field label="Proposed membership"><select value={draft.proposedLevel} onChange={(e)=>{const level=data.levels.find((item)=>item.name===e.target.value);setDraft({...draft,proposedLevel:e.target.value,value:level?.price??draft.value})}}>{data.levels.map((level)=><option key={level.id}>{level.name}</option>)}</select></Field><Field label="Value"><input type="number" min="0" value={draft.value} onChange={(e)=>setDraft({...draft,value:Number(e.target.value)})}/></Field><Field label="Probability"><input type="number" min="0" max="100" value={draft.probability} onChange={(e)=>setDraft({...draft,probability:Number(e.target.value)})}/></Field><Field label="Next action"><input value={draft.nextAction} onChange={(e)=>setDraft({...draft,nextAction:e.target.value})}/></Field><Field label="Next action date"><input type="date" value={draft.nextActionDate} onChange={(e)=>setDraft({...draft,nextActionDate:e.target.value})}/></Field></div><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setAdding(false)}>Cancel</Button><Button type="submit">Add opportunity</Button></div></form></Modal>}
     </div>
   )
 }

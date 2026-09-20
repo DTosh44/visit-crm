@@ -128,6 +128,36 @@ describe('Visit CRM', () => {
     expect(screen.getByDisplayValue('https://vimeo.com/123456')).toBeInTheDocument()
   })
 
+  it('creates a new listing draft and opens its editor', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Listings'}))
+    fireEvent.click(screen.getByRole('button',{name:'Add listing'}))
+    fireEvent.change(screen.getByLabelText('Listing name'),{target:{value:'New visitor experience'}})
+    fireEvent.click(screen.getByRole('button',{name:'Create draft'}))
+    expect(screen.getByRole('heading',{name:'Edit website listing'})).toBeInTheDocument()
+    expect(screen.getByDisplayValue('New visitor experience')).toBeInTheDocument()
+  })
+
+  it('creates a membership pipeline opportunity', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Sales pipeline'}))
+    fireEvent.click(screen.getAllByRole('button',{name:'Add opportunity'})[0])
+    fireEvent.change(screen.getByLabelText('Organisation'),{target:{value:'Valechester Bakery'}})
+    fireEvent.change(screen.getByLabelText('Contact'),{target:{value:'Jamie Stone'}})
+    const addButtons=screen.getAllByRole('button',{name:'Add opportunity'})
+    fireEvent.click(addButtons[addButtons.length-1])
+    expect(screen.getByRole('heading',{name:'Valechester Bakery'})).toBeInTheDocument()
+  })
+
+  it('persists configurable workspace details', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Settings'}))
+    fireEvent.change(screen.getByLabelText('Destination name'),{target:{value:'Visit New Vale'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save changes'}))
+    const stored=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}')
+    expect(stored.workspace.destinationName).toBe('Visit New Vale')
+  })
+
   it('uses configurable level names and keeps a Free Listing basic and unlinked', () => {
     window.history.pushState({}, '', '/listing-templates')
     const { unmount } = renderApp()

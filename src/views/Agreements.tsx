@@ -1,23 +1,28 @@
-import { CheckCircle2, Clock3, Download, Eye, FileSignature, Mail, MoreHorizontal, Plus, Search, Send, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, Clock3, Download, Eye, FileSignature, Mail, Plus, Search, Send, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useCRM } from '../store'
 import { formatDate } from '../utils'
-import { Avatar, Badge, Button, Drawer, PageHeader } from '../components/UI'
+import { Avatar, Badge, Button, Drawer, Field, Modal, PageHeader } from '../components/UI'
+import { downloadFile, openEmail } from '../actions'
 
 export function Agreements() {
-  const { data } = useCRM()
+  const { data, createAgreement, updateAgreement } = useCRM()
   const [query, setQuery] = useState('')
+  const [status,setStatus]=useState('All statuses')
+  const [adding,setAdding]=useState(false)
+  const firstOrg=data.organisations[0]
+  const [draft,setDraft]=useState({organisationId:firstOrg?.id??'',membershipLevel:firstOrg?.tier??data.levels[0]?.name??'',signatory:'',signatoryEmail:'',status:'Draft' as const,validUntil:'2027-08-31'})
   const [selected, setSelected] = useState<string | null>(null)
   const agreements = data.agreements.filter((agreement) => {
     const org = data.organisations.find((item) => item.id === agreement.organisationId)
-    return !query || [agreement.number, agreement.signatory, org?.name].join(' ').toLowerCase().includes(query.toLowerCase())
+    return (!query || [agreement.number, agreement.signatory, org?.name].join(' ').toLowerCase().includes(query.toLowerCase()))&&(status==='All statuses'||agreement.status===status)
   })
   const agreement = data.agreements.find((item) => item.id === selected)
   const selectedOrg = agreement ? data.organisations.find((item) => item.id === agreement.organisationId) : undefined
 
   return (
     <div>
-      <PageHeader eyebrow="Membership" title="Agreements" description="Generate membership agreements and track each signing journey." actions={<><Button variant="secondary">Manage templates</Button><Button icon={Plus}>New agreement</Button></>} />
+      <PageHeader eyebrow="Membership" title="Agreements" description="Generate membership agreements and track each signing journey." actions={<Button icon={Plus} onClick={()=>setAdding(true)}>New agreement</Button>} />
       <section className="agreement-stats">
         <article><span className="stat-icon green"><CheckCircle2 size={18} /></span><div><strong>{data.agreements.filter((item) => item.status === 'Signed').length}</strong><span>Signed</span></div></article>
         <article><span className="stat-icon blue"><Eye size={18} /></span><div><strong>{data.agreements.filter((item) => item.status === 'Viewed').length}</strong><span>Viewed</span></div></article>
@@ -25,10 +30,10 @@ export function Agreements() {
         <article><span className="stat-icon purple"><FileSignature size={18} /></span><div><strong>{data.agreements.filter((item) => item.status === 'Draft').length}</strong><span>Draft</span></div></article>
       </section>
       <section className="panel data-panel">
-        <div className="table-toolbar"><div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agreements..." /></div><Button variant="secondary" size="sm">All statuses</Button></div>
+        <div className="table-toolbar"><div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search agreements..." /></div><label className="select-wrap"><select value={status} onChange={(e)=>setStatus(e.target.value)}><option>All statuses</option>{['Draft','Sent','Viewed','Signed','Declined','Expired'].map((item)=><option key={item}>{item}</option>)}</select></label></div>
         <div className="table-scroll"><table className="data-table agreement-table"><thead><tr><th>Agreement</th><th>Organisation</th><th>Membership</th><th>Signatory</th><th>Created</th><th>Valid until</th><th>Status</th><th /></tr></thead><tbody>{agreements.map((item) => {
           const org = data.organisations.find((orgItem) => orgItem.id === item.organisationId)
-          return <tr key={item.id} onClick={() => setSelected(item.id)}><td><div className="invoice-number"><strong>{item.number}</strong><small>Membership agreement</small></div></td><td><div className="org-cell"><Avatar name={org?.name ?? ''} colour={org?.colour} size="sm" /><strong>{org?.name}</strong></div></td><td>{item.membershipLevel}</td><td><div className="invoice-number"><strong>{item.signatory}</strong><small>{item.signatoryEmail}</small></div></td><td>{formatDate(item.createdAt, { day: 'numeric', month: 'short' })}</td><td>{formatDate(item.validUntil, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td><Badge>{item.status}</Badge></td><td><button className="icon-button"><MoreHorizontal size={17} /></button></td></tr>
+          return <tr key={item.id} onClick={() => setSelected(item.id)}><td><div className="invoice-number"><strong>{item.number}</strong><small>Membership agreement</small></div></td><td><div className="org-cell"><Avatar name={org?.name ?? ''} colour={org?.colour} size="sm" /><strong>{org?.name}</strong></div></td><td>{item.membershipLevel}</td><td><div className="invoice-number"><strong>{item.signatory}</strong><small>{item.signatoryEmail}</small></div></td><td>{formatDate(item.createdAt, { day: 'numeric', month: 'short' })}</td><td>{formatDate(item.validUntil, { day: 'numeric', month: 'short', year: 'numeric' })}</td><td><Badge>{item.status}</Badge></td><td><Eye size={16}/></td></tr>
         })}</tbody></table></div>
       </section>
 
@@ -36,8 +41,9 @@ export function Agreements() {
         <div className="agreement-detail-status"><span className={`agreement-big-icon ${agreement.status.toLowerCase()}`}><FileSignature size={26} /></span><div><Badge>{agreement.status}</Badge><h2>{selectedOrg?.name}</h2><p>{agreement.status === 'Signed' ? `Completed on ${formatDate(agreement.signedAt)}` : `Waiting for ${agreement.signatory}`}</p></div></div>
         <section className="subpanel"><header><div><h3>Signing details</h3><p>The exact recipient and agreement version are preserved.</p></div></header><dl className="detail-list"><div><dt>Signatory</dt><dd><strong>{agreement.signatory}</strong><span>{agreement.signatoryEmail}</span></dd></div><div><dt>Membership</dt><dd>{agreement.membershipLevel}</dd></div><div><dt>Created</dt><dd>{formatDate(agreement.createdAt)}</dd></div><div><dt>Sent</dt><dd>{formatDate(agreement.sentAt)}</dd></div><div><dt>Valid until</dt><dd>{formatDate(agreement.validUntil)}</dd></div></dl></section>
         <section className="agreement-audit"><h3>Agreement history</h3><div className="audit-step complete"><span><CheckCircle2 size={14} /></span><div><strong>Agreement created</strong><small>{formatDate(agreement.createdAt)} · Alex Morgan</small></div></div>{agreement.sentAt && <div className="audit-step complete"><span><Send size={14} /></span><div><strong>Sent to {agreement.signatory}</strong><small>{formatDate(agreement.sentAt)} · {agreement.signatoryEmail}</small></div></div>}{agreement.status === 'Viewed' && <div className="audit-step current"><span><Eye size={14} /></span><div><strong>Agreement viewed</strong><small>Awaiting signature</small></div></div>}{agreement.signedAt && <div className="audit-step complete"><span><ShieldCheck size={14} /></span><div><strong>Signed and completed</strong><small>{formatDate(agreement.signedAt)} · Audit record retained</small></div></div>}</section>
-        <div className="drawer-button-stack"><Button icon={agreement.status === 'Signed' ? Download : Send}>{agreement.status === 'Signed' ? 'Download signed copy' : 'Send reminder'}</Button><Button variant="secondary" icon={Mail}>Email signatory</Button></div>
+        <div className="drawer-button-stack"><Button icon={agreement.status === 'Signed' ? Download : Send} onClick={()=>{if(agreement.status==='Signed')downloadFile(`${agreement.number}.html`,`<h1>${agreement.number}</h1><p>${selectedOrg?.name}</p><p>${agreement.membershipLevel} membership</p><p>Signed by ${agreement.signatory} on ${agreement.signedAt}</p>`,'text/html');else{updateAgreement(agreement.id,{status:'Sent',sentAt:new Date().toISOString().slice(0,10)});openEmail(agreement.signatoryEmail,`Reminder: ${agreement.number}`,`Please review and sign your ${agreement.membershipLevel} membership agreement.`)}}}>{agreement.status === 'Signed' ? 'Download signed copy' : 'Send reminder'}</Button><Button variant="secondary" icon={Mail} onClick={()=>openEmail(agreement.signatoryEmail,agreement.number)}>Email signatory</Button></div>
       </Drawer>}
+      {adding&&<Modal title="New membership agreement" subtitle="Create an agreement and preserve its signatory and membership details." onClose={()=>setAdding(false)}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();createAgreement(draft);setAdding(false)}}><Field label="Organisation"><select value={draft.organisationId} onChange={(e)=>{const org=data.organisations.find((item)=>item.id===e.target.value);const contact=data.contacts.find((item)=>item.id===org?.primaryContactId);setDraft({...draft,organisationId:e.target.value,membershipLevel:org?.tier??draft.membershipLevel,signatory:contact?.name??'',signatoryEmail:contact?.email??''})}}>{data.organisations.map((org)=><option key={org.id} value={org.id}>{org.name}</option>)}</select></Field><div className="form-grid two"><Field label="Membership"><select value={draft.membershipLevel} onChange={(e)=>setDraft({...draft,membershipLevel:e.target.value})}>{data.levels.map((level)=><option key={level.id}>{level.name}</option>)}</select></Field><Field label="Valid until"><input type="date" value={draft.validUntil} onChange={(e)=>setDraft({...draft,validUntil:e.target.value})}/></Field><Field label="Signatory"><input required value={draft.signatory} onChange={(e)=>setDraft({...draft,signatory:e.target.value})}/></Field><Field label="Signatory email"><input required type="email" value={draft.signatoryEmail} onChange={(e)=>setDraft({...draft,signatoryEmail:e.target.value})}/></Field></div><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setAdding(false)}>Cancel</Button><Button type="submit">Create agreement</Button></div></form></Modal>}
     </div>
   )
 }

@@ -1,13 +1,13 @@
 import {
   ArrowRight, Banknote, BedDouble, Building2, CalendarClock, Check, CircleAlert,
-  CircleDollarSign, Eye, GripVertical, MapPinned, MoreHorizontal, PoundSterling,
-  Settings2, Sparkles, Star, TrendingUp, UserPlus, UsersRound, WalletCards, X,
+  CircleDollarSign, Eye, GripVertical, PoundSterling,
+  Settings2, Sparkles, Star, UserPlus, UsersRound, WalletCards, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { Organisation, ViewKey } from '../types'
 import { currency, dateLabel, formatDate, timeAgo } from '../utils'
-import { Avatar, Badge, Button } from '../components/UI'
+import { Avatar, Button } from '../components/UI'
 import { supabase, useAuth } from '../auth'
 
 type WidgetId = 'active-members'|'new-members'|'membership-income'|'visitor-volume'|'visitor-spend'|'overnight-stays'|'pipeline'|'outstanding'|'bank-balance'|'member-tiers'|'review-trends'|'renewals'|'tasks'|'activity'
@@ -42,12 +42,12 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
       'active-members':{value:String(activeMembers),detail:'current paid members',icon:Building2,tone:'purple'},
       'new-members':{value:String(newMembers),detail:'joined in the last 3 months',icon:UserPlus,tone:'green'},
       'membership-income':{value:currency.format(membershipValue),detail:'92.8% of annual target',icon:CircleDollarSign,tone:'green'},
-      'visitor-volume':{value:'5.8m',detail:'+3.6% year on year',icon:UsersRound,tone:'purple'},
-      'visitor-spend':{value:'£412m',detail:'£71 average day spend',icon:Banknote,tone:'green'},
-      'overnight-stays':{value:'1.24m',detail:'2.3 nights average stay',icon:BedDouble,tone:'amber'},
+      'visitor-volume':{value:Intl.NumberFormat('en-GB',{notation:'compact',maximumFractionDigits:1}).format(data.workspace.visitorVolume),detail:'latest configured visitor-economy figure',icon:UsersRound,tone:'purple'},
+      'visitor-spend':{value:currency.format(data.workspace.visitorSpend),detail:data.workspace.visitorVolume?`${currency.format(data.workspace.visitorSpend/data.workspace.visitorVolume)} average spend per visit`:'Add visitor data in Settings',icon:Banknote,tone:'green'},
+      'overnight-stays':{value:Intl.NumberFormat('en-GB',{notation:'compact',maximumFractionDigits:2}).format(data.workspace.overnightStays),detail:'latest configured overnight-stay figure',icon:BedDouble,tone:'amber'},
       'pipeline':{value:currency.format(pipelineValue),detail:`${data.opportunities.filter((o)=>o.stage!=='Won').length} live opportunities`,icon:CalendarClock,tone:'amber'},
       'outstanding':{value:currency.format(unpaidTotal),detail:`${overdueInvoices.length} invoices overdue`,icon:PoundSterling,tone:'coral'},
-      'bank-balance':{value:bankConnected?'£186,420':'Not connected',detail:bankConnected?'Available balance · refreshed 8 mins ago':'Connect an Open Banking provider',icon:WalletCards,tone:'purple'},
+      'bank-balance':{value:bankConnected&&data.workspace.bankBalance!==undefined?currency.format(data.workspace.bankBalance):'Not connected',detail:bankConnected?'Latest imported available balance':'Connect an Open Banking provider',icon:WalletCards,tone:'purple'},
       'member-tiers':{value:'',detail:'',icon:Building2,tone:'purple'},'review-trends':{value:'',detail:'',icon:Star,tone:'amber'},'renewals':{value:'',detail:'',icon:CalendarClock,tone:'amber'},'tasks':{value:'',detail:'',icon:Check,tone:'green'},'activity':{value:'',detail:'',icon:Eye,tone:'purple'}
     }; const item=map[id], Icon=item.icon
     return <article className="dashboard-widget metric-widget"><div className="widget-top"><span className={`stat-icon ${item.tone}`}><Icon size={19}/></span><GripVertical size={17}/></div><p>{widgetNames[id]}</p><h2>{item.value}</h2><small>{item.detail}</small>{id==='bank-balance'&&<button className="widget-link" onClick={()=>navigate('settings')}>{bankConnected?'Manage connection':'Set up connection'} <ArrowRight size={13}/></button>}</article>

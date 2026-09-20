@@ -38,22 +38,26 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 function readUsers() { try { const stored = localStorage.getItem(USERS_KEY); return stored ? JSON.parse(stored) as WorkspaceUser[] : seedUsers } catch { return seedUsers } }
 function readLocalUser(users: WorkspaceUser[]) { try { return users.find((item) => item.id === localStorage.getItem(SESSION_KEY) && item.active) ?? null } catch { return null } }
-function profileFromSession(session: Session): WorkspaceUser {
-  const metadata = session.user.user_metadata; const name = String(metadata.full_name ?? session.user.email?.split('@')[0] ?? 'Workspace user')
-  return { id: session.user.id, email: session.user.email ?? '', name, role: (metadata.role as UserRole | undefined) ?? 'Content editor', tenantId: String(metadata.tenant_id ?? tenant.id), initials: name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase(), colour: tenant.colours.accent, active: true }
+async function profileFromSession(session: Session): Promise<WorkspaceUser|null> {
+  if(!supabase)return null
+  const {data:profile}=await supabase.from('profiles').select('tenant_id,full_name,role,active').eq('user_id',session.user.id).eq('tenant_id',tenant.id).eq('active',true).maybeSingle()
+  if(!profile)return null
+  const name=String(profile.full_name??session.user.email?.split('@')[0]??'Workspace user')
+  return {id:session.user.id,email:session.user.email??'',name,role:profile.role as UserRole,tenantId:String(profile.tenant_id),initials:name.split(' ').map((part)=>part[0]).join('').slice(0,2).toUpperCase(),colour:tenant.colours.accent,active:true}
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<WorkspaceUser[]>(readUsers)
   const [user, setUser] = useState<WorkspaceUser | null>(() => supabase ? null : readLocalUser(readUsers()))
   const [loading, setLoading] = useState(Boolean(supabase))
-  useEffect(() => { localStorage.setItem(USERS_KEY, JSON.stringify(users)); setUser((current) => current ? users.find((item) => item.id === current.id && item.active) ?? null : current) }, [users])
+  useEffect(() => { localStorage.setItem(USERS_KEY, JSON.stringify(users)) }, [users])
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => { setUser(data.session ? profileFromSession(data.session) : null); setLoading(false) })
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => { setUser(session ? profileFromSession(session) : null); setLoading(false) })
+    supabase.auth.getSession().then(async({ data }) => { setUser(data.session ? await profileFromSession(data.session) : null); setLoading(false) })
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => { void (async()=>{setUser(session ? await profileFromSession(session) : null);setLoading(false)})() })
     return () => data.subscription.unsubscribe()
   }, [])
+  useEffect(()=>{if(!supabase||!user)return;void supabase.from('profiles').select('user_id,email,full_name,role,active,updated_at').eq('tenant_id',tenant.id).then(({data})=>{if(data)setUsers(data.map((profile,index)=>({id:profile.user_id,email:profile.email??'',name:profile.full_name,role:profile.role as UserRole,tenantId:tenant.id,initials:profile.full_name.split(' ').map((part:string)=>part[0]).join('').slice(0,2).toUpperCase(),colour:['#6d294f','#7a9a83','#506f8b','#f0785e'][index%4],active:profile.active,lastActive:'Workspace account'})))})},[user])
   const value = useMemo<AuthContextValue>(() => ({
     user, users, loading, productionAuth: Boolean(supabase),
     signIn: async (email, password) => {
@@ -64,10 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(SESSION_KEY, match.id); setUser(match); return null
     },
     signOut: async () => { if (supabase) await supabase.auth.signOut(); localStorage.removeItem(SESSION_KEY); setUser(null) },
-    inviteUser: ({ name, email, role }) => setUsers((current) => [...current, { id: `usr-${Date.now()}`, name, email, role, tenantId: tenant.id, initials: name.split(' ').map((part) => part[0]).join('').slice(0,2).toUpperCase(), colour: ['#6d294f','#7a9a83','#506f8b','#f0785e'][current.length % 4], active: true, lastActive: 'Invitation sent' }]),
-    updateUser: (id, changes) => setUsers((current) => current.map((item) => item.id === id ? { ...item, ...changes, initials: (changes.name ?? item.name).split(' ').map((part) => part[0]).join('').slice(0,2).toUpperCase() } : item)),
-    removeUser: (id) => setUsers((current) => current.filter((item) => item.id !== id)),
-    resetPassword: (id) => setUsers((current) => current.map((item) => item.id === id ? { ...item, lastActive: 'Password reset sent' } : item)),
+    inviteUser: ({ name, email, role }) => {const tempId=`usr-${Date.now()}`;setUsers((current) => [...current, { id: tempId, name, email, role, tenantId: tenant.id, initials: name.split(' ').map((part) => part[0]).join('').slice(0,2).toUpperCase(), colour: ['#6d294f','#7a9a83','#506f8b','#f0785e'][current.length % 4], active: true, lastActive: 'Invitation sent' }]);if(supabase)void supabase.functions.invoke('invite-workspace-user',{body:{name,email,role,tenantId:tenant.id}}).then(({data})=>{if(data?.userId)setUsers((current)=>current.map((item)=>item.id===tempId?{...item,id:data.userId}:item))})},
+    updateUser: (id, changes) => {setUsers((current) => current.map((item) => item.id === id ? { ...item, ...changes, initials: (changes.name ?? item.name).split(' ').map((part) => part[0]).join('').slice(0,2).toUpperCase() } : item));if(id===user?.id&&changes.active===false)setUser(null);if(supabase)void supabase.functions.invoke('manage-workspace-user',{body:{action:'update',userId:id,tenantId:tenant.id,changes:{full_name:changes.name,role:changes.role,active:changes.active}}})},
+    removeUser: (id) => {setUsers((current) => current.filter((item) => item.id !== id));if(supabase)void supabase.functions.invoke('manage-workspace-user',{body:{action:'remove',userId:id,tenantId:tenant.id}})},
+    resetPassword: (id) => {const person=users.find((item)=>item.id===id);setUsers((current) => current.map((item) => item.id === id ? { ...item, lastActive: 'Password reset sent' } : item));if(supabase&&person)void supabase.auth.resetPasswordForEmail(person.email,{redirectTo:`${window.location.origin}/crm`})},
   }), [loading, user, users])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

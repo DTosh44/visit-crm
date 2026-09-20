@@ -1,16 +1,18 @@
-import { CheckCircle2, ChevronDown, Eye, FilePenLine, Globe2, Grid2X2, List, MoreHorizontal, Plus, Search, Send, Sparkles } from 'lucide-react'
+import { CheckCircle2, ChevronDown, Eye, FilePenLine, Globe2, Grid2X2, List, Plus, Search, Send } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
 import type { Listing } from '../types'
 import { formatDate } from '../utils'
 import { imageLibrary } from '../siteData'
-import { Badge, Button, PageHeader, Progress } from '../components/UI'
+import { Badge, Button, Field, Modal, PageHeader, Progress } from '../components/UI'
 
 export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
-  const { data, publishListing } = useCRM()
+  const { data, publishListing, createListing } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All statuses')
   const [layout, setLayout] = useState<'grid' | 'list'>('grid')
+  const [adding,setAdding]=useState(false)
+  const [newListing,setNewListing]=useState({organisationId:data.organisations[0]?.id??'',name:''})
   const listings = useMemo(() => data.listings.filter((listing) => {
     const org = data.organisations.find((item) => item.id === listing.organisationId)
     return (!query || [listing.name, listing.category, listing.town, org?.name].join(' ').toLowerCase().includes(query.toLowerCase())) && (status === 'All statuses' || listing.status === status)
@@ -21,7 +23,7 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
 
   return (
     <div>
-      <PageHeader eyebrow="Website content" title="Listings" description="Edit, review and publish public listings without leaving the CRM." actions={<><Button variant="secondary" icon={Sparkles}>Create with AI</Button><Button icon={Plus}>Add listing</Button></>} />
+      <PageHeader eyebrow="Website content" title="Listings" description="Edit, review and publish public listings without leaving the CRM." actions={<Button icon={Plus} onClick={()=>setAdding(true)}>Add listing</Button>} />
       <section className="listing-summary">
         <div><span className="summary-icon green"><Globe2 size={18} /></span><p><small>Published</small><strong>{data.listings.filter((item) => item.status === 'Published').length}</strong></p></div>
         <div><span className="summary-icon blue"><FilePenLine size={18} /></span><p><small>Awaiting review</small><strong>{reviewCount}</strong></p></div>
@@ -42,7 +44,7 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
           {listings.map((listing) => {
             const org = data.organisations.find((item) => item.id === listing.organisationId)
             return <article className="listing-card" key={listing.id}>
-              <div className="listing-image" style={{backgroundImage:`url("${imageLibrary[listing.image]??listing.image}")`}}><div><Badge>{listing.status}</Badge><button className="icon-button"><MoreHorizontal size={17} /></button></div><span>{listing.category}</span></div>
+              <div className="listing-image" style={{backgroundImage:`url("${imageLibrary[listing.image]??listing.image}")`}}><div><Badge>{listing.status}</Badge></div><span>{listing.category}</span></div>
               <div className="listing-card-content">
                 <small>{org?.name}</small><h3>{listing.name}</h3><p>{listing.shortDescription}</p>
                 <div className="listing-completeness"><div><span>Completeness</span><strong>{listing.completeness}%</strong></div><Progress value={listing.completeness} colour={listing.completeness >= 85 ? '#278362' : '#d28d30'} /></div>
@@ -53,6 +55,7 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
           })}
         </div>
       </section>
+      {adding&&<Modal title="Add website listing" subtitle="Create a draft linked to an organisation, then complete its content and media." onClose={()=>setAdding(false)}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();const listing=createListing(newListing.organisationId,newListing.name);setAdding(false);setNewListing({organisationId:data.organisations[0]?.id??'',name:''});onEdit(listing)}}><Field label="Organisation"><select value={newListing.organisationId} onChange={(event)=>setNewListing({...newListing,organisationId:event.target.value})}>{data.organisations.map((organisation)=><option value={organisation.id} key={organisation.id}>{organisation.name}</option>)}</select></Field><Field label="Listing name"><input autoFocus required value={newListing.name} onChange={(event)=>setNewListing({...newListing,name:event.target.value})}/></Field><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setAdding(false)}>Cancel</Button><Button type="submit">Create draft</Button></div></form></Modal>}
     </div>
   )
 }

@@ -20,6 +20,7 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
   const [draft, setDraft] = useState<EventDraft>(event ? { ...event } : blankEvent(user?.name ?? 'Destination team'))
   const set = <K extends keyof EventDraft>(key: K, value: EventDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
   const submit = (formEvent: FormEvent) => { formEvent.preventDefault(); if (event) updateEvent(event.id, draft); else createEvent(draft); onClose() }
+  const uploadImage=(file?:File)=>{if(!file)return;if(!['image/jpeg','image/png','image/webp'].includes(file.type))return;const reader=new FileReader();reader.onload=()=>set('image',String(reader.result));reader.readAsDataURL(file)}
   return <div className="modal-backdrop" role="presentation"><form className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-label={event ? `Edit ${event.title}` : 'Add event'}>
     <header><div><span className="eyebrow">Website content</span><h2>{event ? 'Edit event' : 'Add event'}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={20}/></button></header>
     <div className="event-form-grid">
@@ -40,8 +41,10 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
       <label>Booking URL<input type="url" value={draft.bookingUrl} onChange={(e)=>set('bookingUrl',e.target.value)}/></label>
       <label>Organiser name<input required value={draft.contactName} onChange={(e)=>set('contactName',e.target.value)}/></label>
       <label>Organiser email<input required type="email" value={draft.contactEmail} onChange={(e)=>set('contactEmail',e.target.value)}/></label>
-      <label>Image<select value={draft.image} onChange={(e)=>set('image',e.target.value)}>{Object.keys(imageLibrary).filter((key)=>key!=='hero').map((key)=><option key={key}>{key}</option>)}</select></label>
+      <label>Image style<select value={draft.image.startsWith('data:')?'uploaded':draft.image} onChange={(e)=>e.target.value!=='uploaded'&&set('image',e.target.value)}>{Object.keys(imageLibrary).filter((key)=>key!=='hero').map((key)=><option key={key}>{key}</option>)}{draft.image.startsWith('data:')&&<option value="uploaded">Uploaded image</option>}</select></label>
+      <label>Upload event image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e)=>uploadImage(e.target.files?.[0])}/></label>
       <label className="event-field-wide">Accessibility information<textarea rows={3} value={draft.accessibility} onChange={(e)=>set('accessibility',e.target.value)}/></label>
+      <label className="event-field-wide">Moderation note<textarea rows={3} value={draft.moderationNote??''} onChange={(e)=>set('moderationNote',e.target.value)} placeholder="Feedback for the organiser or an internal approval note"/></label>
     </div>
     <footer><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">Save event</Button></footer>
   </form></div>
@@ -62,7 +65,7 @@ export function Events() {
     <section className="panel data-panel events-panel">
       <div className="table-toolbar"><div className="table-search"><Search size={17}/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Search events, venues or organisers..."/></div><label className="select-wrap"><select value={status} onChange={(e)=>setStatus(e.target.value)}><option>All</option><option>Published</option><option>Draft</option><option>In review</option><option>Changes requested</option></select></label></div>
       {filtered.length ? <div className="table-scroll"><table className="data-table events-table"><thead><tr><th>Event</th><th>Date</th><th>Venue</th><th>Submitted by</th><th>Status</th><th/></tr></thead><tbody>{filtered.map((event)=><tr key={event.id}>
-        <td><div className="event-name-cell"><img src={imageLibrary[event.image]??imageLibrary.theatre} alt=""/><div><strong>{event.title}</strong><small>{event.category}</small></div></div></td>
+        <td><div className="event-name-cell"><img src={imageLibrary[event.image]??event.image??imageLibrary.theatre} alt=""/><div><strong>{event.title}</strong><small>{event.category}</small></div></div></td>
         <td><strong>{new Date(`${event.startDate}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</strong><small>{event.startTime}–{event.endTime}</small></td>
         <td><strong>{event.venueName}</strong><small><MapPin size={12}/>{event.town}</small></td>
         <td>{event.submittedBy}</td><td><Badge>{event.status}</Badge></td>

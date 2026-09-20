@@ -42,14 +42,12 @@ function CRMApp() {
     return () => window.removeEventListener('hashchange', handleHash)
   }, [])
 
-  useEffect(() => {
-    if (user && !canAccessView(user.role, view)) setView('dashboard')
-  }, [user, view])
-
   const setView = (next: ViewKey) => {
     window.location.hash = `/${next}`
     setViewState(next)
   }
+
+  const activeView=user&&canAccessView(user.role,view)?view:'dashboard'
 
   const openOrganisation = (organisation: Organisation) => {
     setSelectedListingId(null)
@@ -64,23 +62,23 @@ function CRMApp() {
 
   return (
     <Layout
-      view={view}
+      view={activeView}
       setView={setView}
       onAddOrganisation={() => setModal('organisation')}
       onAddInvoice={() => setModal('invoice')}
       onAddTask={() => setModal('task')}
       onOpenOrganisation={openOrganisation}
     >
-      {view === 'dashboard' && <Dashboard navigate={setView} openOrganisation={openOrganisation} />}
-      {view === 'organisations' && <Organisations onAdd={() => setModal('organisation')} onOpen={openOrganisation} />}
-      {view === 'pipeline' && <Pipeline />}
-      {view === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
-      {view === 'listings' && <Listings onEdit={openListing} />}
-      {view === 'events' && <Events />}
-      {view === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
-      {view === 'agreements' && <Agreements />}
-      {view === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
-      {view === 'settings' && <Settings />}
+      {activeView === 'dashboard' && <Dashboard navigate={setView} openOrganisation={openOrganisation} />}
+      {activeView === 'organisations' && <Organisations onAdd={() => setModal('organisation')} onOpen={openOrganisation} />}
+      {activeView === 'pipeline' && <Pipeline />}
+      {activeView === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
+      {activeView === 'listings' && <Listings onEdit={openListing} />}
+      {activeView === 'events' && <Events />}
+      {activeView === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
+      {activeView === 'agreements' && <Agreements />}
+      {activeView === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
+      {activeView === 'settings' && <Settings />}
 
       {selectedOrganisation && <OrganisationDrawer key={selectedOrganisation.id} organisation={selectedOrganisation} onClose={() => setSelectedOrganisationId(null)} onEditListing={openListing} />}
       {selectedListing && <ListingEditor listing={selectedListing} onClose={() => setSelectedListingId(null)} />}

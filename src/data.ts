@@ -216,6 +216,13 @@ export const initialData: CRMData = {
     { id: 'videoViews', label: 'Video views', value: 22500000, displayValue: '22.5m', context: 'Across social channels', source: 'Visit Valechester', period: 'Latest supplied annual figures', updatedAt: '2026-08-19' },
     { id: 'engagements', label: 'Engagements', value: 801000, displayValue: '801k', context: 'Reactions and actions', source: 'Visit Valechester', period: 'Latest supplied annual figures', updatedAt: '2026-08-19' },
   ],
+  workspace: {
+    destinationName: 'Visit Valechester', legalName: 'Valechester Visitor Economy Partnership',
+    strapline: 'Past, present, perfectly placed.', contactEmail: 'hello@visitvalechester.example',
+    address: 'Valechester Visitor Economy Partnership, Valechester, England', timezone: 'Europe/London', currency: 'GBP',
+    financialYearStart: 'September', membershipYearStart: '1 September', primaryColour: '#6d294f', accentColour: '#f0785e', supportingColour: '#7a9a83',
+    visitorVolume: 5800000, visitorSpend: 412000000, overnightStays: 1240000,
+  },
 }
 
 export const typeOptions = ['Accommodation', 'Attraction', 'Arts & culture', 'Food & drink', 'Retail', 'Outdoors', 'Supplier', 'Other']

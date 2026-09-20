@@ -4,9 +4,10 @@ import { useCRM } from '../store'
 import type { Organisation } from '../types'
 import { currency, formatDate } from '../utils'
 import { Avatar, Badge, Button, EmptyState, PageHeader } from '../components/UI'
+import { downloadCsv, openEmail } from '../actions'
 
 export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (organisation: Organisation) => void }) {
-  const { data } = useCRM()
+  const { data, updateOrganisation } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All')
   const [tier, setTier] = useState('All levels')
@@ -30,7 +31,7 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
 
   return (
     <div>
-      <PageHeader eyebrow="CRM" title="Organisations" description="Manage members, prospects, contacts and every relationship in one place." actions={<><Button variant="secondary" icon={Download}>Export</Button><Button icon={Plus} onClick={onAdd}>Add organisation</Button></>} />
+      <PageHeader eyebrow="CRM" title="Organisations" description="Manage members, prospects, contacts and every relationship in one place." actions={<><Button variant="secondary" icon={Download} onClick={()=>downloadCsv('organisations.csv',[['Organisation','Type','Town','Membership','Status','Owner','Renewal','Annual value'],...organisations.map((org)=>[org.name,org.type,org.town,org.tier,org.status,org.owner,org.renewalDate,org.annualValue])])}>Export</Button><Button icon={Plus} onClick={onAdd}>Add organisation</Button></>} />
 
       <section className="summary-strip organisation-summary">
         <div><span className="summary-icon purple"><Building2 size={18} /></span><p><strong>{activeMembers}</strong><small>Active members</small></p></div>
@@ -46,11 +47,11 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
           <div className="toolbar-filters">
             <label className="select-wrap"><Filter size={15} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option>All</option><option>Active</option><option>Renewing</option><option>Prospect</option><option>Free listing</option><option>Lapsed</option></select><ChevronDown size={14} /></label>
             <label className="select-wrap"><select value={tier} onChange={(event) => setTier(event.target.value)}><option>All levels</option>{data.levels.map((level) => <option key={level.id}>{level.name}</option>)}</select><ChevronDown size={14} /></label>
-            <button className="filter-button"><SlidersHorizontal size={16} /> More filters</button>
+            <button className="filter-button" onClick={()=>{setStatus('All');setTier('All levels');setQuery('')}}><SlidersHorizontal size={16} /> Reset filters</button>
           </div>
         </div>
 
-        {selected.length > 0 && <div className="bulk-bar"><strong>{selected.length} selected</strong><button><Mail size={15} /> Send email</button><button>Assign owner</button><button>Change status</button><button className="bulk-clear" onClick={() => setSelected([])}>Clear</button></div>}
+        {selected.length > 0 && <div className="bulk-bar"><strong>{selected.length} selected</strong><button onClick={()=>openEmail(data.contacts.filter((contact)=>selected.includes(contact.organisationId)&&contact.primary).map((contact)=>contact.email),'Message from Visit Valechester')}><Mail size={15} /> Send email</button><button onClick={()=>{const owner=window.prompt('Assign owner');if(owner)selected.forEach((id)=>updateOrganisation(id,{owner}))}}>Assign owner</button><button onClick={()=>{const next=window.prompt('Status: Active, Renewing, Prospect, Free listing or Lapsed');if(next&&['Active','Renewing','Prospect','Free listing','Lapsed'].includes(next))selected.forEach((id)=>updateOrganisation(id,{status:next as Organisation['status']}))}}>Change status</button><button className="bulk-clear" onClick={() => setSelected([])}>Clear</button></div>}
 
         {organisations.length ? (
           <div className="table-scroll">
@@ -73,7 +74,7 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
             </table>
           </div>
         ) : <EmptyState icon={Search} title="No organisations found" description="Try changing the search or filters." action={<Button variant="secondary" onClick={() => { setQuery(''); setStatus('All'); setTier('All levels') }}>Clear filters</Button>} />}
-        <footer className="table-footer"><span>Showing {organisations.length} of {data.organisations.length} organisations</span><div><button disabled>Previous</button><button className="active">1</button><button>2</button><button>3</button><button>Next</button></div></footer>
+        <footer className="table-footer"><span>Showing {organisations.length} of {data.organisations.length} organisations</span><span>All matching records are shown</span></footer>
       </section>
     </div>
   )

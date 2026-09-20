@@ -1,5 +1,5 @@
 import {
-  Bell, Building2, ChevronDown, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
+  Bell, Building2, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine,
   FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings, CalendarDays,
   UsersRound, X,
 } from 'lucide-react'
@@ -87,8 +87,12 @@ export function Layout({
   const searchResults = useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return data.organisations.slice(0, 5)
-    return data.organisations.filter((org) => [org.name, org.town, org.type, org.tier, ...org.tags].join(' ').toLowerCase().includes(term)).slice(0, 7)
-  }, [data.organisations, query])
+    return data.organisations.filter((org) => {
+      const contacts=data.contacts.filter((contact)=>contact.organisationId===org.id)
+      const listings=data.listings.filter((listing)=>listing.organisationId===org.id)
+      return [org.name,org.town,org.type,org.tier,...org.tags,...contacts.flatMap((contact)=>[contact.name,contact.email]),...listings.flatMap((listing)=>[listing.name,listing.category,listing.town])].join(' ').toLowerCase().includes(term)
+    }).slice(0, 7)
+  }, [data.contacts,data.listings,data.organisations, query])
 
   const navigate = (key: ViewKey) => {
     setView(key)
@@ -103,11 +107,10 @@ export function Layout({
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
 
-        <button className="workspace-switcher">
+        <div className="workspace-switcher">
           <span className="workspace-logo">VV</span>
           <span><small>Destination</small><strong>{tenant.name}</strong></span>
-          <ChevronDown size={15} />
-        </button>
+        </div>
 
         <nav className="nav">
           {navGroups.map((group) => (
@@ -127,7 +130,7 @@ export function Layout({
 
         <div className="sidebar-footer">
           <a className="view-site-link" href="/" target="_blank"><ExternalLink size={16} /><span>View visitor website</span></a>
-          <button><HelpCircle size={17} /><span>Help & feedback</span></button>
+          <a href={`mailto:${data.workspace.contactEmail}?subject=${encodeURIComponent('CRM help and feedback')}`}><HelpCircle size={17} /><span>Help & feedback</span></a>
           <div className="sidebar-user">
             <Avatar name={user?.name ?? ''} size="sm" colour={user?.colour} />
             <span><strong>{user?.name}</strong><small>{user?.role}</small></span>
@@ -148,7 +151,7 @@ export function Layout({
             <button className="search-trigger" onClick={() => setSearchOpen(true)}>
               <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
             </button>
-            <button className="icon-button notification-button" aria-label="Notifications"><Bell size={19} /><i /></button>
+            <button className="icon-button notification-button" aria-label="Notifications" onClick={()=>navigate('tasks')} title={`${data.tasks.filter((task)=>!task.completed).length} open tasks`}><Bell size={19} /><i /></button>
             <div className="quick-wrap">
               <button className="button button-primary button-md" onClick={() => setQuickOpen((value) => !value)}><Plus size={17} />Add new</button>
               {quickOpen && (
