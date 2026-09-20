@@ -7,10 +7,15 @@ import { Badge, Button, Drawer, Field, Progress, Tabs } from './UI'
 type EditorTab = 'Content' | 'Visitor taxonomy' | 'Contact & links' | 'Facilities' | 'Media' | 'Preview'
 
 export function ListingEditor({ listing, onClose }: { listing: Listing; onClose: () => void }) {
-  const { updateListing, publishListing } = useCRM()
+  const { data, updateListing, publishListing } = useCRM()
   const [tab, setTab] = useState<EditorTab>('Content')
   const [draft, setDraft] = useState(listing)
   const [saved, setSaved] = useState(false)
+  const organisation = data.organisations.find((item) => item.id === listing.organisationId)
+  const membershipLevel = data.levels.find((item) => item.name === organisation?.tier)
+  const mediaAllowance = membershipLevel
+    ? `${membershipLevel.imageAllowance} image${membershipLevel.imageAllowance === 1 ? '' : 's'}${membershipLevel.videoAllowance ? ` and ${membershipLevel.videoAllowance} video${membershipLevel.videoAllowance === 1 ? '' : 's'}` : ''}`
+    : 'Media allowance unavailable'
 
   const set = <K extends keyof Listing>(key: K, value: Listing[K]) => setDraft((current) => ({ ...current, [key]: value }))
   const save = () => {
@@ -71,7 +76,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
 
           {tab === 'Media' && <div className="form-stack">
             <div className={`media-hero image-${draft.image}`}><span><Image size={28} /><strong>Current hero image</strong><small>Recommended 1600 × 900px</small></span></div>
-            <button className="upload-zone"><UploadCloud size={25} /><strong>Upload images</strong><span>Drag and drop JPG, PNG or WebP files, or browse</span><small>Up to 20 images on this membership level</small></button>
+            <button className="upload-zone" disabled={!membershipLevel?.imageAllowance}><UploadCloud size={25} /><strong>Upload images</strong><span>Drag and drop JPG, PNG or WebP files, or browse</span><small>{membershipLevel?.imageAllowance ? `Up to ${mediaAllowance} on the ${organisation?.tier} membership level` : 'This membership level does not include listing media'}</small></button>
             <div className="info-note"><Info size={17} /><p>Only upload images the organisation owns or has permission to use. Record image rights before publishing.</p></div>
           </div>}
 

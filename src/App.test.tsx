@@ -73,6 +73,27 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('link', { name: /Visit website/ })).toBeInTheDocument()
   })
 
+  it('gives the Strategic listing the complete visitor planning template', () => {
+    window.history.pushState({}, '', '/place/list-001')
+    renderApp()
+    for (const heading of ['Gallery', 'At a glance', 'What visitors say', 'Accessibility information', 'Facilities', 'Opening information', 'Location and contact', 'Awards and accreditations', 'Make it part of your trip']) {
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    }
+  })
+
+  it('uses the public package names and keeps a Free Listing logo-only', () => {
+    window.history.pushState({}, '', '/listing-templates')
+    const { unmount } = renderApp()
+    for (const packageName of ['Strategic', 'Gold', 'Silver', 'Bronze', 'Free Listing']) {
+      expect(screen.getByText(packageName)).toBeInTheDocument()
+    }
+    unmount()
+    window.history.pushState({}, '', '/place/list-011')
+    const { container } = renderApp()
+    expect(container.querySelector('.free-listing-brand .vale-logo')).toBeInTheDocument()
+    expect(screen.queryByText('Riverside Gardens')).not.toBeInTheDocument()
+  })
+
   it('moves safely from a standard listing to a template listing', async () => {
     window.history.pushState({}, '', '/place/list-002')
     renderApp()
