@@ -68,21 +68,19 @@ const eventTitles = [
   'Valechester Folk Festival','Castle Quarter Garden Trail','Outdoor Cinema Weekend','North Vale Family Fun Day','Heritage Railway Gala','Valechester Beer Festival','Museum Late: Invention','Riverside Dance Festival','Market Vale Fashion Week','Valechester Literature Festival',
   'Autumn Photography Walk','Willowmere Pumpkin Weekend','The Great Vale Bake Off','Castle Ghost Stories','Diwali in the Square','Valechester Bonfire Night','Remembrance Arts Trail','Winter Wellness Weekend','Carols by the River','New Year Makers Market',
 ]
-const eventCategories = ['Festival','Food & drink','Family','Culture','Film','Markets','Sport','Heritage','Comedy','Music','Outdoors','Workshops']
 const eventVenues = ['Market Square','Riverside Gardens','Valechester Castle','The Foundry','Willowmere Green','North Vale Park','Eastgate Hall','River Vale','Castle Quarter','Market Vale']
 const eventDates = ['2026-09-26','2026-10-03','2026-10-17','2026-10-22','2026-10-30','2026-10-24','2026-11-07','2026-10-10','2027-04-18','2027-09-11','2026-11-14','2026-11-20','2026-11-28','2026-12-05','2027-01-02','2027-02-07','2027-02-20','2027-03-05','2027-03-20','2027-03-27','2027-04-03','2027-04-10','2027-04-16','2027-04-24','2027-05-01','2027-05-08','2027-06-05','2027-06-12','2027-06-19','2027-06-25','2027-07-02','2027-07-10','2027-07-17','2027-07-24','2027-08-07','2027-08-14','2027-08-20','2027-08-28','2027-09-04','2027-09-17','2027-10-02','2027-10-16','2027-10-23','2027-10-29','2027-11-06','2027-11-05','2027-11-13','2027-01-09','2026-12-12','2027-01-16']
 function eventCategory(title: string) {
-  if (/food|beer|bake|apple|pumpkin|street food|harvest/i.test(title)) return 'Food & drink'
-  if (/half marathon|regatta/i.test(title)) return 'Sport'
-  if (/comedy/i.test(title)) return 'Comedy'
-  if (/jazz|folk|carols|dance/i.test(title)) return 'Music'
-  if (/market|fair|wedding/i.test(title)) return 'Markets'
-  if (/castle|heritage|ghost|remembrance|railway|museum/i.test(title)) return 'Heritage'
-  if (/walk|bluebell|garden|outdoor|snowdrop|river/i.test(title)) return 'Outdoors'
-  if (/science|family|lantern|easter/i.test(title)) return 'Family'
-  if (/workshop|open studios|wellness|makers/i.test(title)) return 'Workshops'
-  if (/book|poetry|literature|theatre|film|voices|arts|diwali|pride|fashion/i.test(title)) return 'Culture'
-  return eventCategories[0]
+  if (/wellness/i.test(title)) return 'Wellbeing'
+  if (/science|family|easter/i.test(title)) return 'Family'
+  if (/food|beer|bake|apple|pumpkin|street food|harvest/i.test(title)) return 'Food & Drink'
+  if (/jazz|folk|carols|dance|comedy|film|cinema|theatre|voices/i.test(title)) return 'Music & Shows'
+  if (/book|poetry|literature|arts|diwali|pride|fashion|photography/i.test(title)) return 'Arts & Culture'
+  if (/castle|heritage|ghost|remembrance|railway|museum|trail|quest/i.test(title)) return 'Tours & Heritage'
+  if (/workshop|open studios|makers/i.test(title)) return 'Talks & Workshops'
+  if (/half marathon|regatta|walk|bluebell|garden|outdoor|snowdrop|river/i.test(title)) return 'Outdoors & Sport'
+  if (/market|fair|festival|lantern|bonfire|christmas/i.test(title)) return 'Festivals & Seasonal'
+  return 'Social'
 }
 function eventVenue(title: string, index: number) {
   if (/castle/i.test(title)) return 'Valechester Castle'
@@ -109,16 +107,27 @@ function eventTimes(title: string): [string,string] {
   if (/after dark|light|cinema|comedy|jazz|lantern|ghost|bonfire|carols|theatre/i.test(title)) return ['18:00','22:00']
   return ['10:00','16:00']
 }
+function eventFormat(title: string) {
+  if (/Poetry Weekend|Winter Wellness Weekend/i.test(title)) return 'Online events' as const
+  if (/Street Food Fridays|Jazz Nights|Open Studios Weekend|Snowdrop Weekend/i.test(title)) return 'Ongoing events' as const
+  return 'One-off and short run' as const
+}
+function eventEndDate(startDate: string, format: ReturnType<typeof eventFormat>) {
+  if (format !== 'Ongoing events') return startDate
+  const end=new Date(`${startDate}T12:00:00`); end.setDate(end.getDate()+28)
+  return end.toISOString().slice(0,10)
+}
 
 export const seededEvents: DestinationEvent[] = eventTitles.map((title, index) => {
   const startDate = eventDates[index]
   const venueName = eventVenue(title,index)
   const [startTime,endTime] = eventTimes(title)
+  const format=eventFormat(title)
   return {
-    id: `event-${String(index + 1).padStart(3, '0')}`, title, category: eventCategory(title),
+    id: `event-${String(index + 1).padStart(3, '0')}`, title, category: eventCategory(title), format,
     description: `${title} brings visitors and local communities together for a memorable day in Valechester, with a welcoming programme and clear information for planning ahead.`,
-    startDate, endDate: startDate, startTime, endTime,
-    venueName, address: `${index + 1} Event Way`, town: eventTown(venueName), postcode: `VC${(index % 6) + 1} ${(index % 9) + 1}EV`,
+    startDate, endDate: eventEndDate(startDate,format), startTime, endTime,
+    venueName:format==='Online events'?'Online':venueName, address:format==='Online events'?'Online event':`${index + 1} Event Way`, town:format==='Online events'?'Online':eventTown(venueName), postcode:format==='Online events'?'ONLINE':`VC${(index % 6) + 1} ${(index % 9) + 1}EV`,
     price: index % 4 === 0 ? 'Free' : index % 4 === 1 ? 'From £6' : index % 4 === 2 ? 'From £12' : '£18',
     bookingUrl: index % 4 === 0 ? '' : `https://example.com/events/${index + 1}`, contactName: 'Events team', contactEmail: `event${index + 1}@example.com`,
     image: images[index % images.length], accessibility: 'Step-free information is available from the organiser. Contact the event team for specific requirements.',

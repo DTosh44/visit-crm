@@ -18,6 +18,7 @@ export type AgreementStatus = 'Draft' | 'Sent' | 'Viewed' | 'Signed' | 'Declined
 export type TaskPriority = 'High' | 'Medium' | 'Low'
 export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won'
 export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
+export type EventFormat = 'One-off and short run' | 'Ongoing events' | 'Online events'
 
 export interface Contact {
   id: string
@@ -116,6 +117,7 @@ export interface DestinationEvent {
   id: string
   title: string
   category: string
+  format: EventFormat
   description: string
   startDate: string
   endDate: string

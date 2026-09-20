@@ -16,7 +16,7 @@ import type {
   TaskDraft,
 } from './types'
 
-const STORAGE_KEY = 'visit-valechester-crm-v3'
+const STORAGE_KEY = 'visit-valechester-crm-v4'
 
 interface CRMContextValue {
   data: CRMData
@@ -119,7 +119,7 @@ function readInitialData(): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? JSON.parse(stored) as CRMData : initialData
-    return { ...parsed, events: parsed.events ?? initialData.events, socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
+    return { ...parsed, events: (parsed.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })), socialMetrics: parsed.socialMetrics ?? initialData.socialMetrics, listings: parsed.listings.map((item) => ({ ...item, searchTags: item.searchTags ?? [], reviewHighlights: item.reviewHighlights ?? [], goodToKnow: item.goodToKnow ?? [] })) }
   } catch {
     return initialData
   }
@@ -148,7 +148,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
         if (active && state?.data) {
           const remoteData = state.data as CRMData
-          setData({ ...remoteData, events: remoteData.events ?? initialData.events, socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
+          setData({ ...remoteData, events: (remoteData.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run' })), socialMetrics: remoteData.socialMetrics ?? initialData.socialMetrics })
         }
       } else {
         const { data: listings } = await client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published')

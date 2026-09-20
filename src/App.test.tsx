@@ -88,6 +88,24 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('heading', { name: 'Harvest & Makers Market' })).toBeInTheDocument()
   })
 
+  it('filters public events by search, date, location, event type and format', () => {
+    window.history.pushState({}, '', '/events')
+    renderApp()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Food & Drink/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Willowmere/ }))
+    fireEvent.change(screen.getByLabelText('Events from date'), { target: { value: '2026-10-01' } })
+    fireEvent.change(screen.getByLabelText('Events to date'), { target: { value: '2026-10-31' } })
+    expect(screen.getByRole('heading', { name: 'Willowmere Apple Day' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Harvest & Makers Market' })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search events' }), { target: { value: 'pumpkin' } })
+    expect(screen.getByRole('heading', { name: 'No matching events' })).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Clear all filters' })[0])
+    expect(screen.getByText('Showing 50 events')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Online events/ }))
+    expect(screen.getByRole('heading', { name: 'Valechester Poetry Weekend' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Harvest & Makers Market' })).not.toBeInTheDocument()
+  })
+
   it('builds a personalised itinerary', () => {
     window.history.pushState({}, '', '/plan')
     renderApp()

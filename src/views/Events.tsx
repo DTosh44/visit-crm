@@ -3,12 +3,13 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth'
 import { imageLibrary } from '../siteData'
 import { useCRM } from '../store'
-import type { DestinationEvent, EventDraft, EventStatus } from '../types'
+import type { DestinationEvent, EventDraft, EventFormat, EventStatus } from '../types'
 import { Badge, Button, EmptyState, PageHeader } from '../components/UI'
 
-const categories = ['Festival','Food & drink','Family','Culture','Film','Markets','Sport','Heritage','Comedy','Music','Outdoors','Workshops']
+const categories = ['Music & Shows','Festivals & Seasonal','Food & Drink','Family','Arts & Culture','Talks & Workshops','Tours & Heritage','Outdoors & Sport','Wellbeing','Social']
+const formats: EventFormat[] = ['One-off and short run','Ongoing events','Online events']
 const blankEvent = (submittedBy: string): EventDraft => ({
-  title:'', category:'Festival', description:'', startDate:'2026-10-01', endDate:'2026-10-01', startTime:'10:00', endTime:'16:00',
+  title:'', category:'Festivals & Seasonal', format:'One-off and short run', description:'', startDate:'2026-10-01', endDate:'2026-10-01', startTime:'10:00', endTime:'16:00',
   venueName:'', address:'', town:'Valechester', postcode:'', price:'Free', bookingUrl:'', contactName:'', contactEmail:'',
   image:'theatre', accessibility:'', status:'Draft', submittedBy,
 })
@@ -24,6 +25,7 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
     <div className="event-form-grid">
       <label className="event-field-wide">Event title<input required value={draft.title} onChange={(e)=>set('title',e.target.value)}/></label>
       <label>Category<select value={draft.category} onChange={(e)=>set('category',e.target.value)}>{categories.map((item)=><option key={item}>{item}</option>)}</select></label>
+      <label>Event format<select value={draft.format} onChange={(e)=>set('format',e.target.value as EventFormat)}>{formats.map((item)=><option key={item}>{item}</option>)}</select></label>
       <label>Status<select value={draft.status} onChange={(e)=>set('status',e.target.value as EventStatus)}><option>Draft</option><option>In review</option><option>Changes requested</option><option>Published</option></select></label>
       <label className="event-field-wide">Description<textarea required rows={4} value={draft.description} onChange={(e)=>set('description',e.target.value)}/></label>
       <label>Start date<input required type="date" value={draft.startDate} onChange={(e)=>set('startDate',e.target.value)}/></label>

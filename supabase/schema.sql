@@ -96,6 +96,7 @@ create table public.events (
   submitted_by_label text not null default '',
   title text not null,
   category text not null,
+  format text not null default 'One-off and short run' check (format in ('One-off and short run','Ongoing events','Online events')),
   description text not null,
   start_date date not null,
   end_date date not null,
