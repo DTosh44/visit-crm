@@ -23,6 +23,8 @@ export interface TenantBrand {
 export type FeatureKey =
   | 'publicWebsite'
   | 'interactiveMap'
+  | 'imageBank'
+  | 'websiteExperiments'
   | 'organisations'
   | 'salesPipeline'
   | 'memberships'
@@ -41,6 +43,8 @@ export type FeatureKey =
 export const defaultFeatures: Record<FeatureKey, boolean> = {
   publicWebsite: true,
   interactiveMap: true,
+  imageBank: true,
+  websiteExperiments: true,
   organisations: true,
   salesPipeline: true,
   memberships: true,

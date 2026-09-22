@@ -18,6 +18,8 @@ import { Events } from './views/Events'
 import { Content } from './views/Content'
 import { WebsitePages } from './views/WebsitePages'
 import { MapProduct } from './views/MapProduct'
+import { ImageBank } from './views/ImageBank'
+import { WebsiteExperiments } from './views/WebsiteExperiments'
 import { Inbox } from './views/Inbox'
 import { Insights } from './views/Insights'
 import { useAuth } from './auth'
@@ -28,8 +30,8 @@ import { BrandLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 
-const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','pages','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
-const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
+const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -87,6 +89,8 @@ function CRMApp() {
       {activeView === 'listings' && <Listings onEdit={openListing} />}
       {activeView === 'events' && <Events />}
       {activeView === 'pages' && <WebsitePages />}
+      {activeView === 'images' && <ImageBank />}
+      {activeView === 'experiments' && <WebsiteExperiments />}
       {activeView === 'map' && <MapProduct />}
       {activeView === 'content' && <Content />}
       {activeView === 'inbox' && <Inbox />}

@@ -1919,7 +1919,44 @@ button { min-width: 24px; min-height: 24px; }
 .pin-editor-options strong { font-size: 12px; }
 .pin-editor-options small { color: var(--muted); font-size: 10px; }
 
+/* Image bank and website experiments */
+.image-bank-kpis { margin: 22px 0; }
+.media-library { overflow: hidden; }
+.media-library > .panel-header { align-items: center; }
+.media-filters { display:flex; gap:10px; align-items:center; }
+.media-filters label { min-width:250px; display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:8px; padding:0 10px; background:#fff; }
+.media-filters input { border:0; outline:0; padding:9px 0; width:100%; }
+.media-filters select { border:1px solid var(--border); border-radius:8px; padding:9px 30px 9px 10px; background:#fff; }
+.asset-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; padding:20px; }
+.asset-card { min-width:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#fff; }
+.asset-preview { height:185px; position:relative; background:#eee; }
+.asset-preview img { width:100%; height:100%; object-fit:cover; display:block; }
+.asset-preview .badge { position:absolute; top:10px; right:10px; }
+.asset-card > div:last-child { padding:15px; }
+.asset-card h3 { margin:0 0 5px; font-size:15px; }
+.asset-card p { margin:0 0 12px; color:var(--muted); font-size:12px; line-height:1.45; min-height:35px; }
+.asset-tags { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:12px; }
+.asset-tags span { background:var(--surface); border-radius:999px; padding:3px 7px; font-size:10px; }
+.asset-card dl { margin:0; display:grid; gap:7px; font-size:11px; }
+.asset-card dl div { display:grid; grid-template-columns:55px 1fr; gap:8px; }
+.asset-card dt { color:var(--muted); }.asset-card dd { margin:0; }
+.asset-card footer { display:flex; align-items:center; justify-content:space-between; margin-top:14px; padding-top:12px; border-top:1px solid var(--border); }
+.storage-options { display:grid; grid-template-columns:1.05fr .95fr; gap:20px; margin-top:22px; }
+.recommended-storage { display:grid; grid-template-columns:auto 1fr; gap:15px; padding:25px; border-color:color-mix(in srgb,var(--tenant-primary) 28%,var(--border)); }
+.recommended-storage > span { width:44px;height:44px;border-radius:12px;background:var(--tenant-mist);display:grid;place-items:center;color:var(--tenant-primary); }
+.recommended-storage h2,.storage-comparison h2 { margin:10px 0 8px;font-size:19px; }.recommended-storage p,.recommended-storage li,.storage-comparison span,.storage-comparison p { color:var(--muted);font-size:13px;line-height:1.55; }
+.storage-comparison { padding:25px; }.storage-comparison > div { display:grid; gap:3px; padding:12px 0; border-bottom:1px solid var(--border); }.storage-comparison aside { display:flex; gap:10px; margin-top:16px;padding:12px;background:var(--surface);border-radius:9px; }.storage-comparison aside p { margin:0; }
+.image-upload-zone { min-height:135px;border:1px dashed var(--border-strong);border-radius:10px;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;overflow:hidden; }
+.image-upload-zone img { width:100%;max-height:220px;object-fit:cover; }.image-upload-zone label { font-weight:650;color:var(--tenant-primary);cursor:pointer; }.image-upload-zone input { display:none; }.image-upload-zone small { color:var(--muted); }
+.experiment-guide { display:flex;gap:13px;align-items:flex-start;margin:22px 0;padding:15px 18px;background:var(--tenant-mist);border-radius:10px;color:var(--tenant-primary); }.experiment-guide p { margin:3px 0 0;color:var(--muted);font-size:13px; }
+.experiment-list { display:grid;gap:18px; }.experiment-card { padding:22px; }.experiment-card > header { display:flex;justify-content:space-between;gap:20px; }.experiment-card h2 { margin:8px 0 4px;font-size:19px; }.experiment-card header p { margin:0;color:var(--muted);font-size:13px; }
+.experiment-meta { display:flex;gap:22px;margin:18px 0;padding:12px 0;border-block:1px solid var(--border); }.experiment-meta span { display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted); }.experiment-meta strong { color:var(--ink); }
+.variant-results { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px; }.variant-results > section { border:1px solid var(--border);border-radius:10px;padding:15px; }.variant-results section > header { display:flex;justify-content:space-between;align-items:center; }.variant-results header div { display:grid; }.variant-results header span { color:var(--muted);font-size:11px; }.variant-results blockquote { margin:14px 0;font-family:Georgia,serif;font-size:17px;min-height:42px; }
+.variant-metrics { display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-radius:8px;padding:10px; }.variant-metrics span { display:grid;gap:2px; }.variant-metrics small { color:var(--muted);font-size:10px; }.variant-metrics strong { font-size:16px; }.experiment-empty { margin:13px 0 0;color:var(--muted);font-size:12px; }
+.variant-editor-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px; }.variant-editor-grid fieldset { border:1px solid var(--border);border-radius:10px;padding:15px;display:grid;gap:12px; }.variant-editor-grid legend { padding:0 6px;font-weight:700; }
+
 @media (max-width:1050px) {
+  .asset-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .site-audience-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .site-neighbourhood-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .site-event-grid article { min-height: 0; }
@@ -1928,6 +1965,9 @@ button { min-width: 24px; min-height: 24px; }
   .map-product-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width:760px) {
+  .asset-grid,.storage-options,.variant-results,.variant-editor-grid { grid-template-columns:1fr; }
+  .media-library > .panel-header,.experiment-card > header,.media-filters,.experiment-meta { align-items:stretch;flex-direction:column; }
+  .media-filters label { min-width:0; }
   .editorial-heading > button { position: static; margin-top: 20px; }
   .editorial-heading h2 { font-size: 43px; }
   .site-audiences { padding-bottom: 74px; }

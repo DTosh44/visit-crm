@@ -11,7 +11,7 @@ import { useCRM } from './store'
 import { tenant } from './tenant'
 import { supabase } from './auth'
 import { filtersForVisitorQuery, matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
-import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing, WebsitePageBlock, WebsitePageContent } from './types'
+import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing, WebsitePageBlock, WebsitePageContent, WebsiteExperimentVariant } from './types'
 import { downloadCalendarEvent } from './actions'
 import { publishedPages } from './contentPublishing'
 import type { WebsiteAnalyticsEvent } from './types'
@@ -82,14 +82,31 @@ function recordSubmission(key: string, value: Record<string, unknown>) {
 }
 
 const ANALYTICS_VISITOR_KEY='visit-analytics-visitor-v1'
+const EXPERIMENT_ASSIGNMENT_PREFIX='visit-experiment-assignment-v1:'
+type ExperimentAssignment={experimentId:string;variantId:string}
 function analyticsVisitorId(){let value=localStorage.getItem(ANALYTICS_VISITOR_KEY);if(!value){value=`visitor-${crypto.randomUUID()}`;localStorage.setItem(ANALYTICS_VISITOR_KEY,value)}return value}
 function analyticsSource(){try{if(!document.referrer)return'Direct';const host=new URL(document.referrer).hostname;if(host.includes('google.'))return'Google';if(host.includes('facebook.'))return'Facebook';if(host.includes('instagram.'))return'Instagram';return host}catch{return'Direct'}}
 function recordAnalytics(type:WebsiteAnalyticsEvent['type'],title=document.title){
   if(localStorage.getItem('visit-cookie-consent')!=='analytics')return
   const params=new URLSearchParams(window.location.search)
-  const event:WebsiteAnalyticsEvent={id:crypto.randomUUID(),type,path:window.location.pathname,title:title.replace(/ \| .*$/,''),visitorId:analyticsVisitorId(),source:params.get('utm_source')??analyticsSource(),campaign:params.get('utm_campaign')??undefined,occurredAt:new Date().toISOString()}
+  if(params.has('experiment'))return
+  let assignment:ExperimentAssignment|undefined;try{assignment=JSON.parse(sessionStorage.getItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${window.location.pathname}`)??'null')??undefined}catch{assignment=undefined}
+  const event:WebsiteAnalyticsEvent={id:crypto.randomUUID(),type,path:window.location.pathname,title:title.replace(/ \| .*$/,''),visitorId:analyticsVisitorId(),source:params.get('utm_source')??analyticsSource(),campaign:params.get('utm_campaign')??undefined,experimentId:assignment?.experimentId,variantId:assignment?.variantId,occurredAt:new Date().toISOString()}
   window.dispatchEvent(new CustomEvent('website-analytics',{detail:event}))
-  if(supabase)void supabase.from('website_analytics_events').insert({id:event.id,tenant_id:tenant.id,event_type:event.type,path:event.path,title:event.title,visitor_id:event.visitorId,source:event.source,campaign:event.campaign??null,occurred_at:event.occurredAt})
+  if(supabase)void supabase.from('website_analytics_events').insert({id:event.id,tenant_id:tenant.id,event_type:event.type,path:event.path,title:event.title,visitor_id:event.visitorId,source:event.source,campaign:event.campaign??null,experiment_id:event.experimentId??null,variant_id:event.variantId??null,occurred_at:event.occurredAt})
+}
+
+function experimentVariant(data:ReturnType<typeof useCRM>['data'],path=window.location.pathname):WebsiteExperimentVariant|undefined{
+  const params=new URLSearchParams(window.location.search)
+  const previewExperiment=params.get('experiment')
+  const experiment=data.websiteExperiments.find((item)=>item.pagePath===path&&(item.status==='Running'||item.id===previewExperiment))
+  if(!experiment){sessionStorage.removeItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`);return undefined}
+  const requested=params.get('variant')
+  let variant=experiment.variants.find((item)=>item.id===requested)
+  if(!variant){let saved:ExperimentAssignment|undefined;try{saved=JSON.parse(sessionStorage.getItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`)??'null')??undefined}catch{saved=undefined}variant=saved?.experimentId===experiment.id?experiment.variants.find((item)=>item.id===saved?.variantId):undefined}
+  if(!variant){const position=Math.random()*100;let total=0;variant=experiment.variants.find((item)=>{total+=item.weight;return position<total})??experiment.variants[0]}
+  sessionStorage.setItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`,JSON.stringify({experimentId:experiment.id,variantId:variant.id}))
+  return variant
 }
 
 function categoryGroup(listing: Listing) {
@@ -216,8 +233,9 @@ function ManagedBlocks({ blocks }: { blocks: WebsitePageBlock[] }) {
 function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; title: string; description: string; image?: string }) {
   const { data } = useCRM()
   const managed = managedContent(data)
+  const variant = experimentVariant(data)
   const heroImage = managed?.heroImage ? mediaUrl(managed.heroImage) : image
-  return <><section className={`visitor-page-intro${heroImage ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{managed?.eyebrow || eyebrow}</span><h1>{managed?.title || title}</h1><p>{managed?.description || description}</p></div>{heroImage && <img src={heroImage} alt="" />}</section>{managed && <ManagedBlocks blocks={managed.blocks}/>}</>
+  return <><section className={`visitor-page-intro${heroImage ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{managed?.eyebrow || eyebrow}</span><h1>{variant?.title||managed?.title||title}</h1><p>{variant?.description||managed?.description||description}</p></div>{heroImage && <img src={heroImage} alt="" />}</section>{managed && <ManagedBlocks blocks={managed.blocks}/>}</>
 }
 
 function NewsletterSignup() {
@@ -230,6 +248,7 @@ function NewsletterSignup() {
 function HomePage({ actions, location }: { actions: VisitorActions; location: string }) {
   const { data } = useCRM()
   const managed = managedContent(data, '/')
+  const experiment = experimentVariant(data, '/')
   const { features } = useFeatures()
   const [query, setQuery] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -267,7 +286,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
     else if (target) window.setTimeout(() => document.querySelector(target)?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [location])
   const runSearch=(term:string)=>{setQuery(term);setSearchTerm(term);setActiveFilters(filtersForVisitorQuery(term));setVisibleCount(12);document.querySelector('#discover')?.scrollIntoView({behavior:'smooth'})}
-  const submitSearch = (event: FormEvent) => { event.preventDefault(); runSearch(query) }
+  const submitSearch = (event: FormEvent) => { event.preventDefault(); recordAnalytics('cta_click','Homepage search'); runSearch(query) }
   const quickSearch = (term: string) => runSearch(term)
   const toggleFilter=(groupId:string,optionId:string)=>setActiveFilters((current)=>{const selected=current[groupId]??[];return {...current,[groupId]:selected.includes(optionId)?selected.filter((id)=>id!==optionId):[...selected,optionId]}})
   const activeOptions=visitorFilterGroups.flatMap((group)=>group.options.filter((option)=>(activeFilters[group.id]??[]).includes(option.id)).map((option)=>({...option,groupId:group.id})))
@@ -278,8 +297,8 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
       <section className="site-hero">
         <img src={managed?.heroImage ? mediaUrl(managed.heroImage) : imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
-        <div className="site-hero-content"><span className="site-eyebrow">{managed?.eyebrow || 'Find your kind of remarkable'}</span><h1>{managed?.title || 'A town with stories in every direction.'}</h1><p>{managed?.description || data.workspace.strapline}</p>
-          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...visitorTaxonomyFor(item)]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
+        <div className="site-hero-content"><span className="site-eyebrow">{managed?.eyebrow || 'Find your kind of remarkable'}</span><h1>{experiment?.title||managed?.title||'A town with stories in every direction.'}</h1><p>{experiment?.description||managed?.description||data.workspace.strapline}</p>
+          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...visitorTaxonomyFor(item)]))).map((item)=><option key={item} value={item}/>)}</datalist><button>{experiment?.buttonLabel||'Search'}</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
@@ -618,8 +637,10 @@ function ContentDirectoryPage({kind,savedCount}:{kind:ContentPage['type'];savedC
 function ContentDetailPage({page,savedCount}:{page:ContentPage;savedCount:number}){return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow={page.type} title={page.title} description={page.summary} image={mediaUrl(page.image)}/><article className="content-detail site-container">{page.body.split(/\n+/).filter(Boolean).map((paragraph,index)=>paragraph.startsWith('## ')?<h2 key={index}>{paragraph.slice(3)}</h2>:paragraph.startsWith('- ')?<ul key={index}><li>{paragraph.slice(2)}</li></ul>:index===0?<p className="place-lede" key={index}>{paragraph}</p>:<p key={index}>{paragraph}</p>)}</article></main></PublicShell>}
 
 function ManagedLandingPage({ content, savedCount }: { content: WebsitePageContent; savedCount: number }) {
+  const {data}=useCRM()
+  const variant=experimentVariant(data)
   const image = content.heroImage ? mediaUrl(content.heroImage) : undefined
-  return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{content.title}</h1><p>{content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
+  return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{variant?.title||content.title}</h1><p>{variant?.description||content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
 }
 
 function InteractiveMapPage({ savedCount }: { savedCount: number }) {
@@ -701,7 +722,7 @@ export function PublicSite() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [location])
-  useEffect(()=>{if(new URLSearchParams(window.location.search).get('preview')!=='true')recordAnalytics('page_view')},[location])
+  useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.get('preview')!=='true'&&!params.has('experiment'))recordAnalytics('page_view')},[location])
   if (!features.publicWebsite) return <main className="site-disabled"><BrandLogo /><h1>Website module is not enabled</h1><p>This destination currently uses the CRM workspace without a public website.</p><a href="/crm">Open destination workspace</a></main>
   const published = data.listings.filter((listing) => listing.status === 'Published')
   const toggleSaved = (listing: Listing) => {

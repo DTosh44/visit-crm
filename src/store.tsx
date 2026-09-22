@@ -25,6 +25,8 @@ import type {
   WebsiteAnalyticsEvent,
   WebsitePage,
   WebsitePageContent,
+  ImageAsset,
+  WebsiteExperiment,
 } from './types'
 import { contentSnapshot } from './contentPublishing'
 
@@ -84,6 +86,12 @@ interface CRMContextValue {
   discardWebsitePageDraft: (id: string) => void
   restoreWebsitePageVersion: (id: string, version: number) => void
   deleteWebsitePage: (id: string) => void
+  createImageAsset: (asset: Omit<ImageAsset, 'id' | 'uploadedAt'>) => ImageAsset
+  updateImageAsset: (id: string, changes: Partial<ImageAsset>) => void
+  archiveImageAsset: (id: string) => void
+  createWebsiteExperiment: (experiment: Omit<WebsiteExperiment, 'id' | 'createdAt'>) => WebsiteExperiment
+  updateWebsiteExperiment: (id: string, changes: Partial<WebsiteExperiment>) => void
+  deleteWebsiteExperiment: (id: string) => void
   updateSubmission: (id: string, changes: Partial<WebsiteSubmission>) => void
   updateSocialMetric: (id: SocialMetric['id'], changes: Partial<SocialMetric>) => void
   resetWorkspace: () => void
@@ -215,6 +223,8 @@ function normalizeCRMData(parsed: CRMData): CRMData {
     websitePages: initialData.websitePages.map((baseline) => normalized.websitePages?.find((page) => page.id === baseline.id) ?? baseline).concat((normalized.websitePages ?? []).filter((page) => !initialData.websitePages.some((baseline) => baseline.id === page.id))),
     contentPages: (normalized.contentPages ?? initialData.contentPages).map((page) => page.status === 'Published' && !page.published ? { ...page, published: contentSnapshot(page), publishedAt: page.updatedAt, version: 1 } : page),
     analyticsEvents: normalized.analyticsEvents ?? initialData.analyticsEvents,
+    imageAssets: normalized.imageAssets ?? initialData.imageAssets,
+    websiteExperiments: normalized.websiteExperiments ?? initialData.websiteExperiments,
     submissions: normalized.submissions ?? initialData.submissions,
     levels: normalized.levels.map((level) => {
       const baseline = initialData.levels.find((item) => item.id === level.id)
@@ -280,14 +290,19 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         if(active&&submissions)setData((current)=>({...current,submissions:submissions.map((item)=>({id:item.id,kind:item.kind,payload:item.payload as Record<string,unknown>,createdAt:item.created_at,status:(item.status??'New') as WebsiteSubmission['status']}))}))
         const {data:auditRows}=await client.from('audit_log').select('id,action,entity_type,entity_id,detail,created_at,actor_id').eq('tenant_id',tenant.id).order('created_at',{ascending:false}).limit(250)
         if(active&&auditRows?.length)setData((current)=>({...current,activities:auditRows.map((row)=>({id:`audit-${row.id}`,organisationId:row.entity_type==='organisation'?row.entity_id:undefined,type:'note' as const,title:`${row.action.replaceAll('_',' ')} · ${row.entity_type.replaceAll('_',' ')}`,detail:JSON.stringify(row.detail??{}),timestamp:row.created_at,user:row.actor_id??'System'}))}))
-        const {data:analytics}=await client.from('website_analytics_events').select('id,event_type,path,title,visitor_id,source,campaign,occurred_at').eq('tenant_id',tenant.id).order('occurred_at',{ascending:false}).limit(5000)
-        if(active&&analytics)setData((current)=>({...current,analyticsEvents:analytics.map((row)=>({id:row.id,type:row.event_type,path:row.path,title:row.title,visitorId:row.visitor_id,source:row.source,campaign:row.campaign??undefined,occurredAt:row.occurred_at} as WebsiteAnalyticsEvent))}))
+        const {data:analytics}=await client.from('website_analytics_events').select('id,event_type,path,title,visitor_id,source,campaign,experiment_id,variant_id,occurred_at').eq('tenant_id',tenant.id).order('occurred_at',{ascending:false}).limit(5000)
+        if(active&&analytics)setData((current)=>({...current,analyticsEvents:analytics.map((row)=>({id:row.id,type:row.event_type,path:row.path,title:row.title,visitorId:row.visitor_id,source:row.source,campaign:row.campaign??undefined,experimentId:row.experiment_id??undefined,variantId:row.variant_id??undefined,occurredAt:row.occurred_at} as WebsiteAnalyticsEvent))}))
+        const {data:imageAssets}=await client.from('image_assets').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
+        if(active&&imageAssets?.length)setData((current)=>({...current,imageAssets:imageAssets.map((row)=>({id:row.id,name:row.name,url:row.public_url,alt:row.alt_text,caption:row.caption,credit:row.credit,rightsHolder:row.rights_holder,licence:row.licence,usageExpiry:row.usage_expiry??undefined,tags:row.tags??[],collection:row.collection_name,width:row.width,height:row.height,fileSize:row.file_size,mimeType:row.mime_type,storageProvider:'Supabase Storage',uploadedAt:row.created_at,uploadedBy:row.uploaded_by??'Workspace user',status:row.status} as ImageAsset))}))
+        const {data:experiments}=await client.from('website_experiments').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
+        if(active&&experiments?.length)setData((current)=>({...current,websiteExperiments:experiments.map((row)=>({id:row.id,name:row.name,hypothesis:row.hypothesis,pagePath:row.page_path,goal:row.goal,status:row.status,variants:row.variants,createdAt:row.created_at,startedAt:row.started_at??undefined,endedAt:row.ended_at??undefined} as WebsiteExperiment))}))
       } else {
-        const [{ data: listings },{data:events},{data:content},{data:websitePages}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published'),client.from('public_website_pages').select('*').eq('tenant_id',tenant.id)])
+        const [{ data: listings },{data:events},{data:content},{data:websitePages},{data:experiments}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published'),client.from('public_website_pages').select('*').eq('tenant_id',tenant.id),client.from('website_experiments').select('*').eq('tenant_id',tenant.id).eq('status','Running')])
         if (active && listings) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
         if(active&&events)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
         if(active&&content)setData((current)=>({...current,contentPages:content.map((row)=>({id:row.id,type:row.type,title:row.title,slug:row.slug,summary:row.summary,body:row.body,image:row.image,status:row.status,metaTitle:row.meta_title??'',metaDescription:row.meta_description??'',updatedAt:row.updated_at.slice(0,10)} as ContentPage))}))
         if(active&&websitePages?.length)setData((current)=>({...current,websitePages:websitePages.map((row)=>({id:row.id,name:row.name,path:row.path,template:row.template,status:'Published',draft:row.content,published:row.content,version:row.version,versions:[],updatedAt:row.updated_at.slice(0,10),publishedAt:row.published_at} as WebsitePage))}))
+        if(active&&experiments)setData((current)=>({...current,websiteExperiments:experiments.map((row)=>({id:row.id,name:row.name,hypothesis:row.hypothesis,pagePath:row.page_path,goal:row.goal,status:row.status,variants:row.variants,createdAt:row.created_at,startedAt:row.started_at??undefined,endedAt:row.ended_at??undefined} as WebsiteExperiment))}))
       }
       if (active) setRemoteReady(true)
     }
@@ -330,6 +345,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       const publishedWebsitePages=data.websitePages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,name:page.name,path:page.path,template:page.template,content:page.published,version:page.version,published_at:page.publishedAt??new Date().toISOString(),updated_at:new Date().toISOString()}))
       if(publishedContent.length)void client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})
       if(publishedWebsitePages.length)void client.from('public_website_pages').upsert(publishedWebsitePages,{onConflict:'tenant_id,id'})
+      const imageAssets=data.imageAssets.map((asset)=>({id:asset.id,tenant_id:tenant.id,name:asset.name,storage_path:null,public_url:asset.url,alt_text:asset.alt,caption:asset.caption,credit:asset.credit,rights_holder:asset.rightsHolder,licence:asset.licence,usage_expiry:asset.usageExpiry??null,tags:asset.tags,collection_name:asset.collection,width:asset.width,height:asset.height,file_size:asset.fileSize,mime_type:asset.mimeType,status:asset.status,updated_at:new Date().toISOString()}))
+      const experiments=data.websiteExperiments.map((experiment)=>({id:experiment.id,tenant_id:tenant.id,name:experiment.name,hypothesis:experiment.hypothesis,page_path:experiment.pagePath,goal:experiment.goal,status:experiment.status,variants:experiment.variants,started_at:experiment.startedAt??null,ended_at:experiment.endedAt??null,created_at:experiment.createdAt,updated_at:new Date().toISOString()}))
+      if(imageAssets.length)void client.from('image_assets').upsert(imageAssets,{onConflict:'tenant_id,id'})
+      if(experiments.length)void client.from('website_experiments').upsert(experiments,{onConflict:'tenant_id,id'})
       const listingIds=data.listings.map((item)=>item.id)
       const contentIds=publishedContent.map((item)=>item.id)
       if(listingIds.length)void client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)
@@ -339,6 +358,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       const websitePageIds=publishedWebsitePages.map((item)=>item.id)
       if(websitePageIds.length)void client.from('public_website_pages').delete().eq('tenant_id',tenant.id).not('id','in',`(${websitePageIds.join(',')})`)
       else void client.from('public_website_pages').delete().eq('tenant_id',tenant.id)
+      const imageAssetIds=imageAssets.map((item)=>item.id)
+      const experimentIds=experiments.map((item)=>item.id)
+      if(imageAssetIds.length)void client.from('image_assets').delete().eq('tenant_id',tenant.id).not('id','in',`(${imageAssetIds.join(',')})`)
+      if(experimentIds.length)void client.from('website_experiments').delete().eq('tenant_id',tenant.id).not('id','in',`(${experimentIds.join(',')})`)
     }, 650)
     return () => window.clearTimeout(timer)
   }, [data, remoteReady, user])
@@ -581,6 +604,12 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     discardWebsitePageDraft: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>page.id===pageId&&page.published?{...page,draft:structuredClone(page.published),status:'Published',updatedAt:todayISO()}:page)}));audit('discard_draft','website_page',pageId)},
     restoreWebsitePageVersion: (pageId,version) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>{const snapshot=page.versions.find((item)=>item.version===version);return page.id===pageId&&snapshot?{...page,draft:structuredClone(snapshot.content),status:'Draft changes',updatedAt:todayISO()}:page})}));audit('restore_version','website_page',pageId,{version})},
     deleteWebsitePage: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.filter((page)=>page.id!==pageId)}));audit('delete','website_page',pageId)},
+    createImageAsset: (asset) => {const created:ImageAsset={...asset,id:id('asset'),uploadedAt:new Date().toISOString()};setData((current)=>({...current,imageAssets:[created,...current.imageAssets]}));audit('upload','image_asset',created.id,{name:created.name,licence:created.licence});return created},
+    updateImageAsset: (assetId,changes) => {setData((current)=>({...current,imageAssets:current.imageAssets.map((asset)=>asset.id===assetId?{...asset,...changes}:asset)}));audit('update','image_asset',assetId,{fields:Object.keys(changes)})},
+    archiveImageAsset: (assetId) => {setData((current)=>({...current,imageAssets:current.imageAssets.map((asset)=>asset.id===assetId?{...asset,status:'Archived'}:asset)}));audit('archive','image_asset',assetId)},
+    createWebsiteExperiment: (experiment) => {const created:WebsiteExperiment={...experiment,id:id('experiment'),createdAt:new Date().toISOString()};setData((current)=>({...current,websiteExperiments:[created,...current.websiteExperiments]}));audit('create','website_experiment',created.id,{name:created.name,pagePath:created.pagePath});return created},
+    updateWebsiteExperiment: (experimentId,changes) => {setData((current)=>({...current,websiteExperiments:current.websiteExperiments.map((experiment)=>experiment.id===experimentId?{...experiment,...changes}:experiment)}));audit('update','website_experiment',experimentId,{status:changes.status})},
+    deleteWebsiteExperiment: (experimentId) => {setData((current)=>({...current,websiteExperiments:current.websiteExperiments.filter((experiment)=>experiment.id!==experimentId)}));audit('delete','website_experiment',experimentId)},
     updateSubmission: (submissionId, changes) => {setData((current)=>({...current,submissions:current.submissions.map((item)=>item.id===submissionId?{...item,...changes}:item)}));if(supabase)void supabase.from('public_submissions').update(changes.status?{status:changes.status}:{}).eq('id',submissionId)},
     updateSocialMetric: (metricId, changes) => setData((current)=>({...current,socialMetrics:current.socialMetrics.map((item)=>item.id===metricId?{...item,...changes}:item)})),
     resetWorkspace: () => {

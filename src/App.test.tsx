@@ -35,6 +35,26 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
   })
 
+  it('provides a searchable rights-managed image bank', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Image bank'}))
+    expect(screen.getByRole('heading',{name:'Image bank'})).toBeInTheDocument()
+    expect(screen.getByText('Valechester riverside hero')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Search images'),{target:{value:'castle'}})
+    expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
+    expect(screen.queryByText('Independent dining')).not.toBeInTheDocument()
+  })
+
+  it('starts a draft website experiment', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'A/B testing'}))
+    expect(screen.getByRole('heading',{name:'A/B testing'})).toBeInTheDocument()
+    expect(screen.getByText('Homepage hero message')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Start'}))
+    expect(screen.getByText('Running')).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Pause'})).toBeInTheDocument()
+  })
+
   it('filters organisations by location, health and type while keeping every match scrollable', () => {
     const {container}=renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Organisations'}))

@@ -6,6 +6,8 @@ export type ViewKey =
   | 'listings'
   | 'events'
   | 'pages'
+  | 'images'
+  | 'experiments'
   | 'map'
   | 'content'
   | 'inbox'
@@ -307,7 +309,59 @@ export interface WebsiteAnalyticsEvent {
   visitorId: string
   source: string
   campaign?: string
+  experimentId?: string
+  variantId?: string
   occurredAt: string
+}
+
+export type ImageAssetLicence = 'Owned' | 'Licensed' | 'Partner supplied' | 'Creative Commons'
+export type ImageAssetStatus = 'Ready' | 'Processing' | 'Archived'
+
+export interface ImageAsset {
+  id: string
+  name: string
+  url: string
+  alt: string
+  caption: string
+  credit: string
+  rightsHolder: string
+  licence: ImageAssetLicence
+  usageExpiry?: string
+  tags: string[]
+  collection: string
+  width: number
+  height: number
+  fileSize: number
+  mimeType: string
+  storageProvider: 'Demo library' | 'Supabase Storage' | 'Cloudinary' | 'S3 compatible'
+  uploadedAt: string
+  uploadedBy: string
+  status: ImageAssetStatus
+}
+
+export type WebsiteExperimentStatus = 'Draft' | 'Scheduled' | 'Running' | 'Paused' | 'Completed'
+export type WebsiteExperimentGoal = WebsiteAnalyticsEvent['type']
+
+export interface WebsiteExperimentVariant {
+  id: string
+  name: string
+  weight: number
+  title: string
+  description: string
+  buttonLabel: string
+}
+
+export interface WebsiteExperiment {
+  id: string
+  name: string
+  hypothesis: string
+  pagePath: string
+  goal: WebsiteExperimentGoal
+  status: WebsiteExperimentStatus
+  variants: WebsiteExperimentVariant[]
+  createdAt: string
+  startedAt?: string
+  endedAt?: string
 }
 
 export interface WebsiteSubmission {
@@ -356,6 +410,8 @@ export interface CRMData {
   websitePages: WebsitePage[]
   contentPages: ContentPage[]
   analyticsEvents: WebsiteAnalyticsEvent[]
+  imageAssets: ImageAsset[]
+  websiteExperiments: WebsiteExperiment[]
   submissions: WebsiteSubmission[]
   workspace: WorkspaceSettings
 }
