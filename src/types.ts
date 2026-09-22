@@ -5,6 +5,7 @@ export type ViewKey =
   | 'memberships'
   | 'listings'
   | 'events'
+  | 'pages'
   | 'content'
   | 'inbox'
   | 'insights'
@@ -242,6 +243,53 @@ export interface ContentPage {
 
 export type PublishedContentPage = Pick<ContentPage, 'type' | 'title' | 'slug' | 'summary' | 'body' | 'image' | 'metaTitle' | 'metaDescription'>
 
+export type WebsitePageStatus = 'Published' | 'Draft' | 'Draft changes'
+export type WebsitePageTemplate = 'Home' | 'Collection' | 'Service' | 'Information' | 'Landing page'
+export type WebsiteBlockType = 'Text' | 'Callout' | 'Image' | 'Button'
+
+export interface WebsitePageBlock {
+  id: string
+  type: WebsiteBlockType
+  heading: string
+  body: string
+  image?: string
+  buttonLabel?: string
+  buttonUrl?: string
+}
+
+export interface WebsitePageContent {
+  eyebrow: string
+  title: string
+  description: string
+  heroImage?: string
+  metaTitle: string
+  metaDescription: string
+  navigationLabel: string
+  showInNavigation: boolean
+  blocks: WebsitePageBlock[]
+}
+
+export interface WebsitePageVersion {
+  version: number
+  publishedAt: string
+  publishedBy: string
+  content: WebsitePageContent
+}
+
+export interface WebsitePage {
+  id: string
+  name: string
+  path: string
+  template: WebsitePageTemplate
+  status: WebsitePageStatus
+  draft: WebsitePageContent
+  published?: WebsitePageContent
+  version: number
+  versions: WebsitePageVersion[]
+  updatedAt: string
+  publishedAt?: string
+}
+
 export interface WebsiteAnalyticsEvent {
   id: string
   type: 'page_view' | 'form_submit' | 'cta_click' | 'booking_completed'
@@ -296,6 +344,7 @@ export interface CRMData {
   opportunities: Opportunity[]
   activities: Activity[]
   socialMetrics: SocialMetric[]
+  websitePages: WebsitePage[]
   contentPages: ContentPage[]
   analyticsEvents: WebsiteAnalyticsEvent[]
   submissions: WebsiteSubmission[]

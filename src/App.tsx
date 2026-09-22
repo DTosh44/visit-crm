@@ -16,6 +16,7 @@ import { Settings } from './views/Settings'
 import { Tasks } from './views/Tasks'
 import { Events } from './views/Events'
 import { Content } from './views/Content'
+import { WebsitePages } from './views/WebsitePages'
 import { Inbox } from './views/Inbox'
 import { Insights } from './views/Insights'
 import { useAuth } from './auth'
@@ -26,8 +27,8 @@ import { BrandLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 
-const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
-const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
+const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','pages','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -84,6 +85,7 @@ function CRMApp() {
       {activeView === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
       {activeView === 'listings' && <Listings onEdit={openListing} />}
       {activeView === 'events' && <Events />}
+      {activeView === 'pages' && <WebsitePages />}
       {activeView === 'content' && <Content />}
       {activeView === 'inbox' && <Inbox />}
       {activeView === 'insights' && <Insights />}

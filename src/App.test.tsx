@@ -354,6 +354,30 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('heading', { name: 'You’re on the list.' })).toBeInTheDocument()
   })
 
+  it('manages every website route through a draft and publish workflow', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Pages' }))
+    expect(screen.getByRole('heading', { name: 'Pages' })).toBeInTheDocument()
+    expect(screen.getAllByText('13').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Homepage' }))
+    fireEvent.change(screen.getByLabelText('Page title'), { target: { value: 'A new story in every direction.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+    expect(screen.getByText('Draft changes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
+    expect(screen.getByText('Live v2')).toBeInTheDocument()
+  })
+
+  it('creates structured landing pages for prompted website changes', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Pages' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New landing page' }))
+    fireEvent.change(screen.getByLabelText('Internal page name'), { target: { value: 'Autumn campaign' } })
+    fireEvent.change(screen.getByLabelText('Website route'), { target: { value: '/autumn' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create draft' }))
+    expect(screen.getByRole('heading', { name: 'Edit Autumn campaign' })).toBeInTheDocument()
+    expect(screen.getByText('/autumn · Changes stay private until published.')).toBeInTheDocument()
+  })
+
   it('requires an account before opening the CRM', () => {
     localStorage.removeItem('visit-valechester-auth-v2')
     renderApp()

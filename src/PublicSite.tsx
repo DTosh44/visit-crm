@@ -11,10 +11,11 @@ import { useCRM } from './store'
 import { tenant } from './tenant'
 import { supabase } from './auth'
 import { filtersForVisitorQuery, matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
-import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing } from './types'
+import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing, WebsitePageBlock, WebsitePageContent } from './types'
 import { downloadCalendarEvent } from './actions'
 import { publishedPages } from './contentPublishing'
 import type { WebsiteAnalyticsEvent } from './types'
+import { websitePageContent, websitePageForPath } from './websitePages'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
 const SAVED_KEY = 'visit-valechester-saved-v1'
@@ -147,6 +148,8 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
   const { data } = useCRM()
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeMenu = () => setMenuOpen(false)
+  const publishedPage = (path: string) => websitePageForPath(data.websitePages, path)?.published
+  const extraNavigation = data.websitePages.filter((page) => page.published?.showInNavigation && !['/', '/events', '/guides', '/plan'].includes(page.path))
   useEffect(() => {
     if (!menuOpen) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -166,11 +169,12 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
         <SiteLink to="/" className="site-logo" aria-label={`${data.workspace.destinationName} home`}><BrandLogo /></SiteLink>
         <nav id="site-primary-navigation" className={menuOpen ? 'site-nav open' : 'site-nav'} aria-label="Main navigation">
           <SiteLink to="/?category=Things%20to%20do#discover" onClick={closeMenu}>Things to do</SiteLink>
-          {features.events && <SiteLink to="/events" onClick={closeMenu}>What’s on</SiteLink>}
+          {features.events && <SiteLink to="/events" onClick={closeMenu}>{publishedPage('/events')?.navigationLabel || 'What’s on'}</SiteLink>}
           <SiteLink to="/?category=Places%20to%20stay#discover" onClick={closeMenu}>Stay</SiteLink>
           <SiteLink to="/?category=Food%20%26%20drink#discover" onClick={closeMenu}>Food & drink</SiteLink>
-          {features.itineraries && <SiteLink to="/guides" onClick={closeMenu}>Ideas & inspiration</SiteLink>}
-          <SiteLink to="/plan" onClick={closeMenu}>Plan your visit</SiteLink>
+          {features.itineraries && <SiteLink to="/guides" onClick={closeMenu}>{publishedPage('/guides')?.navigationLabel || 'Ideas & inspiration'}</SiteLink>}
+          <SiteLink to="/plan" onClick={closeMenu}>{publishedPage('/plan')?.navigationLabel || 'Plan your visit'}</SiteLink>
+          {extraNavigation.map((page) => <SiteLink key={page.id} to={page.path} onClick={closeMenu}>{page.published!.navigationLabel || page.name}</SiteLink>)}
         </nav>
         <div className="site-header-actions"><button onClick={() => siteNavigate('/?search=1')} aria-label="Search"><Search size={20} /></button><SiteLink to="/plan" className="site-plan-button">Plan my trip</SiteLink><button ref={menuButtonRef} className="site-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="site-primary-navigation">{menuOpen ? <X size={22} /> : <Menu size={22} />}</button></div>
       </header>
@@ -188,8 +192,21 @@ function PublicShell({ savedCount, children }: { savedCount: number; children: R
   return <div className="public-site"><a className="skip-link" href="#site-content">Skip to main content</a><SiteHeader savedCount={savedCount} /><div id="site-content" tabIndex={-1}>{children}</div><SiteFooter /></div>
 }
 
+function managedContent(data: ReturnType<typeof useCRM>['data'], path = window.location.pathname) {
+  const page = websitePageForPath(data.websitePages, path)
+  return page ? websitePageContent(page, new URLSearchParams(window.location.search).get('preview') === 'true') : undefined
+}
+
+function ManagedBlocks({ blocks }: { blocks: WebsitePageBlock[] }) {
+  if (!blocks.length) return null
+  return <section className="managed-page-blocks site-container">{blocks.map((block) => <article key={block.id} className={`managed-block managed-block-${block.type.toLowerCase()}`}>{block.type === 'Image' && block.image && <img src={mediaUrl(block.image)} alt="" />}{block.heading && <h2>{block.heading}</h2>}{block.body && <p>{block.body}</p>}{block.type === 'Button' && block.buttonLabel && block.buttonUrl && (block.buttonUrl.startsWith('/') ? <SiteLink to={block.buttonUrl}>{block.buttonLabel}<ArrowRight size={15}/></SiteLink> : <a href={block.buttonUrl}>{block.buttonLabel}<ArrowRight size={15}/></a>)}</article>)}</section>
+}
+
 function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; title: string; description: string; image?: string }) {
-  return <section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{description}</p></div>{image && <img src={image} alt="" />}</section>
+  const { data } = useCRM()
+  const managed = managedContent(data)
+  const heroImage = managed?.heroImage ? mediaUrl(managed.heroImage) : image
+  return <><section className={`visitor-page-intro${heroImage ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{managed?.eyebrow || eyebrow}</span><h1>{managed?.title || title}</h1><p>{managed?.description || description}</p></div>{heroImage && <img src={heroImage} alt="" />}</section>{managed && <ManagedBlocks blocks={managed.blocks}/>}</>
 }
 
 function NewsletterSignup() {
@@ -201,6 +218,7 @@ function NewsletterSignup() {
 
 function HomePage({ actions, location }: { actions: VisitorActions; location: string }) {
   const { data } = useCRM()
+  const managed = managedContent(data, '/')
   const { features } = useFeatures()
   const [query, setQuery] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -247,14 +265,15 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
   return <PublicShell savedCount={actions.savedIds.length}>
     <main>
       <section className="site-hero">
-        <img src={imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
+        <img src={managed?.heroImage ? mediaUrl(managed.heroImage) : imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
-        <div className="site-hero-content"><span className="site-eyebrow">Find your kind of remarkable</span><h1>A town with stories<br />in every direction.</h1><p>{data.workspace.strapline}</p>
+        <div className="site-hero-content"><span className="site-eyebrow">{managed?.eyebrow || 'Find your kind of remarkable'}</span><h1>{managed?.title || 'A town with stories in every direction.'}</h1><p>{managed?.description || data.workspace.strapline}</p>
           <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...visitorTaxonomyFor(item)]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
       </section>
+      {managed && <ManagedBlocks blocks={managed.blocks}/>}
 
       <section className="site-intro site-container"><span className="site-eyebrow plum">Welcome to Valechester</span><div><h2>Historic at heart.<br /><em>Independent by nature.</em></h2><p>{data.workspace.strapline} Come for the landmark sights, stay for the unexpected finds—and make the story your own.</p></div></section>
 
@@ -580,6 +599,11 @@ const contentTypeByPath:Record<string,ContentPage['type']>={guides:'Guide',itine
 function ContentDirectoryPage({kind,savedCount}:{kind:ContentPage['type'];savedCount:number}){const {data}=useCRM();const pages=publishedPages(data.contentPages).filter((page)=>page.type===kind);const plural=kind==='Itinerary'?'itineraries':`${kind.toLowerCase()}s`;return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Ideas and inspiration" title={`${kind}s for your visit.`} description={kind==='Guide'?'Practical recommendations to help you choose what to do.':kind==='Itinerary'?'Ready made plans for making the most of your time in Valechester.':'Follow Valechester stories, landmarks and landscapes at your own pace.'}/><section className="content-directory site-container"><div className="site-card-grid">{pages.map((page)=><article className="site-card content-card" key={page.id}><button className="site-card-open" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}><img src={mediaUrl(page.image)} alt=""/></button><div className="site-card-copy"><span>{page.type}</span><h2>{page.title}</h2><p>{page.summary}</p><button className="site-text-link" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}>Read more <ArrowRight size={15}/></button></div></article>)}</div>{!pages.length&&<div className="visitor-empty">The destination team is preparing new {kind.toLowerCase()}s.</div>}</section></main></PublicShell>}
 function ContentDetailPage({page,savedCount}:{page:ContentPage;savedCount:number}){return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow={page.type} title={page.title} description={page.summary} image={mediaUrl(page.image)}/><article className="content-detail site-container">{page.body.split(/\n+/).filter(Boolean).map((paragraph,index)=>paragraph.startsWith('## ')?<h2 key={index}>{paragraph.slice(3)}</h2>:paragraph.startsWith('- ')?<ul key={index}><li>{paragraph.slice(2)}</li></ul>:index===0?<p className="place-lede" key={index}>{paragraph}</p>:<p key={index}>{paragraph}</p>)}</article></main></PublicShell>}
 
+function ManagedLandingPage({ content, savedCount }: { content: WebsitePageContent; savedCount: number }) {
+  const image = content.heroImage ? mediaUrl(content.heroImage) : undefined
+  return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{content.title}</h1><p>{content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
+}
+
 const infoPages: Record<string, { eyebrow: string; title: string; description: string; sections: Array<[string, string]> }> = {
   privacy: { eyebrow: 'Visitor information', title: 'Privacy', description: 'How Visit Valechester handles visitor information.', sections: [['What we collect', 'We collect only the information needed to answer enquiries, provide requested updates and improve your visit planning. Saved places remain on your device unless you choose to share them.'], ['Production approach', 'We keep personal information only for as long as it is needed, use approved service providers and respect your data protection rights.']] },
   cookies: { eyebrow: 'Visitor information', title: 'Cookies', description: 'How this website uses cookies and local storage.', sections: [['Essential storage', 'Essential local storage remembers saved places, cookie choices and account session details.'], ['Analytics and marketing', 'Analytics and marketing cookies are used only with consent. You can change your choice at any time.']] },
@@ -627,13 +651,15 @@ export function PublicSite() {
     const preview=new URLSearchParams(window.location.search).get('preview')==='true'
     const content=contentTypeByPath[parts[0]]?(preview?data.contentPages:liveContent).find((item)=>item.slug===parts[1]):undefined
     const titles:Record<string,string>={'/':'Visit Valechester','/events':"What's on in Valechester",'/plan':'Plan your visit to Valechester','/guides':'Valechester visitor guides','/itineraries':'Valechester itineraries','/trails':'Valechester trails','/saved':'Saved places','/contact':'Contact Visit Valechester','/accessibility':'Accessible Valechester','/privacy':'Privacy','/cookies':'Cookies'}
-    const title=listing?.name??content?.metaTitle??content?.title??titles[path]??'Visit Valechester'
-    const description=listing?.shortDescription??content?.metaDescription??content?.summary??data.workspace.strapline
+    const websitePage=websitePageForPath(data.websitePages,path)
+    const websiteContent=websitePage?websitePageContent(websitePage,preview):undefined
+    const title=listing?.name??content?.metaTitle??content?.title??websiteContent?.metaTitle??websiteContent?.title??titles[path]??'Visit Valechester'
+    const description=listing?.shortDescription??content?.metaDescription??content?.summary??websiteContent?.metaDescription??websiteContent?.description??data.workspace.strapline
     document.title=`${title} | ${data.workspace.destinationName}`
     let meta=document.querySelector<HTMLMetaElement>('meta[name="description"]');if(!meta){meta=document.createElement('meta');meta.name='description';document.head.append(meta)}meta.content=description
     let canonical=document.querySelector<HTMLLinkElement>('link[rel="canonical"]');if(!canonical){canonical=document.createElement('link');canonical.rel='canonical';document.head.append(canonical)}canonical.href=`${window.location.origin}${path}`
     let og=document.querySelector<HTMLMetaElement>('meta[property="og:title"]');if(!og){og=document.createElement('meta');og.setAttribute('property','og:title');document.head.append(og)}og.content=title
-  },[data.contentPages,data.listings,data.workspace.destinationName,data.workspace.strapline,liveContent,location])
+  },[data.contentPages,data.listings,data.websitePages,data.workspace.destinationName,data.workspace.strapline,liveContent,location])
   useEffect(() => {
     const listener = () => { setLocation(`${window.location.pathname}${window.location.search}${window.location.hash}`); if (!window.location.hash) window.scrollTo({ top: 0 }) }
     window.addEventListener('popstate', listener)
@@ -683,6 +709,6 @@ export function PublicSite() {
   else if (parts[0] === 'place') {
     const listing = published.find((item) => item.id === parts[1])
     page = listing ? <ListingPage listing={listing} actions={actions} /> : <NotFoundPage savedCount={savedIds.length} />
-  } else page = <NotFoundPage savedCount={savedIds.length} />
+  } else { const managedPage=websitePageForPath(data.websitePages,path);const content=managedPage?websitePageContent(managedPage,new URLSearchParams(window.location.search).get('preview')==='true'):undefined;page=content?<ManagedLandingPage content={content} savedCount={savedIds.length}/>:<NotFoundPage savedCount={savedIds.length}/> }
   return <>{page}<CookiePreferences/>{notice && <div className="site-toast" role="status"><Check size={16} />{notice}</div>}</>
 }

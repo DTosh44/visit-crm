@@ -23,6 +23,8 @@ import type {
   PipelineStage,
   TaskDraft,
   WebsiteAnalyticsEvent,
+  WebsitePage,
+  WebsitePageContent,
 } from './types'
 import { contentSnapshot } from './contentPublishing'
 
@@ -76,6 +78,12 @@ interface CRMContextValue {
   publishContentPage: (id: string) => void
   discardContentDraft: (id: string) => void
   deleteContentPage: (id: string) => void
+  createWebsitePage: (input: { name: string; path: string; content: WebsitePageContent }) => WebsitePage
+  updateWebsitePageDraft: (id: string, draft: WebsitePageContent) => void
+  publishWebsitePage: (id: string) => void
+  discardWebsitePageDraft: (id: string) => void
+  restoreWebsitePageVersion: (id: string, version: number) => void
+  deleteWebsitePage: (id: string) => void
   updateSubmission: (id: string, changes: Partial<WebsiteSubmission>) => void
   updateSocialMetric: (id: SocialMetric['id'], changes: Partial<SocialMetric>) => void
   resetWorkspace: () => void
@@ -195,6 +203,7 @@ function normalizeCRMData(parsed: CRMData): CRMData {
     workspace: normalized.workspace ?? initialData.workspace,
     events: (normalized.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run', recurrence:event.recurrence??'None' })),
     socialMetrics: normalized.socialMetrics ?? initialData.socialMetrics,
+    websitePages: initialData.websitePages.map((baseline) => normalized.websitePages?.find((page) => page.id === baseline.id) ?? baseline).concat((normalized.websitePages ?? []).filter((page) => !initialData.websitePages.some((baseline) => baseline.id === page.id))),
     contentPages: (normalized.contentPages ?? initialData.contentPages).map((page) => page.status === 'Published' && !page.published ? { ...page, published: contentSnapshot(page), publishedAt: page.updatedAt, version: 1 } : page),
     analyticsEvents: normalized.analyticsEvents ?? initialData.analyticsEvents,
     submissions: normalized.submissions ?? initialData.submissions,
@@ -265,10 +274,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const {data:analytics}=await client.from('website_analytics_events').select('id,event_type,path,title,visitor_id,source,campaign,occurred_at').eq('tenant_id',tenant.id).order('occurred_at',{ascending:false}).limit(5000)
         if(active&&analytics)setData((current)=>({...current,analyticsEvents:analytics.map((row)=>({id:row.id,type:row.event_type,path:row.path,title:row.title,visitorId:row.visitor_id,source:row.source,campaign:row.campaign??undefined,occurredAt:row.occurred_at} as WebsiteAnalyticsEvent))}))
       } else {
-        const [{ data: listings },{data:events},{data:content}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published')])
+        const [{ data: listings },{data:events},{data:content},{data:websitePages}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published'),client.from('public_website_pages').select('*').eq('tenant_id',tenant.id)])
         if (active && listings) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
         if(active&&events)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
         if(active&&content)setData((current)=>({...current,contentPages:content.map((row)=>({id:row.id,type:row.type,title:row.title,slug:row.slug,summary:row.summary,body:row.body,image:row.image,status:row.status,metaTitle:row.meta_title??'',metaDescription:row.meta_description??'',updatedAt:row.updated_at.slice(0,10)} as ContentPage))}))
+        if(active&&websitePages?.length)setData((current)=>({...current,websitePages:websitePages.map((row)=>({id:row.id,name:row.name,path:row.path,template:row.template,status:'Published',draft:row.content,published:row.content,version:row.version,versions:[],updatedAt:row.updated_at.slice(0,10),publishedAt:row.published_at} as WebsitePage))}))
       }
       if (active) setRemoteReady(true)
     }
@@ -308,13 +318,18 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       }, { onConflict: 'tenant_id' })
       void client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' })
       const publishedContent=data.contentPages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,type:page.published!.type,title:page.published!.title,slug:page.published!.slug,summary:page.published!.summary,body:page.published!.body,image:page.published!.image,status:'Published',meta_title:page.published!.metaTitle??'',meta_description:page.published!.metaDescription??'',updated_at:page.publishedAt??new Date().toISOString()}))
+      const publishedWebsitePages=data.websitePages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,name:page.name,path:page.path,template:page.template,content:page.published,version:page.version,published_at:page.publishedAt??new Date().toISOString(),updated_at:new Date().toISOString()}))
       if(publishedContent.length)void client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})
+      if(publishedWebsitePages.length)void client.from('public_website_pages').upsert(publishedWebsitePages,{onConflict:'tenant_id,id'})
       const listingIds=data.listings.map((item)=>item.id)
       const contentIds=publishedContent.map((item)=>item.id)
       if(listingIds.length)void client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)
       else void client.from('public_listings').delete().eq('tenant_id',tenant.id)
       if(contentIds.length)void client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)
       else void client.from('public_content').delete().eq('tenant_id',tenant.id)
+      const websitePageIds=publishedWebsitePages.map((item)=>item.id)
+      if(websitePageIds.length)void client.from('public_website_pages').delete().eq('tenant_id',tenant.id).not('id','in',`(${websitePageIds.join(',')})`)
+      else void client.from('public_website_pages').delete().eq('tenant_id',tenant.id)
     }, 650)
     return () => window.clearTimeout(timer)
   }, [data, remoteReady, user])
@@ -551,6 +566,12 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     publishContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,status:'Published',published:contentSnapshot(item),publishedAt:new Date().toISOString(),updatedAt:todayISO(),version:(item.version??0)+1}:item)}));audit('publish','content_page',pageId)},
     discardContentDraft: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId&&item.published?{...item,...item.published,status:'Published',updatedAt:todayISO()}:item)}));audit('discard_draft','content_page',pageId)},
     deleteContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.filter((item)=>item.id!==pageId)}));audit('delete','content_page',pageId)},
+    createWebsitePage: ({name,path,content}) => {const created:WebsitePage={id:id('webpage'),name,path:path.startsWith('/')?path:`/${path}`,template:'Landing page',status:'Draft',draft:content,version:0,versions:[],updatedAt:todayISO()};setData((current)=>({...current,websitePages:[created,...current.websitePages]}));audit('create_draft','website_page',created.id,{name,path:created.path});return created},
+    updateWebsitePageDraft: (pageId,draft) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>page.id===pageId?{...page,draft,status:page.published?'Draft changes':'Draft',updatedAt:todayISO()}:page)}));audit('save_draft','website_page',pageId,{title:draft.title})},
+    publishWebsitePage: (pageId) => {const now=new Date().toISOString();setData((current)=>({...current,websitePages:current.websitePages.map((page)=>{if(page.id!==pageId)return page;const version=page.version+1;const published=structuredClone(page.draft);return {...page,published,status:'Published',version,publishedAt:now,updatedAt:todayISO(),versions:[{version,publishedAt:now,publishedBy:user?.name??'Workspace user',content:published},...page.versions].slice(0,20)}})}));audit('publish','website_page',pageId)},
+    discardWebsitePageDraft: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>page.id===pageId&&page.published?{...page,draft:structuredClone(page.published),status:'Published',updatedAt:todayISO()}:page)}));audit('discard_draft','website_page',pageId)},
+    restoreWebsitePageVersion: (pageId,version) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>{const snapshot=page.versions.find((item)=>item.version===version);return page.id===pageId&&snapshot?{...page,draft:structuredClone(snapshot.content),status:'Draft changes',updatedAt:todayISO()}:page})}));audit('restore_version','website_page',pageId,{version})},
+    deleteWebsitePage: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.filter((page)=>page.id!==pageId)}));audit('delete','website_page',pageId)},
     updateSubmission: (submissionId, changes) => {setData((current)=>({...current,submissions:current.submissions.map((item)=>item.id===submissionId?{...item,...changes}:item)}));if(supabase)void supabase.from('public_submissions').update(changes.status?{status:changes.status}:{}).eq('id',submissionId)},
     updateSocialMetric: (metricId, changes) => setData((current)=>({...current,socialMetrics:current.socialMetrics.map((item)=>item.id===metricId?{...item,...changes}:item)})),
     resetWorkspace: () => {
