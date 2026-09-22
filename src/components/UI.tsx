@@ -179,5 +179,5 @@ export function StatDelta({ value, label, positive = true }: { value: string; la
 }
 
 export function Tabs<T extends string>({ items, active, onChange }: { items: T[]; active: T; onChange: (item: T) => void }) {
-  return <div className="tabs" aria-label="Sections">{items.map((item) => <button key={item} type="button" aria-pressed={active === item} className={active === item ? 'active' : ''} onClick={() => onChange(item)}>{item}</button>)}</div>
+  return <div className="tabs" role="tablist" aria-label="Sections">{items.map((item) => <button key={item} type="button" role="tab" aria-selected={active === item} className={active === item ? 'active' : ''} onClick={() => onChange(item)}>{item}</button>)}</div>
 }
