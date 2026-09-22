@@ -10,13 +10,13 @@
   --primary-dark: var(--tenant-primary-dark, #4f1b39);
   --coral: var(--tenant-accent, #f0785e);
   --green: #278362;
-  --amber: #cf8a2d;
-  --red: #c94f5c;
+  --amber: #9a5e0c;
+  --red: #b13f4d;
   --blue: #3477bc;
   --teal: #277f83;
   --purple: #6655c8;
   --text: #19283d;
-  --muted: #6c788a;
+  --muted: #667286;
   --line: #e2e7ee;
   --line-dark: #d7dde6;
   --surface: #ffffff;
@@ -1456,3 +1456,154 @@ input[type="checkbox"] { accent-color: var(--primary); }
 @media(max-width:720px){.organisation-result-count{display:none}.organisation-filter-bar{padding-inline:11px}.organisation-table-scroll{max-height:calc(100vh - 300px)}}
 .cookie-preferences{position:fixed;z-index:300;left:24px;right:24px;bottom:24px;margin:auto;max-width:980px;background:#fffdf9;color:#22152b;border:1px solid rgba(109,41,79,.18);border-radius:18px;box-shadow:0 18px 60px rgba(34,21,43,.2);padding:20px 22px;display:flex;align-items:center;justify-content:space-between;gap:24px}.cookie-preferences strong{display:block;font-size:18px;margin-bottom:4px}.cookie-preferences p{margin:0;max-width:620px;color:#6f6670}.cookie-preferences>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.cookie-preferences button{border:1px solid var(--tenant-primary);background:transparent;color:var(--tenant-primary);border-radius:999px;padding:10px 14px;font-weight:700}.cookie-preferences button:last-child{background:var(--tenant-primary);color:white}.cookie-preferences label{display:flex;gap:8px;margin-top:10px}.listing-map iframe{width:100%;min-height:210px;border:0;border-radius:14px}.command-results button.active{background:rgba(109,41,79,.08)}
 @media(max-width:700px){.cookie-preferences{left:12px;right:12px;bottom:12px;display:block}.cookie-preferences>div:last-child{justify-content:flex-start;margin-top:14px}}
+
+
+/* Accessibility hardening — WCAG 2.2 AA target */
+button { min-width: 24px; min-height: 24px; }
+.skip-link {
+  position: fixed;
+  z-index: 10000;
+  top: 10px;
+  left: 10px;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  color: #fff;
+  border-radius: 6px;
+  background: #17263b;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.skip-link:focus { transform: translateY(0); }
+:where(button, a[href], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid #0b63ce !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 2px #fff !important;
+}
+.sidebar :where(button, a[href]):focus-visible,
+.site-footer :where(button, a[href]):focus-visible,
+.site-utility :where(button, a[href]):focus-visible,
+.site-events :where(button, a[href]):focus-visible,
+.site-neighbourhoods :where(button, a[href]):focus-visible {
+  outline-color: #fff !important;
+  box-shadow: 0 0 0 2px #0b63ce !important;
+}
+.table-primary-action {
+  min-height: 24px;
+  padding: 2px 0;
+  color: #26364b;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.table-primary-action:hover { color: var(--primary); }
+
+/* Keep custom checkbox/toggle inputs keyboard reachable and give their visual wrapper a focus indicator. */
+.check-grid label input,
+.module-toggle input {
+  position: absolute !important;
+  display: block !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+}
+.check-grid label:has(input:focus-visible),
+.module-toggle:has(input:focus-visible),
+.planner-builder fieldset label:has(input:focus-visible),
+.widget-picker label:has(input:focus-visible),
+.upload-zone:focus-within,
+.media-replace:focus-within {
+  outline: 3px solid #0b63ce;
+  outline-offset: 3px;
+}
+
+/* Strengthen text contrast on light CRM surfaces. */
+.quick-menu > span,
+.data-table th,
+.dashboard-task span,
+.field small,
+.billing-stats small,
+.revenue-summary small,
+.compact-main small,
+.compact-date small,
+.org-cell small,
+.org-listing-card > footer,
+.listing-editor-top > div:first-child,
+.upload-zone span,
+.upload-zone small,
+.mini-contact span,
+.invoice-number small,
+.invoice-sheet small,
+.timeline-item time,
+.timeline-item small,
+.activity-item small,
+.health-ring span,
+.org-kpi-row small,
+.command-palette > footer,
+.command-label,
+.command-results small,
+.search-result-meta,
+.detail-list dd > span,
+.inline-empty,
+.drag-hint,
+.kanban-empty {
+  color: #667286;
+}
+.badge-amber { color: #845016; }
+.badge-grey { color: #556174; }
+.nav-label { color: #8292aa; }
+
+/* Public-site contrast, target sizes and focus visibility. */
+.site-search button { background: var(--tenant-primary); }
+.site-hero-credit {
+  padding: 4px 7px;
+  color: #fff;
+  border-radius: 3px;
+  background: rgba(34,21,43,.78);
+}
+.site-footer-bottom { color: #b9aab4; }
+.public-site :is(.site-card p, .site-guide-grid p, .site-planner > div > p, .info-page p, .visitor-empty, .saved-empty, .contact-page form > small) {
+  color: #665a64;
+}
+.public-site :is(.site-text-link, .site-popular button, .event-card-link, .site-section-heading > button, .event-calendar button, .newsletter-success button) {
+  min-height: 24px;
+}
+.site-category-tabs button,
+.event-quick-dates button {
+  min-height: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within { scroll-behavior: auto; }
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .badge,
+  .site-card-category,
+  .site-category-tabs button.active,
+  .planner-builder fieldset label.selected {
+    border: 1px solid ButtonText;
+  }
+  .progress span,
+  .opportunity-progress span,
+  .composition-bar span {
+    forced-color-adjust: auto;
+  }
+}
