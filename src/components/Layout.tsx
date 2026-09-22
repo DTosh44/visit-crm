@@ -174,7 +174,7 @@ export function Layout({
             <span className="breadcrumb"><span>{data.workspace.destinationName} CRM</span><i>/</i><strong>{pageNames[view]}</strong></span>
           </div>
           <div className="topbar-right">
-            <button className="search-trigger" onClick={() => {setActiveResult(0);setSearchOpen(true)}}>
+            <button type="button" className="search-trigger" aria-haspopup="dialog" aria-expanded={searchOpen} aria-controls="crm-search-dialog" onClick={() => {setActiveResult(0);setSearchOpen(true)}}>
               <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
             </button>
             <div className="notification-wrap"><button className="icon-button notification-button" aria-label={`Notifications${notifications.length ? `, ${notifications.length} requiring attention` : ''}`} aria-expanded={notificationsOpen} aria-controls="crm-notifications" onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div id="crm-notifications" className="notification-panel" role="region" aria-label="Notifications"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div>{notifications.length>0&&<button onClick={dismissNotifications}>Mark all read</button>}<button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
