@@ -77,7 +77,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
 
           <section className="subpanel notes-card">
             <header><div><h3>Relationship notes</h3><p>Private to your destination team</p></div>{!editing && <button className="text-button" onClick={() => setEditing(true)}><Edit3 size={14} /> Edit</button>}</header>
-            {editing ? <><textarea value={draftNotes} onChange={(event) => setDraftNotes(event.target.value)} rows={5} /><div className="inline-actions"><Button variant="secondary" size="sm" onClick={() => { setDraftNotes(organisation.notes); setEditing(false) }}>Cancel</Button><Button size="sm" onClick={saveNotes}>Save notes</Button></div></> : <p className="note-copy">{organisation.notes || 'No relationship notes have been added yet.'}</p>}
+            {editing ? <><textarea aria-label="Relationship notes" value={draftNotes} onChange={(event) => setDraftNotes(event.target.value)} rows={5} /><div className="inline-actions"><Button variant="secondary" size="sm" onClick={() => { setDraftNotes(organisation.notes); setEditing(false) }}>Cancel</Button><Button size="sm" onClick={saveNotes}>Save notes</Button></div></> : <p className="note-copy">{organisation.notes || 'No relationship notes have been added yet.'}</p>}
           </section>
 
           <section className="subpanel contact-summary-card">
@@ -112,7 +112,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
             const used = benefit.kind === 'Ongoing' ? benefit.allowance : use?.used ?? 0
             const complete = used >= benefit.allowance
             return <div className="benefit-row" key={benefit.id}>
-              <button className={`benefit-check ${complete ? 'complete' : ''}`} onClick={() => benefit.kind !== 'Ongoing' && incrementBenefit(organisation.id, benefit.id, benefit.allowance)}>{complete ? <Check size={14} /> : used}</button>
+              <button type="button" className={`benefit-check ${complete ? 'complete' : ''}`} disabled={benefit.kind === 'Ongoing'} aria-label={benefit.kind === 'Ongoing' ? `${benefit.name} is an ongoing benefit` : `${complete ? 'Benefit complete:' : 'Record use of'} ${benefit.name}`} onClick={() => benefit.kind !== 'Ongoing' && incrementBenefit(organisation.id, benefit.id, benefit.allowance)}>{complete ? <Check size={14} /> : used}</button>
               <div><strong>{benefit.name}</strong><span>{benefit.category} · {benefit.kind}</span></div>
               <div className="benefit-progress"><Progress value={(used / benefit.allowance) * 100} colour={complete ? '#278362' : level?.colour} /><span>{benefit.kind === 'Ongoing' ? 'Active' : `${used} of ${benefit.allowance} used`}</span></div>
             </div>
