@@ -33,6 +33,19 @@ describe('Visit CRM', () => {
     expect(screen.getByText('5.8m')).toBeInTheDocument()
   })
 
+  it('saves a communication draft without claiming it was sent', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Communications'}))
+    expect(screen.getByText('No communications yet')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'New communication'}))
+    fireEvent.change(screen.getByLabelText('Internal name'),{target:{value:'Autumn update'}})
+    fireEvent.change(screen.getByLabelText('Subject'),{target:{value:'A destination update'}})
+    fireEvent.change(screen.getByLabelText(/Rich text content/),{target:{value:'Hello {{first_name}}'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save draft'}))
+    expect(screen.getByText('A destination update')).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+  })
+
   it('creates an automation and runs it once for a new organisation', async () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Automations'}))

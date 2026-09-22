@@ -2,10 +2,16 @@ export type PlatformCollection = keyof PlatformData
 
 export interface MemberValueEntry { id:string; organisationId:string; date:string; category:'Website'|'Marketing'|'PR'|'Travel trade'|'MICE'|'Engagement'; activity:string; quantity:number; estimatedValue:number; evidence:string }
 export interface MemberResource { id:string; title:string; category:string; description:string; url:string; membershipLevels:string[]; published:boolean; updatedAt:string }
-export interface CommunicationTemplate { id:string; name:string; category:string; subject:string; previewText:string; body:string; senderName:string; updatedAt:string }
+export interface CommunicationTemplate { id:string; name:string; category:string; subject:string; previewText:string; body:string; senderName:string; replyTo?:string; ctaLabel?:string; ctaUrl?:string; updatedAt:string }
 export interface ContactSegment { id:string; name:string; description:string; filters:Array<{field:string;operator:string;value:string}>; dynamic:boolean; contactIds?:string[]; updatedAt:string }
-export interface CommunicationRecord { id:string; name:string; templateId?:string; segmentId?:string; contactId?:string; subject:string; body:string; status:'Draft'|'Queued'|'Sent'; recipientCount:number; createdAt:string; sentAt?:string }
-export interface CommunicationPreference { id:string; contactId:string; service:boolean; marketing:boolean; trade:boolean; events:boolean; research:boolean; lawfulBasis:string; note:string }
+export type CommunicationType='Email campaign'|'Individual email'|'Member update'|'Newsletter'|'Renewal'|'Event / opportunity'
+export type CommunicationStatus='Draft'|'Scheduled'|'Sending'|'Sent'|'Failed'
+export type DeliveryStatus='Queued'|'Sent to provider'|'Delivered'|'Failed'|'Bounced'
+export interface AudienceFilter { field:string; value:string }
+export interface CommunicationAudience { filters:AudienceFilter[]; organisationIds:string[]; contactIds:string[]; mode:'all'|'selected' }
+export interface CommunicationRecipient { contactId:string; organisationId?:string; email:string; status:DeliveryStatus; providerId?:string; sentAt?:string; deliveredAt?:string; opens:number; clicks:number; bouncedAt?:string; unsubscribedAt?:string; error?:string }
+export interface CommunicationRecord { id:string; name:string; type?:CommunicationType; templateId?:string; segmentId?:string; contactId?:string; audience?:CommunicationAudience; subject:string; previewText?:string; fromName?:string; replyTo?:string; body:string; ctaLabel?:string; ctaUrl?:string; status:CommunicationStatus|'Queued'; recipientCount:number; recipients?:CommunicationRecipient[]; createdBy?:string; createdAt:string; scheduledAt?:string; sentAt?:string; error?:string; testSentAt?:string }
+export interface CommunicationPreference { id:string; contactId:string; service:boolean; marketing:boolean; trade:boolean; businessEvents?:boolean; prMedia?:boolean; events:boolean; research:boolean; preferredEmail?:string; unsubscribed?:boolean; lawfulBasis:string; note:string }
 export type AutomationTrigger = 'organisation_created'|'contact_created'|'lead_created'|'pipeline_stage_changed'|'membership_created'|'renewal_approaching'|'membership_expired'|'invoice_due'|'invoice_overdue'|'agreement_expiring'|'task_completed'|'event_created'|'opportunity_created'|'risk_changed'|'date_based'|'scheduled_recurring'
 export type AutomationField = 'membership_tier'|'organisation_type'|'area'|'pipeline_stage'|'member_status'|'membership_status'|'satisfaction_status'|'tags'|'owner'|'invoice_status'|'renewal_date'|'last_engagement_date'|'contact_preference'
 export interface AutomationCondition { field:AutomationField; operator:'equals'|'not_equals'|'contains'|'before'|'after'|'within_days'; value:string }

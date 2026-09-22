@@ -12,6 +12,7 @@ import { Avatar, Badge, Button, Drawer, Field, Modal, Progress, Tabs } from './U
 import { downloadFile, openEmail } from '../actions'
 import { TagPicker } from './TagPicker'
 import { engagementScore, usePlatform } from '../platform'
+import { useCommunicationHistory } from '../communicationHistory'
 
 type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Value & engagement' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
 
@@ -32,6 +33,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   const invoices = data.invoices.filter((item) => item.organisationId === organisation.id)
   const agreements = data.agreements.filter((item) => item.organisationId === organisation.id)
   const activities = data.activities.filter((item) => item.organisationId === organisation.id)
+  const communications=useCommunicationHistory('organisation',organisation.id,platform.communications)
   const level = data.levels.find((item) => item.name === organisation.tier)
   const primaryContact = contacts.find((item) => item.primary) ?? contacts[0]
   const isMember = organisation.status !== 'Non-member' && organisation.tier !== 'No membership'
@@ -163,6 +165,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
 
       {tab === 'Activity' && <div className="org-tab-content">
         <div className="section-heading"><div><h3>Activity history</h3><p>A complete record of key interactions and changes.</p></div><Button icon={MessageSquarePlus} size="sm" onClick={()=>{const detail=window.prompt('Note');if(detail)addActivity(organisation.id,'Note added',detail)}}>Add note</Button></div>
+        {communications.map((item)=><div className="timeline-item" key={item.id}><span className="timeline-icon email"><Mail size={15}/></span><div><header><strong>{item.subject}</strong><time>{timeAgo(item.at)}</time></header><p>Communication · {item.status}</p></div></div>)}
         <div className="timeline">{activities.map((activity) => <div className="timeline-item" key={activity.id}><span className={`timeline-icon ${activity.type}`}><CheckCircle2 size={15} /></span><div><header><strong>{activity.title}</strong><time>{timeAgo(activity.timestamp)}</time></header><p>{activity.detail}</p><small>{activity.user}</small></div></div>)}</div>
       </div>}
       {contactDraft&&<Modal title={contactDraft.isNew?'Add contact':'Edit contact'} subtitle="Contact details and communication permissions." onClose={()=>setContactDraft(null)} width="sm"><form className="form-stack" onSubmit={(event)=>{event.preventDefault();const {isNew,id,...values}=contactDraft;if(isNew)addContact(values);else updateContact(id,values);setContactDraft(null)}}><div className="form-grid two"><Field label="Name"><input required value={contactDraft.name} onChange={(e)=>setContactDraft({...contactDraft,name:e.target.value})}/></Field><Field label="Job title"><input value={contactDraft.jobTitle} onChange={(e)=>setContactDraft({...contactDraft,jobTitle:e.target.value})}/></Field><Field label="Email"><input required type="email" value={contactDraft.email} onChange={(e)=>setContactDraft({...contactDraft,email:e.target.value})}/></Field><Field label="Phone"><input value={contactDraft.phone} onChange={(e)=>setContactDraft({...contactDraft,phone:e.target.value})}/></Field></div><TagPicker label="Roles" value={contactDraft.roles} onChange={(roles)=>setContactDraft({...contactDraft,roles})} suggestions={['Primary','Membership','Marketing','Accounts','Signatory','PR','Media','Travel Trade','General']}/><TagPicker value={contactDraft.tags??[]} onChange={(tags)=>setContactDraft({...contactDraft,tags})} suggestions={Array.from(new Set(data.contacts.flatMap((person)=>person.tags??[])))}/><label className="settings-checkbox"><input type="checkbox" checked={contactDraft.primary} onChange={(e)=>setContactDraft({...contactDraft,primary:e.target.checked})}/><span><strong>Primary contact</strong><small>Use this person by default for the organisation.</small></span></label><label className="settings-checkbox"><input type="checkbox" checked={contactDraft.portalAccess} onChange={(e)=>setContactDraft({...contactDraft,portalAccess:e.target.checked})}/><span><strong>Portal access</strong><small>Allow this contact to use member services.</small></span></label><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setContactDraft(null)}>Cancel</Button><Button type="submit">Save contact</Button></div></form></Modal>}

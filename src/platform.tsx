@@ -24,7 +24,7 @@ interface PlatformContextValue{
 }
 
 const PlatformContext=createContext<PlatformContextValue|null>(null)
-function normaliseData(saved:Partial<PlatformData>):PlatformData{return{...initialPlatformData,...saved,automations:(saved.automations??[]).filter((item)=>!['auto-001','auto-002','auto-003'].includes(item.id)).map((item)=>({...item,createdAt:item.createdAt??new Date().toISOString(),owner:item.owner??'Workspace administrator',runs:item.runs??0})),automationRuns:saved.automationRuns??[],automationNotifications:saved.automationNotifications??[]}}
+function normaliseData(saved:Partial<PlatformData>):PlatformData{return{...initialPlatformData,...saved,communications:(saved.communications??[]).filter((item)=>item.id!=='comm-001').map((item)=>({...item,status:item.status==='Queued'?'Draft':item.status})),automations:(saved.automations??[]).filter((item)=>!['auto-001','auto-002','auto-003'].includes(item.id)).map((item)=>({...item,createdAt:item.createdAt??new Date().toISOString(),owner:item.owner??'Workspace administrator',runs:item.runs??0})),automationRuns:saved.automationRuns??[],automationNotifications:saved.automationNotifications??[]}}
 function readData(){try{const saved=localStorage.getItem(STORAGE_KEY)??(tenant.id==='00000000-0000-4000-8000-000000000001'?localStorage.getItem(LEGACY_STORAGE_KEY):null);return saved?normaliseData(JSON.parse(saved) as Partial<PlatformData>):initialPlatformData}catch{return initialPlatformData}}
 
 export function PlatformProvider({children}:{children:ReactNode}){
