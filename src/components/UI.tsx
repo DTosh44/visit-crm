@@ -112,7 +112,7 @@ export function Modal({ title, subtitle, onClose, children, width = 'md' }: {
       <section ref={dialogRef} tabIndex={-1} className={classNames('modal', `modal-${width}`)} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? descriptionId : undefined}>
         <header className="modal-header">
           <div><h2 id={titleId}>{title}</h2>{subtitle && <p id={descriptionId}>{subtitle}</p>}</div>
-          <button className="icon-button" onClick={onClose} aria-label={`Close ${title}`}><X size={19} /></button>
+          <button className="icon-button" onClick={onClose} aria-label="Close" title={`Close ${title}`}><X size={19} /></button>
         </header>
         <div className="modal-body">{children}</div>
       </section>
