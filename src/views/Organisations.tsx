@@ -69,7 +69,7 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
 
       <section className={`panel data-panel organisation-directory ${filtersVisible?'filters-open':'filters-closed'}`}>
         <div className="table-toolbar organisation-toolbar">
-          <div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organisations..." /></div>
+          <div className="table-search"><Search size={17} /><input type="search" aria-label="Search organisations" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search organisations..." /></div>
           <div className="organisation-toolbar-actions">
             <span className="organisation-result-count"><strong>{organisations.length}</strong> matching {organisations.length===1?'organisation':'organisations'}</span>
             <button className={`filter-visibility-button ${filtersVisible?'active':''}`} type="button" onClick={toggleFilterVisibility} aria-label={`${filtersVisible?'Hide filters':'Show filters'}${activeFilterCount>0?`, ${activeFilterCount} active`:''}`} aria-expanded={filtersVisible} aria-controls="organisation-filters"><SlidersHorizontal size={15}/>{filtersVisible?'Hide filters':'Show filters'}{activeFilterCount>0&&<em aria-hidden="true">{activeFilterCount}</em>}</button>
@@ -82,7 +82,7 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
         {organisations.length ? (
           <div className="table-scroll organisation-table-scroll" tabIndex={0} aria-label="Organisation results. Scroll to view all matching organisations.">
             <table className="data-table organisations-table">
-              <thead><tr><th className="checkbox-cell"><input type="checkbox" aria-label="Select all matching organisations" checked={selected.length === organisations.length && organisations.length > 0} onChange={toggleAll} /></th><th>Organisation</th><th>Membership</th><th>Health</th><th>Location</th><th>Renewal</th><th>Value</th><th>Owner</th><th /></tr></thead>
+              <thead><tr><th className="checkbox-cell"><input type="checkbox" aria-label="Select all matching organisations" checked={selected.length === organisations.length && organisations.length > 0} onChange={toggleAll} /></th><th>Organisation</th><th>Membership</th><th>Health</th><th>Location</th><th>Renewal</th><th>Value</th><th>Owner</th><th aria-label="Actions" /></tr></thead>
               <tbody>{organisations.map((org) => {
                 const contact = data.contacts.find((item) => item.id === org.primaryContactId)
                 return <tr key={org.id}>
