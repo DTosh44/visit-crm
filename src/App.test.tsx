@@ -568,6 +568,33 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Spring by the river')).toBeInTheDocument()
   })
 
+  it('creates a campaign plan and connects a partner, KPI and CRM task', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Campaigns'}))
+    fireEvent.click(screen.getByRole('button',{name:'New campaign'}))
+    fireEvent.change(screen.getByLabelText('Campaign name'),{target:{value:'River summer campaign'}})
+    fireEvent.change(screen.getByLabelText('Objectives'),{target:{value:'Increase summer visits'}})
+    fireEvent.change(screen.getByLabelText('Overall budget (£)'),{target:{value:'5000'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save campaign'}))
+    expect(screen.getByRole('heading',{name:'River summer campaign'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Partners'}))
+    fireEvent.change(screen.getByLabelText('Add organisation'),{target:{value:'org-001'}})
+    fireEvent.click(screen.getByRole('button',{name:'Add partner'}))
+    expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Results'}))
+    fireEvent.change(screen.getByLabelText('Target'),{target:{value:'1000'}})
+    fireEvent.click(screen.getByRole('button',{name:'Add KPI'}))
+    expect(screen.getAllByText('Website visits').length).toBeGreaterThan(1)
+    fireEvent.click(screen.getByRole('tab',{name:'Tasks'}))
+    fireEvent.change(screen.getByLabelText('Task'),{target:{value:'Prepare campaign creative'}})
+    fireEvent.click(screen.getByRole('button',{name:'Add task'}))
+    expect(screen.getByText('Prepare campaign creative')).toBeInTheDocument()
+    const savedCampaigns=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}').campaigns as Array<{name:string;partners:Array<{organisationId:string}>;kpis:Array<{metric:string}>}>
+    expect(savedCampaigns.find((item)=>item.name==='River summer campaign')).toMatchObject({partners:[{organisationId:'org-001'}],kpis:[{metric:'website_visits'}]})
+    const savedTasks=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}').tasks as Array<{title:string;campaignId?:string}>
+    expect(savedTasks.some((item)=>item.title==='Prepare campaign creative'&&Boolean(item.campaignId))).toBe(true)
+  })
+
   it('creates and edits a FAM trip with linked buyers and organisations', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Buyers, leads & FAMs'}))

@@ -235,6 +235,7 @@ export interface CRMTask {
   id: string
   title: string
   organisationId?: string
+  campaignId?: string
   dueDate: string
   dueTime?: string
   priority: TaskPriority
@@ -488,6 +489,7 @@ export interface InvoiceDraft {
 export interface TaskDraft {
   title: string
   organisationId?: string
+  campaignId?: string
   dueDate: string
   priority: TaskPriority
   category: CRMTask['category']
