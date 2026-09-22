@@ -1839,8 +1839,8 @@ button { min-width: 24px; min-height: 24px; }
 .map-promo-visual i { position: absolute; z-index: 2; width: 38px; height: 38px; display: grid; place-items: center; color: #fff; border: 3px solid #fff; border-radius: 50% 50% 50% 5px; background: var(--tenant-primary); box-shadow: 0 6px 18px rgba(48,29,39,.25); transform: rotate(-45deg); }
 .map-promo-visual i svg { transform: rotate(45deg); }
 .public-map-page { padding-block: 40px 100px; }
-.interactive-map { position: relative; min-height: 660px; display: grid; grid-template-columns: 360px minmax(0,1fr); overflow: hidden; border: 1px solid #ddd5d0; border-radius: 12px; background: #f5f0eb; box-shadow: 0 22px 50px rgba(46,31,38,.1); }
-.map-results-panel { z-index: 3; min-width: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #e3dcd8; background: #fff; }
+.interactive-map { position: relative; height: 660px; min-height: 0; display: grid; grid-template-columns: 360px minmax(0,1fr); overflow: hidden; border: 1px solid #ddd5d0; border-radius: 12px; background: #f5f0eb; box-shadow: 0 22px 50px rgba(46,31,38,.1); }
+.map-results-panel { z-index: 3; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid #e3dcd8; background: #fff; }
 .map-results-panel > header { display: flex; align-items: flex-start; justify-content: space-between; padding: 24px 22px 14px; }
 .map-results-panel > header h2 { margin: 3px 0 0; font-family: Georgia,serif; font-size: 29px; font-weight: 400; }
 .map-results-panel > header > button { padding: 5px; color: #786d73; border: 0; background: transparent; }
@@ -1851,7 +1851,10 @@ button { min-width: 24px; min-height: 24px; }
 .map-kind-filters button { padding: 7px 10px; color: #70646a; border: 1px solid #ddd4d0; border-radius: 20px; background: #fff; font-size: 10px; font-weight: 700; }
 .map-kind-filters button.active { color: #fff; border-color: var(--tenant-primary); background: var(--tenant-primary); }
 .map-result-count { padding: 10px 20px; color: #8a7e83; border-block: 1px solid #eee8e4; background: #faf8f6; font-size: 10px; font-weight: 750; letter-spacing: .3px; text-transform: uppercase; }
-.map-result-list { overflow-y: auto; }
+.map-result-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: rgba(109,41,79,.35) transparent; scrollbar-width: thin; }
+.map-result-list::-webkit-scrollbar { width: 8px; }
+.map-result-list::-webkit-scrollbar-track { background: transparent; }
+.map-result-list::-webkit-scrollbar-thumb { border: 2px solid #fff; border-radius: 8px; background: rgba(109,41,79,.35); }
 .map-result-list > button { width: 100%; display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 12px; padding: 12px 16px; color: var(--tenant-ink); border: 0; border-bottom: 1px solid #eee8e4; background: #fff; text-align: left; }
 .map-result-list > button:hover,.map-result-list > button.active { background: #f8f3f5; }
 .map-result-list img { width: 76px; height: 66px; object-fit: cover; border-radius: 5px; }
@@ -1895,7 +1898,7 @@ button { min-width: 24px; min-height: 24px; }
 .map-status-stack span.featured { color: #9a6719; }
 .event-row-actions .icon-button.active { color: #a66b14; background: #fff4d8; }
 .map-admin-preview { margin-top: 16px; padding: 12px; }
-.map-admin-preview .interactive-map { min-height: 610px; }
+.map-admin-preview .interactive-map { height: 610px; }
 .map-product-setup { margin-top: 16px; overflow: hidden; }
 .map-product-setup > header { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px; border-bottom: 1px solid var(--border); }
 .map-product-setup > header > div,.map-product-setup > header span { display: flex; align-items: center; gap: 11px; }
@@ -1939,7 +1942,7 @@ button { min-width: 24px; min-height: 24px; }
   .site-map-promo > .site-container { grid-template-columns: 1fr; }
   .map-promo-visual { min-height: 330px; }
   .public-map-page { padding: 20px 14px 70px; }
-  .interactive-map { min-height: 820px; grid-template-columns: 1fr; grid-template-rows: 365px minmax(0,1fr); }
+  .interactive-map { height: 720px; min-height: 0; grid-template-columns: 1fr; grid-template-rows: 320px minmax(0,1fr); }
   .map-results-panel { border-right: 0; border-bottom: 1px solid #e3dcd8; }
   .interactive-map:not(.list-open) { grid-template-rows: 0 minmax(0,1fr); }
   .interactive-map:not(.list-open) .map-results-panel { visibility: hidden; }
