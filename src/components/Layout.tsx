@@ -144,7 +144,7 @@ export function Layout({
             <div className="nav-group" key={group.label}>
               <span className="nav-label">{group.label}</span>
               {group.items.filter((item) => (item.key==='insights' ? features.reviewIntelligence||features.socialInsights : !item.feature || features[item.feature]) && canAccessView(user?.role, item.key)).map(({ key, label, icon: Icon }) => (
-                <button type="button" key={key} className={classNames('nav-item', view === key && 'active')} aria-current={view === key ? 'page' : undefined} onClick={() => navigate(key)}>
+                <button type="button" key={key} className={classNames('nav-item', view === key && 'active')} aria-current={view === key ? 'page' : undefined} onClick={() => { navigate(key); setSidebarOpen(false) }}>
                   <Icon size={18} strokeWidth={1.9} />
                   <span>{label}</span>
                   {key === 'tasks' && <em>{data.tasks.filter((task) => !task.completed).length}</em>}
