@@ -648,6 +648,42 @@ describe('Visit CRM', () => {
     expect(screen.getByText('castle and dinner.')).toBeInTheDocument()
   })
 
+  it('creates a trade profile using shared organisation and contact records', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Buyers, leads & FAMs'}))
+    fireEvent.click(screen.getByRole('button',{name:'New trade profile'}))
+    fireEvent.change(screen.getByLabelText('Trade organisation name'),{target:{value:'North Coast Tours'}})
+    fireEvent.change(screen.getByLabelText('Primary contact'),{target:{value:'Jordan Reed'}})
+    fireEvent.change(screen.getByLabelText('Primary contact email'),{target:{value:'jordan@example.com'}})
+    fireEvent.change(screen.getByLabelText(/Markets \/ countries/),{target:{value:'Germany, Netherlands'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save trade profile'}))
+    expect(screen.getByRole('heading',{name:'North Coast Tours'})).toBeInTheDocument()
+    const crm=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}') as typeof initialData
+    const platform=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}') as typeof initialPlatformData
+    const org=crm.organisations.find((item)=>item.name==='North Coast Tours')!
+    expect(org.tags).toContain('Travel Trade')
+    expect(crm.contacts.find((item)=>item.organisationId===org.id)?.tags).toContain('Travel Trade')
+    expect(platform.travelBuyers.find((item)=>item.company==='North Coast Tours')).toMatchObject({organisationId:org.id,sourceMarkets:['Germany','Netherlands']})
+  })
+
+  it('requires an evidenced outcome before counting a trade lead conversion', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Buyers, leads & FAMs'}))
+    fireEvent.click(screen.getByRole('tab',{name:'Leads'}))
+    fireEvent.click(screen.getByRole('button',{name:'Edit / distribute'}))
+    fireEvent.change(screen.getByLabelText('Stage'),{target:{value:'Converted'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save trade lead'}))
+    expect(screen.getAllByRole('alert')[0]).toHaveTextContent('Record an outcome and conversion date')
+    fireEvent.change(screen.getAllByLabelText('Shared date')[0],{target:{value:'2026-09-20'}})
+    fireEvent.change(screen.getAllByLabelText('Response')[0],{target:{value:'Converted'}})
+    fireEvent.change(screen.getByLabelText('Outcome'),{target:{value:'Confirmed group booking'}})
+    fireEvent.change(screen.getByLabelText('Conversion date'),{target:{value:'2026-09-21'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save trade lead'}))
+    const platform=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}') as typeof initialPlatformData
+    expect(platform.tradeLeads[0]).toMatchObject({stage:'Converted',convertedAt:'2026-09-21',outcome:'Confirmed group booking'})
+    expect(screen.getAllByText('Recorded conversions').length).toBeGreaterThan(0)
+  })
+
   it('records transparent estimated member value', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Member Value'}))

@@ -9,6 +9,7 @@ import type { CRMData } from './types'
 import { applyAutomationActions, detectAutomationEvents, matchesAutomationConditions, nextRunFor, scheduledAutomationEvents, type AutomationEvent } from './automationEngine'
 import { normaliseCampaign } from './campaignModel'
 import { normaliseOpportunity } from './opportunityModel'
+import { normaliseBuyer, normaliseTradeLead } from './travelTradeModel'
 
 const STORAGE_KEY=`visitmade-platform-v2-${tenant.id}`
 const LEGACY_STORAGE_KEY='visitmade-platform-v1'
@@ -27,7 +28,7 @@ interface PlatformContextValue{
 
 const PlatformContext=createContext<PlatformContextValue|null>(null)
 const legacyDemoValues:Record<string,string>={'value-001':'Autumn newsletter feature','value-002':'Outbound website referrals','value-003':'Weekend travel article inclusion','value-004':'German group buyer introduction'}
-function normaliseData(saved:Partial<PlatformData>):PlatformData{return{...initialPlatformData,...saved,memberValue:(saved.memberValue??[]).filter((item)=>item.activity!==legacyDemoValues[item.id]),campaigns:(saved.campaigns??initialPlatformData.campaigns).map(normaliseCampaign),memberOpportunities:(saved.memberOpportunities??initialPlatformData.memberOpportunities).map(normaliseOpportunity),communications:(saved.communications??[]).filter((item)=>item.id!=='comm-001').map((item)=>({...item,status:item.status==='Queued'?'Draft':item.status})),automations:(saved.automations??[]).filter((item)=>!['auto-001','auto-002','auto-003'].includes(item.id)).map((item)=>({...item,createdAt:item.createdAt??new Date().toISOString(),owner:item.owner??'Workspace administrator',runs:item.runs??0})),automationRuns:saved.automationRuns??[],automationNotifications:saved.automationNotifications??[]}}
+function normaliseData(saved:Partial<PlatformData>):PlatformData{return{...initialPlatformData,...saved,memberValue:(saved.memberValue??[]).filter((item)=>item.activity!==legacyDemoValues[item.id]),campaigns:(saved.campaigns??initialPlatformData.campaigns).map(normaliseCampaign),memberOpportunities:(saved.memberOpportunities??initialPlatformData.memberOpportunities).map(normaliseOpportunity),travelBuyers:(saved.travelBuyers??initialPlatformData.travelBuyers).map(normaliseBuyer),tradeLeads:(saved.tradeLeads??initialPlatformData.tradeLeads).map(normaliseTradeLead),tradeActivities:saved.tradeActivities??[],communications:(saved.communications??[]).filter((item)=>item.id!=='comm-001').map((item)=>({...item,status:item.status==='Queued'?'Draft':item.status})),automations:(saved.automations??[]).filter((item)=>!['auto-001','auto-002','auto-003'].includes(item.id)).map((item)=>({...item,createdAt:item.createdAt??new Date().toISOString(),owner:item.owner??'Workspace administrator',runs:item.runs??0})),automationRuns:saved.automationRuns??[],automationNotifications:saved.automationNotifications??[]}}
 function readData(){try{const saved=localStorage.getItem(STORAGE_KEY)??(tenant.id==='00000000-0000-4000-8000-000000000001'?localStorage.getItem(LEGACY_STORAGE_KEY):null);return saved?normaliseData(JSON.parse(saved) as Partial<PlatformData>):initialPlatformData}catch{return initialPlatformData}}
 
 export function PlatformProvider({children}:{children:ReactNode}){

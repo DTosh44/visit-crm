@@ -13,7 +13,8 @@ describe('member value calculations',()=>{
     expect(membershipPeriod(org,-1)).toEqual({start:'2024-10-01',end:'2025-09-30'})
   })
   it('links benefits, campaigns, FAMs and media to source records without inventing revenue',()=>{
-    const rows=memberValueRows(initialData,initialPlatformData)
+    const completed={...initialPlatformData,famTrips:initialPlatformData.famTrips.map((trip)=>({...trip,startDate:'2026-05-01',endDate:'2026-05-03',outcome:'Buyers attended and received product information.'}))}
+    const rows=memberValueRows(initialData,completed)
     expect(rows.find((item)=>item.benefitId)?.source).toBe('Membership benefit usage')
     expect(rows.find((item)=>item.campaignId)?.source).toBe('Campaign participation')
     expect(rows.find((item)=>item.id==='fam-fam-001-org-001')?.estimatedValue).toBe(0)

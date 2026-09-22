@@ -20,7 +20,7 @@ function LinkSelector({label,options,selected,onChange}:{label:string;options:Ar
 export function FamTripEditor({trip,onClose,onSave}:{trip?:FamTrip;onClose:()=>void;onSave:(trip:FamTrip)=>void}){
   const {data:crm}=useCRM()
   const {data:platform}=usePlatform()
-  const [draft,setDraft]=useState<FamTrip>(()=>trip??{id:makePlatformId('fam'),title:'',startDate:'',endDate:'',targetMarket:'',buyerIds:[],organisationIds:[],listingIds:[],itinerary:'',dietary:'',accessibility:'',cost:0,feedback:'',followUp:''})
+  const [draft,setDraft]=useState<FamTrip>(()=>trip??{id:makePlatformId('fam'),title:'',startDate:'',endDate:'',targetMarket:'',buyerIds:[],mediaProfileIds:[],organisationIds:[],listingIds:[],itinerary:'',dietary:'',accessibility:'',cost:0,notes:'',outcome:'',feedback:'',followUp:''})
   const [dateError,setDateError]=useState('')
   const update=<K extends keyof FamTrip>(key:K,value:FamTrip[K])=>setDraft((current)=>({...current,[key]:value}))
   const submit=(event:FormEvent)=>{event.preventDefault();if(draft.endDate<draft.startDate){setDateError('The end date must be on or after the start date.');return}onSave({...draft,title:draft.title.trim(),targetMarket:draft.targetMarket.trim(),itinerary:draft.itinerary.trim()})}
@@ -37,14 +37,18 @@ export function FamTripEditor({trip,onClose,onSave}:{trip?:FamTrip;onClose:()=>v
         <Field label="Cost (£)"><input type="number" min="0" step="0.01" value={draft.cost} onChange={(event)=>update('cost',Number(event.target.value))}/></Field>
       </div>
       <LinkSelector label="Buyers" options={platform.travelBuyers.map((item)=>({id:item.id,name:`${item.company} · ${item.contact}`}))} selected={draft.buyerIds} onChange={(ids)=>update('buyerIds',ids)}/>
+      <LinkSelector label="Journalists and media" options={platform.mediaProfiles.map((item)=>({id:item.id,name:`${item.name} · ${item.outlet}`}))} selected={draft.mediaProfileIds??[]} onChange={(ids)=>update('mediaProfileIds',ids)}/>
       <LinkSelector label="Participating members" options={crm.organisations.filter((item)=>['Active','Renewing'].includes(item.status)||draft.organisationIds.includes(item.id)).map((item)=>({id:item.id,name:item.name}))} selected={draft.organisationIds} onChange={(ids)=>update('organisationIds',ids)}/>
       <LinkSelector label="Places and venues" options={crm.listings.map((item)=>({id:item.id,name:item.name}))} selected={draft.listingIds} onChange={(ids)=>update('listingIds',ids)}/>
+      <Field label="Related member opportunity"><select value={draft.memberOpportunityId??''} onChange={(event)=>update('memberOpportunityId',event.target.value||undefined)}><option value="">None</option>{platform.memberOpportunities.filter((item)=>['Familiarisation visit','Travel trade activity','Trade show'].includes(item.type??item.category)||item.id===draft.memberOpportunityId).map((item)=><option key={item.id} value={item.id}>{item.title}</option>)}</select></Field>
       <Field label="Itinerary"><textarea required rows={6} value={draft.itinerary} onChange={(event)=>update('itinerary',event.target.value)} placeholder="Day 1: arrivals and welcome…"/></Field>
       <div className="form-grid two">
         <Field label="Dietary requirements"><textarea rows={3} value={draft.dietary} onChange={(event)=>update('dietary',event.target.value)}/></Field>
         <Field label="Accessibility requirements"><textarea rows={3} value={draft.accessibility} onChange={(event)=>update('accessibility',event.target.value)}/></Field>
       </div>
       <Field label="Feedback"><textarea rows={3} value={draft.feedback} onChange={(event)=>update('feedback',event.target.value)}/></Field>
+      <Field label="Internal notes"><textarea rows={3} value={draft.notes??''} onChange={(event)=>update('notes',event.target.value)}/></Field>
+      <Field label="Recorded outcome"><textarea rows={3} value={draft.outcome??''} onChange={(event)=>update('outcome',event.target.value)}/></Field>
       <Field label="Follow-up"><textarea rows={3} value={draft.followUp} onChange={(event)=>update('followUp',event.target.value)}/></Field>
       <div className="modal-actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">{trip?'Save FAM trip':'Create FAM trip'}</Button></div>
     </form>
