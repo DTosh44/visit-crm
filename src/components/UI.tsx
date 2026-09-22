@@ -1,5 +1,5 @@
 import { X, type LucideIcon } from 'lucide-react'
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { classNames, initials } from '../utils'
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -58,6 +58,7 @@ export function Button({
   icon: Icon,
   children,
   className,
+  type = 'button',
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -65,7 +66,7 @@ export function Button({
   icon?: LucideIcon
 }) {
   return (
-    <button className={classNames('button', `button-${variant}`, `button-${size}`, className)} {...props}>
+    <button type={type} className={classNames('button', `button-${variant}`, `button-${size}`, className)} {...props}>
       {Icon && <Icon size={size === 'sm' ? 15 : 17} strokeWidth={2} />}
       {children}
     </button>
@@ -82,16 +83,16 @@ const toneByLabel: Record<string, string> = {
 
 export function Badge({ children, tone, dot = false }: { children: ReactNode; tone?: string; dot?: boolean }) {
   const label = String(children)
-  return <span className={classNames('badge', `badge-${tone ?? toneByLabel[label] ?? 'grey'}`)}>{dot && <i />}{children}</span>
+  return <span className={classNames('badge', `badge-${tone ?? toneByLabel[label] ?? 'grey'}`)}>{dot && <i aria-hidden="true" />}{children}</span>
 }
 
 export function Avatar({ name, colour, size = 'md' }: { name: string; colour?: string; size?: 'sm' | 'md' | 'lg' }) {
-  return <span className={classNames('avatar', `avatar-${size}`)} style={{ '--avatar-colour': colour ?? '#365c7d' } as React.CSSProperties}>{initials(name)}</span>
+  return <span aria-hidden="true" className={classNames('avatar', `avatar-${size}`)} style={{ '--avatar-colour': colour ?? '#365c7d' } as React.CSSProperties}>{initials(name)}</span>
 }
 
 export function Progress({ value, colour }: { value: number; colour?: string }) {
   return (
-    <div className="progress" role="progressbar" aria-label="Completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, value))}>
+    <div className="progress" role="progressbar" aria-label="Completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, value))} aria-valuetext={`${Math.max(0, Math.min(100, value))}% complete`}>
       <span style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: colour }} />
     </div>
   )
@@ -179,5 +180,17 @@ export function StatDelta({ value, label, positive = true }: { value: string; la
 }
 
 export function Tabs<T extends string>({ items, active, onChange }: { items: T[]; active: T; onChange: (item: T) => void }) {
-  return <div className="tabs" role="tablist" aria-label="Sections">{items.map((item) => <button key={item} type="button" role="tab" aria-selected={active === item} className={active === item ? 'active' : ''} onClick={() => onChange(item)}>{item}</button>)}</div>
+  const moveFocus = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') nextIndex = (index + 1) % items.length
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') nextIndex = (index - 1 + items.length) % items.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = items.length - 1
+    else return
+    event.preventDefault()
+    onChange(items[nextIndex])
+    const tabs = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    window.setTimeout(() => tabs?.[nextIndex]?.focus(), 0)
+  }
+  return <div className="tabs" role="tablist" aria-label="Sections">{items.map((item,index) => <button key={item} type="button" role="tab" aria-selected={active === item} tabIndex={active === item ? 0 : -1} className={active === item ? 'active' : ''} onKeyDown={(event)=>moveFocus(event,index)} onClick={() => onChange(item)}>{item}</button>)}</div>
 }
