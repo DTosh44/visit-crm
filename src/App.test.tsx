@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { CRMProvider } from './store'
@@ -77,6 +77,26 @@ describe('Visit CRM', () => {
     fireEvent.click(screen.getByRole('button',{name:'Create organisation'}))
     expect(screen.getByRole('button',{name:'Valechester PR Collective'})).toBeInTheDocument()
     expect(screen.getAllByText('Non-member').length).toBeGreaterThan(0)
+  })
+
+  it('offers CRM-wide record types from Add new', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Add new'}))
+    const menu=within(screen.getByRole('region',{name:'Quick create'}))
+    for(const name of ['Organisation','Person','Opportunity','Task','Membership level','Invoice','Agreement','Listing','Event','Guide, itinerary or trail','Website page','Image','A/B test'])expect(menu.getByRole('button',{name:new RegExp(`^${name}`)})).toBeInTheDocument()
+    fireEvent.click(menu.getByRole('button',{name:/^Person/}))
+    expect(screen.getByRole('heading',{name:'People'})).toBeInTheDocument()
+    expect(screen.getByRole('heading',{name:'Add person'})).toBeInTheDocument()
+  })
+
+  it('searches records across the whole CRM', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:/Search the CRM/}))
+    const search=screen.getByLabelText('Search the whole CRM')
+    fireEvent.change(search,{target:{value:'VV-2026-1048'}})
+    expect(screen.getByRole('button',{name:/VV-2026-1048.*Invoice/})).toBeInTheDocument()
+    fireEvent.change(search,{target:{value:'Amelia Grant'}})
+    expect(screen.getByRole('button',{name:/Amelia Grant.*Person/})).toBeInTheDocument()
   })
 
   it('provides a searchable rights-managed image bank', () => {

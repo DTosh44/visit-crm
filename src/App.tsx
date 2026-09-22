@@ -4,7 +4,7 @@ import { AddOrganisationModal, AddTaskModal, CreateInvoiceModal } from './compon
 import { ListingEditor } from './components/ListingEditor'
 import { OrganisationDrawer } from './components/OrganisationDrawer'
 import { useCRM } from './store'
-import type { Listing, Organisation, ViewKey } from './types'
+import type { CreateTarget, Listing, Organisation, ViewKey } from './types'
 import { Agreements } from './views/Agreements'
 import { Billing } from './views/Billing'
 import { Dashboard } from './views/Dashboard'
@@ -47,6 +47,7 @@ function CRMApp() {
   const [selectedOrganisationId, setSelectedOrganisationId] = useState<string | null>(null)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
   const [modal, setModal] = useState<'organisation' | 'invoice' | 'task' | null>(null)
+  const [createRequest,setCreateRequest]=useState<{target:CreateTarget;token:number}|null>(null)
 
   useEffect(() => {
     const handleHash = () => setViewState(initialView())
@@ -55,6 +56,7 @@ function CRMApp() {
   }, [])
 
   const setView = (next: ViewKey) => {
+    setCreateRequest(null)
     window.location.hash = `/${next}`
     setViewState(next)
   }
@@ -73,32 +75,37 @@ function CRMApp() {
   }
   const selectedOrganisation = data.organisations.find((item) => item.id === selectedOrganisationId)
   const selectedListing = data.listings.find((item) => item.id === selectedListingId)
+  const requestCreate=(target:CreateTarget)=>{
+    if(target==='organisation'||target==='invoice'||target==='task'){setCreateRequest(null);setModal(target);return}
+    const destinations:Record<Exclude<CreateTarget,'organisation'|'invoice'|'task'>,ViewKey>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',experiment:'experiments',agreement:'agreements'}
+    setView(destinations[target])
+    setCreateRequest({target,token:Date.now()})
+  }
 
   return (
     <Layout
       view={activeView}
       setView={setView}
-      onAddOrganisation={() => setModal('organisation')}
-      onAddInvoice={() => setModal('invoice')}
-      onAddTask={() => setModal('task')}
+      onCreate={requestCreate}
       onOpenOrganisation={openOrganisation}
+      onOpenListing={openListing}
     >
       {activeView === 'dashboard' && <Dashboard navigate={setView} openOrganisation={openOrganisation} />}
       {activeView === 'organisations' && <Organisations onAdd={() => setModal('organisation')} onOpen={openOrganisation} />}
-      {activeView === 'people' && <People />}
-      {activeView === 'pipeline' && <Pipeline />}
-      {activeView === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
-      {activeView === 'listings' && <Listings onEdit={openListing} />}
-      {activeView === 'events' && <Events />}
-      {activeView === 'pages' && <WebsitePages />}
-      {activeView === 'images' && <ImageBank />}
-      {activeView === 'experiments' && <WebsiteExperiments />}
+      {activeView === 'people' && <People key={createRequest?.target==='person'?createRequest.token:0} createRequest={createRequest?.target==='person'?createRequest.token:0} />}
+      {activeView === 'pipeline' && <Pipeline key={createRequest?.target==='opportunity'?createRequest.token:0} createRequest={createRequest?.target==='opportunity'?createRequest.token:0} />}
+      {activeView === 'memberships' && <Memberships key={createRequest?.target==='membership'?createRequest.token:0} openOrganisation={openOrganisation} createRequest={createRequest?.target==='membership'?createRequest.token:0} />}
+      {activeView === 'listings' && <Listings key={createRequest?.target==='listing'?createRequest.token:0} onEdit={openListing} createRequest={createRequest?.target==='listing'?createRequest.token:0} />}
+      {activeView === 'events' && <Events key={createRequest?.target==='event'?createRequest.token:0} createRequest={createRequest?.target==='event'?createRequest.token:0} />}
+      {activeView === 'pages' && <WebsitePages key={createRequest?.target==='page'?createRequest.token:0} createRequest={createRequest?.target==='page'?createRequest.token:0} />}
+      {activeView === 'images' && <ImageBank key={createRequest?.target==='image'?createRequest.token:0} createRequest={createRequest?.target==='image'?createRequest.token:0} />}
+      {activeView === 'experiments' && <WebsiteExperiments key={createRequest?.target==='experiment'?createRequest.token:0} createRequest={createRequest?.target==='experiment'?createRequest.token:0} />}
       {activeView === 'map' && <MapProduct />}
-      {activeView === 'content' && <Content />}
+      {activeView === 'content' && <Content key={createRequest?.target==='content'?createRequest.token:0} createRequest={createRequest?.target==='content'?createRequest.token:0} />}
       {activeView === 'inbox' && <Inbox />}
       {activeView === 'insights' && <Insights />}
       {activeView === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
-      {activeView === 'agreements' && <Agreements />}
+      {activeView === 'agreements' && <Agreements key={createRequest?.target==='agreement'?createRequest.token:0} createRequest={createRequest?.target==='agreement'?createRequest.token:0} />}
       {activeView === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
       {activeView === 'settings' && <Settings />}
 

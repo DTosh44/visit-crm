@@ -6,12 +6,12 @@ import { formatDate } from '../utils'
 import { imageLibrary } from '../siteData'
 import { Badge, Button, Field, Modal, PageHeader, Progress } from '../components/UI'
 
-export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
+export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing) => void;createRequest?:number }) {
   const { data, publishListing, unpublishListing, duplicateListing, deleteListing, createListing } = useCRM()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All statuses')
   const [layout, setLayout] = useState<'grid' | 'list'>('grid')
-  const [adding,setAdding]=useState(false)
+  const [adding,setAdding]=useState(Boolean(createRequest))
   const [newListing,setNewListing]=useState({organisationId:data.organisations[0]?.id??'',name:''})
   const listings = useMemo(() => data.listings.filter((listing) => {
     const org = data.organisations.find((item) => item.id === listing.organisationId)

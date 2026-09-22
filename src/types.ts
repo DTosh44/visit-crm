@@ -18,6 +18,8 @@ export type ViewKey =
   | 'tasks'
   | 'settings'
 
+export type CreateTarget = 'organisation' | 'person' | 'opportunity' | 'membership' | 'listing' | 'event' | 'content' | 'page' | 'image' | 'experiment' | 'invoice' | 'agreement' | 'task'
+
 export type Health = 'Happy' | 'OK' | 'Needs attention'
 export type MembershipStatus = 'Active' | 'Renewing' | 'Prospect' | 'Free listing' | 'Lapsed' | 'Non-member'
 export type ListingStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'

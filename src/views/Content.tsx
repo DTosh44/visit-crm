@@ -8,9 +8,9 @@ import { imageLibrary } from '../siteData'
 type PageDraft = Omit<ContentPage,'id'|'updatedAt'>
 const blank:PageDraft={type:'Guide',title:'',slug:'',summary:'',body:'',image:'hero',status:'Draft',metaTitle:'',metaDescription:'',version:0}
 
-export function Content(){
+export function Content({createRequest=0}:{createRequest?:number}){
   const {data,createContentPage,updateContentPage,publishContentPage,discardContentDraft,deleteContentPage}=useCRM()
-  const [query,setQuery]=useState('');const [type,setType]=useState('All');const [editing,setEditing]=useState<ContentPage|PageDraft|null>(null);const [error,setError]=useState('')
+  const [query,setQuery]=useState('');const [type,setType]=useState('All');const [editing,setEditing]=useState<ContentPage|PageDraft|null>(createRequest?{...blank}:null);const [error,setError]=useState('')
   const pages=useMemo(()=>data.contentPages.filter((page)=>(type==='All'||page.type===type)&&(!query||[page.title,page.summary,page.slug].join(' ').toLowerCase().includes(query.toLowerCase()))),[data.contentPages,query,type])
   const save=(event:FormEvent)=>{event.preventDefault();if(!editing)return;const duplicate=data.contentPages.some((page)=>page.slug===editing.slug&&(!('id'in editing)||page.id!==editing.id));if(duplicate){setError('That URL slug is already in use. Choose a unique slug.');return}if('id'in editing)updateContentPage(editing.id,editing);else createContentPage(editing);setEditing(null);setError('')}
   const duplicate=(page:ContentPage)=>{const copy:PageDraft={type:page.type,title:`${page.title} copy`,slug:`${page.slug}-copy-${Date.now().toString().slice(-4)}`,summary:page.summary,body:page.body,image:page.image,status:'Draft',metaTitle:page.metaTitle,metaDescription:page.metaDescription,version:0};const created=createContentPage(copy);setEditing(created)}

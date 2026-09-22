@@ -54,9 +54,9 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
   </form></div>
 }
 
-export function Events() {
+export function Events({createRequest=0}:{createRequest?:number}) {
   const { data, publishEvent, deleteEvent } = useCRM()
-  const [query,setQuery]=useState(''); const [status,setStatus]=useState('All'); const [editing,setEditing]=useState<DestinationEvent|null|undefined>(undefined)
+  const [query,setQuery]=useState(''); const [status,setStatus]=useState('All'); const [editing,setEditing]=useState<DestinationEvent|null|undefined>(createRequest?null:undefined)
   const filtered=useMemo(()=>data.events.filter((event)=>{
     const matchesQuery=!query.trim()||[event.title,event.category,event.venueName,event.town,event.submittedBy].join(' ').toLowerCase().includes(query.toLowerCase())
     return matchesQuery&&(status==='All'||event.status===status)

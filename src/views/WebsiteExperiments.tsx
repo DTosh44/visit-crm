@@ -6,9 +6,9 @@ import type { WebsiteExperiment, WebsiteExperimentGoal, WebsiteExperimentVariant
 
 const goalLabels:Record<WebsiteExperimentGoal,string>={page_view:'Page view',cta_click:'CTA click',form_submit:'Form submission',booking_completed:'Booking completed'}
 
-export function WebsiteExperiments(){
+export function WebsiteExperiments({createRequest=0}:{createRequest?:number}){
   const {data,createWebsiteExperiment,updateWebsiteExperiment,deleteWebsiteExperiment}=useCRM()
-  const [creating,setCreating]=useState(false)
+  const [creating,setCreating]=useState(Boolean(createRequest))
   const start=(experiment:WebsiteExperiment)=>updateWebsiteExperiment(experiment.id,{status:'Running',startedAt:experiment.startedAt??new Date().toISOString(),endedAt:undefined})
   const changeStatus=(experiment:WebsiteExperiment,status:WebsiteExperiment['status'])=>updateWebsiteExperiment(experiment.id,{status,...(status==='Completed'?{endedAt:new Date().toISOString()}: {})})
   return <div><PageHeader eyebrow="Website" title="A/B testing" description="Test website messages safely, split traffic consistently and measure consented conversion events." actions={<Button icon={Plus} onClick={()=>setCreating(true)}>Create experiment</Button>}/><section className="experiment-guide"><Beaker size={21}/><div><strong>Experiments never change a CMS draft.</strong><p>A running test overlays its variant on the published page. Pause or complete it to return every visitor to the published control.</p></div></section><div className="experiment-list">{data.websiteExperiments.map((experiment)=>{

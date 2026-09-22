@@ -10,12 +10,12 @@ const roleSuggestions=['Primary','Membership','Marketing','Accounts','Signatory'
 const tagSuggestions=['National media','Regional media','Trade media','Press trip','Tour operator','Coach operator','Groups','UK inbound','International','Agency','Media relations','Campaign partner','Family travel','Luxury travel','Accessible travel','Food & drink','Culture','Outdoors','Instagram','LinkedIn','Newsletter']
 const emptyPerson:Contact={id:'',organisationId:'',name:'',jobTitle:'',email:'',phone:'',roles:['General'],tags:[],primary:false,portalAccess:false}
 
-export function People(){
+export function People({createRequest=0}:{createRequest?:number}){
   const {data,addContact,updateContact,deleteContact}=useCRM()
   const [query,setQuery]=useState('')
   const [tag,setTag]=useState('All tags')
   const [affiliation,setAffiliation]=useState<'All people'|'Organisation contacts'|'Independent contacts'>('All people')
-  const [editing,setEditing]=useState<Contact|null>(null)
+  const [editing,setEditing]=useState<Contact|null>(createRequest?{...emptyPerson}:null)
   const allTags=useMemo(()=>Array.from(new Set(data.contacts.flatMap((person)=>person.tags??[]))).sort(),[data.contacts])
   const people=useMemo(()=>data.contacts.filter((person)=>{const organisation=data.organisations.find((item)=>item.id===person.organisationId);const matchesSearch=!query||[person.name,person.jobTitle,person.email,organisation?.name,...person.roles,...(person.tags??[])].join(' ').toLowerCase().includes(query.toLowerCase());const matchesTag=tag==='All tags'||person.tags?.includes(tag);const linked=Boolean(organisation);const matchesAffiliation=affiliation==='All people'||(affiliation==='Organisation contacts'?linked:!linked);return matchesSearch&&matchesTag&&matchesAffiliation}).sort((a,b)=>a.name.localeCompare(b.name)),[affiliation,data.contacts,data.organisations,query,tag])
   const linkedCount=data.contacts.filter((person)=>data.organisations.some((organisation)=>organisation.id===person.organisationId)).length

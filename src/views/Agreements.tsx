@@ -5,11 +5,11 @@ import { formatDate } from '../utils'
 import { Avatar, Badge, Button, Drawer, Field, Modal, PageHeader } from '../components/UI'
 import { downloadFile, openEmail } from '../actions'
 
-export function Agreements() {
+export function Agreements({createRequest=0}:{createRequest?:number}) {
   const { data, createAgreement, updateAgreement, deleteAgreement } = useCRM()
   const [query, setQuery] = useState('')
   const [status,setStatus]=useState('All statuses')
-  const [adding,setAdding]=useState(false)
+  const [adding,setAdding]=useState(Boolean(createRequest))
   const firstOrg=data.organisations[0]
   const [draft,setDraft]=useState({organisationId:firstOrg?.id??'',membershipLevel:firstOrg?.tier??data.levels[0]?.name??'',signatory:'',signatoryEmail:'',status:'Draft' as const,validUntil:new Date(new Date().setFullYear(new Date().getFullYear()+1)).toISOString().slice(0,10)})
   const [selected, setSelected] = useState<string | null>(null)

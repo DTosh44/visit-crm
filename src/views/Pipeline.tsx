@@ -8,11 +8,11 @@ import { Avatar, Badge, Button, Field, Modal, PageHeader } from '../components/U
 const stages: PipelineStage[] = ['New lead', 'Qualified', 'Proposal', 'Decision', 'Won']
 const stageColours: Record<PipelineStage, string> = { 'New lead': '#6b7788', Qualified: '#3773b9', Proposal: '#6858ce', Decision: '#d28d30', Won: '#278362' }
 
-export function Pipeline() {
+export function Pipeline({createRequest=0}:{createRequest?:number}) {
   const { data, moveOpportunity, addOpportunity, updateOpportunity, deleteOpportunity } = useCRM()
   const [query, setQuery] = useState('')
   const [dragOver, setDragOver] = useState<PipelineStage | null>(null)
-  const [adding,setAdding]=useState(false)
+  const [adding,setAdding]=useState(Boolean(createRequest))
   const [editingId,setEditingId]=useState<string|null>(null)
   const [draft,setDraft]=useState({organisationName:'',contactName:'',stage:'New lead' as PipelineStage,proposedLevel:data.levels[0]?.name??'',value:data.levels[0]?.price??0,probability:15,source:'Website enquiry',nextAction:'Arrange discovery call',nextActionDate:new Date().toISOString().slice(0,10),owner:'Morgan Lee'})
   const edit=(item:Opportunity)=>{setDraft({organisationName:item.organisationName,contactName:item.contactName,stage:item.stage,proposedLevel:item.proposedLevel,value:item.value,probability:item.probability,source:item.source,nextAction:item.nextAction,nextActionDate:item.nextActionDate,owner:item.owner});setEditingId(item.id);setAdding(true)}

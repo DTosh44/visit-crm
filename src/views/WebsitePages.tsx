@@ -7,10 +7,10 @@ import type { WebsiteBlockType, WebsitePage, WebsitePageBlock, WebsitePageConten
 const blankContent = (): WebsitePageContent => ({ eyebrow: '', title: '', description: '', heroImage: '', metaTitle: '', metaDescription: '', navigationLabel: '', showInNavigation: false, blocks: [] })
 const newBlock = (type: WebsiteBlockType): WebsitePageBlock => ({ id: `block-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type, heading: '', body: '', buttonLabel: type === 'Button' ? 'Learn more' : '', buttonUrl: type === 'Button' ? '/' : '' })
 
-export function WebsitePages() {
+export function WebsitePages({createRequest=0}:{createRequest?:number}) {
   const { data, createWebsitePage, updateWebsitePageDraft, publishWebsitePage, discardWebsitePageDraft, restoreWebsitePageVersion, deleteWebsitePage } = useCRM()
   const [editing, setEditing] = useState<WebsitePage | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState(Boolean(createRequest))
   const [query, setQuery] = useState('')
   const pages = useMemo(() => data.websitePages.filter((page) => !query || `${page.name} ${page.path} ${page.draft.title}`.toLowerCase().includes(query.toLowerCase())), [data.websitePages, query])
   const edit = (page: WebsitePage) => setEditing(structuredClone(page))

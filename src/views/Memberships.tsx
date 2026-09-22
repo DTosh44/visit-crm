@@ -8,10 +8,10 @@ import { downloadCsv } from '../actions'
 
 type MembershipTab = 'Overview' | 'Benefits' | 'Renewals'
 
-export function Memberships({ openOrganisation }: { openOrganisation: (organisation: Organisation) => void }) {
+export function Memberships({ openOrganisation,createRequest=0 }: { openOrganisation: (organisation: Organisation) => void;createRequest?:number }) {
   const { data, addLevel, updateLevel, addBenefit } = useCRM()
   const [tab, setTab] = useState<MembershipTab>('Overview')
-  const [addOpen, setAddOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(Boolean(createRequest))
   const [editingLevel, setEditingLevel] = useState<MembershipLevel|null>(null)
   const [addingBenefit,setAddingBenefit]=useState(false)
   const [showArchived,setShowArchived]=useState(false)

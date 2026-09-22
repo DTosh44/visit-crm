@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useCRM } from '../store'
-import type { Organisation, ViewKey } from '../types'
+import type { CreateTarget, Listing, Organisation, ViewKey } from '../types'
 import { classNames } from '../utils'
 import { Avatar, useDialogFocus } from './UI'
 import { BrandLogo, ProductLogo } from './BrandLogo'
@@ -52,18 +52,16 @@ const pageNames: Record<ViewKey, string> = {
 export function Layout({
   view,
   setView,
-  onAddOrganisation,
-  onAddInvoice,
-  onAddTask,
+  onCreate,
   onOpenOrganisation,
+  onOpenListing,
   children,
 }: {
   view: ViewKey
   setView: (view: ViewKey) => void
-  onAddOrganisation: () => void
-  onAddInvoice: () => void
-  onAddTask: () => void
+  onCreate: (target: CreateTarget) => void
   onOpenOrganisation: (organisation: Organisation) => void
+  onOpenListing: (listing: Listing) => void
   children: ReactNode
 }) {
   const { data } = useCRM()
@@ -105,16 +103,33 @@ export function Layout({
     document.title = `${pageNames[view]} | ${data.workspace.destinationName} CRM`
   }, [data.workspace.destinationName, view])
 
+  const navigate = (key: ViewKey) => {
+    setView(key)
+    setSidebarOpen(false)
+  }
+
   const searchResults = useMemo(() => {
-    const term = query.trim().toLowerCase()
-    if (!term) return data.organisations.slice(0, 5)
-    return data.organisations.filter((org) => {
-      const contacts=data.contacts.filter((contact)=>contact.organisationId===org.id)
-      const listings=data.listings.filter((listing)=>listing.organisationId===org.id)
-      return [org.name,org.town,org.type,org.tier,...org.tags,...contacts.flatMap((contact)=>[contact.name,contact.email]),...listings.flatMap((listing)=>[listing.name,listing.category,listing.town])].join(' ').toLowerCase().includes(term)
-    }).slice(0, 7)
-  }, [data.contacts,data.listings,data.organisations, query])
-  useEffect(()=>{if(!searchOpen)return;const handle=(event:KeyboardEvent)=>{if(event.key==='ArrowDown'){event.preventDefault();setActiveResult((current)=>Math.min(searchResults.length-1,current+1))}if(event.key==='ArrowUp'){event.preventDefault();setActiveResult((current)=>Math.max(0,current-1))}if(event.key==='Enter'&&searchResults[activeResult]){event.preventDefault();setSearchOpen(false);setQuery('');onOpenOrganisation(searchResults[activeResult])}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)},[activeResult,onOpenOrganisation,searchOpen,searchResults])
+    const term=query.trim().toLowerCase();const match=(...values:unknown[])=>!term||values.flat().join(' ').toLowerCase().includes(term)
+    const results:Array<{id:string;title:string;detail:string;meta:string;view:ViewKey;entityId?:string;kind:'organisation'|'listing'|'module';colour?:string}>=[]
+    data.organisations.filter((item)=>match(item.name,item.type,item.town,item.tier,item.status,item.tags)).forEach((item)=>results.push({id:`org-${item.id}`,title:item.name,detail:`${item.type} · ${item.town}`,meta:'Organisation',view:'organisations',entityId:item.id,kind:'organisation',colour:item.colour}))
+    data.contacts.filter((item)=>match(item.name,item.jobTitle,item.email,item.phone,item.roles,item.tags,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`person-${item.id}`,title:item.name,detail:`${item.jobTitle||item.roles.join(', ')} · ${item.email}`,meta:'Person',view:'people',kind:'module'}))
+    data.opportunities.filter((item)=>match(item.organisationName,item.contactName,item.stage,item.proposedLevel,item.owner,item.nextAction)).forEach((item)=>results.push({id:`opportunity-${item.id}`,title:item.organisationName,detail:`${item.stage} · ${item.contactName}`,meta:'Opportunity',view:'pipeline',kind:'module'}))
+    data.levels.filter((item)=>match(item.name,item.description,item.price,item.benefits)).forEach((item)=>results.push({id:`level-${item.id}`,title:item.name,detail:item.description,meta:'Membership',view:'memberships',kind:'module',colour:item.colour}))
+    data.benefits.filter((item)=>match(item.name,item.kind,item.category,item.allowance)).forEach((item)=>results.push({id:`benefit-${item.id}`,title:item.name,detail:`${item.category} · ${item.kind}`,meta:'Benefit',view:'memberships',kind:'module'}))
+    data.listings.filter((item)=>match(item.name,item.category,item.town,item.status,item.searchTags,item.facilities)).forEach((item)=>results.push({id:`listing-${item.id}`,title:item.name,detail:`${item.category} · ${item.town}`,meta:'Listing',view:'listings',entityId:item.id,kind:'listing'}))
+    data.events.filter((item)=>match(item.title,item.category,item.venueName,item.town,item.status,item.contactName)).forEach((item)=>results.push({id:`event-${item.id}`,title:item.title,detail:`${item.venueName} · ${item.startDate}`,meta:'Event',view:'events',kind:'module'}))
+    data.contentPages.filter((item)=>match(item.title,item.summary,item.type,item.slug,item.status)).forEach((item)=>results.push({id:`content-${item.id}`,title:item.title,detail:`${item.type} · /${item.slug}`,meta:'Content',view:'content',kind:'module'}))
+    data.websitePages.filter((item)=>match(item.name,item.path,item.template,item.status,item.draft.title)).forEach((item)=>results.push({id:`page-${item.id}`,title:item.name,detail:`${item.path} · ${item.status}`,meta:'Website page',view:'pages',kind:'module'}))
+    data.imageAssets.filter((item)=>match(item.name,item.alt,item.credit,item.collection,item.tags)).forEach((item)=>results.push({id:`image-${item.id}`,title:item.name,detail:`${item.collection} · ${item.credit}`,meta:'Image',view:'images',kind:'module'}))
+    data.websiteExperiments.filter((item)=>match(item.name,item.hypothesis,item.pagePath,item.status,item.goal)).forEach((item)=>results.push({id:`experiment-${item.id}`,title:item.name,detail:`${item.pagePath} · ${item.status}`,meta:'A/B test',view:'experiments',kind:'module'}))
+    data.submissions.filter((item)=>match(item.kind,item.status,item.createdAt,JSON.stringify(item.payload))).forEach((item)=>results.push({id:`submission-${item.id}`,title:String(item.payload.name??item.payload.email??item.kind),detail:`${item.kind} · ${item.status}`,meta:'Website inbox',view:'inbox',kind:'module'}))
+    data.invoices.filter((item)=>match(item.number,item.description,item.status,item.sentTo,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`invoice-${item.id}`,title:item.number,detail:`${item.description} · ${item.status}`,meta:'Invoice',view:'billing',kind:'module'}))
+    data.agreements.filter((item)=>match(item.number,item.membershipLevel,item.signatory,item.signatoryEmail,item.status,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`agreement-${item.id}`,title:item.number,detail:`${item.signatory} · ${item.status}`,meta:'Agreement',view:'agreements',kind:'module'}))
+    data.tasks.filter((item)=>match(item.title,item.category,item.priority,item.assignee,item.dueDate,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`task-${item.id}`,title:item.title,detail:`${item.category} · ${item.dueDate}`,meta:'Task',view:'tasks',kind:'module'}))
+    return results.filter((item)=>canAccessView(user?.role,item.view)).slice(0,15)
+  }, [data,user?.role,query])
+  const openSearchResult=(result:typeof searchResults[number])=>{setSearchOpen(false);setQuery('');if(result.kind==='organisation'){const item=data.organisations.find((org)=>org.id===result.entityId);if(item)onOpenOrganisation(item);return}if(result.kind==='listing'){const item=data.listings.find((listing)=>listing.id===result.entityId);if(item)onOpenListing(item);return}navigate(result.view)}
+  useEffect(()=>{if(!searchOpen)return;const handle=(event:KeyboardEvent)=>{if(event.key==='ArrowDown'){event.preventDefault();setActiveResult((current)=>Math.min(searchResults.length-1,current+1))}if(event.key==='ArrowUp'){event.preventDefault();setActiveResult((current)=>Math.max(0,current-1))}if(event.key==='Enter'&&searchResults[activeResult]){event.preventDefault();openSearchResult(searchResults[activeResult])}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)})
   const generatedNotifications=useMemo(()=>{const today=new Date().toISOString().slice(0,10);return[
     ...data.tasks.filter((task)=>!task.completed&&task.dueDate<=today).map((task)=>({id:`task-${task.id}`,title:task.title,detail:task.dueDate<today?'Task is overdue':'Task is due today',view:'tasks' as ViewKey})),
     ...data.invoices.filter((invoice)=>invoice.status==='Overdue').map((invoice)=>({id:`invoice-${invoice.id}`,title:`${invoice.number} is overdue`,detail:'Payment follow-up required',view:'billing' as ViewKey})),
@@ -123,11 +138,6 @@ export function Layout({
   ].slice(0,12)},[data.agreements,data.events,data.invoices,data.tasks])
   const notifications=generatedNotifications.filter((item)=>!dismissedNotifications.includes(item.id))
   const dismissNotifications=()=>{const next=Array.from(new Set([...dismissedNotifications,...generatedNotifications.map((item)=>item.id)]));setDismissedNotifications(next);localStorage.setItem('vv-dismissed-notifications',JSON.stringify(next))}
-
-  const navigate = (key: ViewKey) => {
-    setView(key)
-    setSidebarOpen(false)
-  }
 
   return (
     <div className="app-shell">
@@ -180,7 +190,7 @@ export function Layout({
           </div>
           <div className="topbar-right">
             <button className="search-trigger" onClick={() => {setActiveResult(0);setSearchOpen(true)}} aria-haspopup="dialog" aria-expanded={searchOpen} aria-controls="command-palette">
-              <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
+              <Search size={17} /><span>Search the CRM...</span><kbd>⌘ K</kbd>
             </button>
             <div className="notification-wrap"><button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} aria-controls="notification-panel" onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications requiring attention`}><Bell size={19} />{notifications.length>0&&<i aria-hidden="true" />}</button>{notificationsOpen&&<div id="notification-panel" className="notification-panel" role="region" aria-label="Notifications"><header><div><strong>Notifications</strong><span aria-live="polite">{notifications.length} requiring attention</span></div>{notifications.length>0&&<button onClick={dismissNotifications}>Mark all read</button>}<button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
             <div className="quick-wrap">
@@ -188,9 +198,9 @@ export function Layout({
               {quickOpen && (
                 <div id="quick-create-menu" className="quick-menu" role="region" aria-label="Quick create">
                   <span>Quick create</span>
-                  {canAccessView(user?.role, 'organisations') && <button onClick={() => { setQuickOpen(false); onAddOrganisation() }}><Building2 size={17} /><div><strong>Organisation</strong><small>Add a member, prospect or partner</small></div></button>}
-                  {canAccessView(user?.role, 'tasks') && <button onClick={() => { setQuickOpen(false); onAddTask() }}><ClipboardCheck size={17} /><div><strong>Task</strong><small>Create a follow-up</small></div></button>}
-                  {canAccessView(user?.role, 'billing') && <button onClick={() => { setQuickOpen(false); onAddInvoice() }}><CircleDollarSign size={17} /><div><strong>Invoice</strong><small>Raise a new invoice</small></div></button>}
+                  {([
+                    ['organisation','organisations',Building2,'Organisation','Member, prospect or partner'],['person','people',ContactRound,'Person','Contact, PR or travel trade'],['opportunity','pipeline',Handshake,'Opportunity','Add to the sales pipeline'],['task','tasks',ClipboardCheck,'Task','Create a follow-up'],['membership','memberships',UsersRound,'Membership level','Create a package'],['invoice','billing',CircleDollarSign,'Invoice','Raise a new invoice'],['agreement','agreements',FileSignature,'Agreement','Create a signing record'],['listing','listings',FilePenLine,'Listing','Create a website listing'],['event','events',CalendarDays,'Event','Add to what’s on'],['content','content',BookOpen,'Guide, itinerary or trail','Create inspiration content'],['page','pages',PanelsTopLeft,'Website page','Create a landing page'],['image','images',Images,'Image','Add to the image bank'],['experiment','experiments',FlaskConical,'A/B test','Create a website experiment'],
+                  ] as Array<[CreateTarget,ViewKey,typeof Building2,string,string]>).filter(([,target])=>canAccessView(user?.role,target)).map(([target,,Icon,label,detail])=><button key={target} onClick={()=>{setQuickOpen(false);onCreate(target)}}><Icon size={17}/><div><strong>{label}</strong><small>{detail}</small></div></button>)}
                 </div>
               )}
             </div>
@@ -202,17 +212,17 @@ export function Layout({
 
       {searchOpen && (
         <div className="command-overlay" onMouseDown={(event) => event.target === event.currentTarget && setSearchOpen(false)}>
-          <div id="command-palette" ref={commandRef} tabIndex={-1} className="command-palette" role="dialog" aria-modal="true" aria-label="Search organisations">
-            <div className="command-input"><Search size={20} /><input ref={searchRef} data-dialog-initial-focus aria-label="Search organisations, contacts and listings" value={query} onChange={(event) => {setQuery(event.target.value);setActiveResult(0)}} placeholder="Search organisations, contacts and listings..." /><kbd>esc</kbd></div>
+          <div id="command-palette" ref={commandRef} tabIndex={-1} className="command-palette" role="dialog" aria-modal="true" aria-label="Search the CRM">
+            <div className="command-input"><Search size={20} /><input ref={searchRef} data-dialog-initial-focus aria-label="Search the whole CRM" value={query} onChange={(event) => {setQuery(event.target.value);setActiveResult(0)}} placeholder="Search people, content, finance and more..." /><kbd>esc</kbd></div>
             <div className="command-results">
-              <span className="command-label">{query ? 'Results' : 'Recently viewed'}</span>
-              {searchResults.length ? searchResults.map((org,index) => (
-                <button key={org.id} className={index===activeResult?'active':''} onMouseEnter={()=>setActiveResult(index)} onClick={() => { setSearchOpen(false); setQuery(''); onOpenOrganisation(org) }}>
-                  <span className="search-result-avatar" style={{ background: org.colour }}>{org.name.slice(0, 2).toUpperCase()}</span>
-                  <span><strong>{org.name}</strong><small>{org.type} · {org.town}</small></span>
-                  <span className="search-result-meta">{org.tier}</span>
+              <span className="command-label">{query ? 'Results' : 'Browse CRM'}</span>
+              {searchResults.length ? searchResults.map((result,index) => (
+                <button key={result.id} className={index===activeResult?'active':''} onMouseEnter={()=>setActiveResult(index)} onClick={()=>openSearchResult(result)}>
+                  <span className="search-result-avatar" style={{ background: result.colour }}>{result.title.slice(0, 2).toUpperCase()}</span>
+                  <span><strong>{result.title}</strong><small>{result.detail}</small></span>
+                  <span className="search-result-meta">{result.meta}</span>
                 </button>
-              )) : <div className="command-empty"><Search size={24} /><p>No matching organisations</p></div>}
+              )) : <div className="command-empty"><Search size={24} /><p>No matching CRM records</p></div>}
             </div>
             <footer><span><kbd>↑</kbd><kbd>↓</kbd> to navigate</span><span><kbd>↵</kbd> to open</span></footer>
           </div>

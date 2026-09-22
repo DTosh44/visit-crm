@@ -8,12 +8,12 @@ import { Badge, Button, Field, Modal, PageHeader, Tabs } from '../components/UI'
 const resolveImage=(value:string)=>imageLibrary[value]??value
 const formatBytes=(value:number)=>value?`${(value/1_000_000).toFixed(1)} MB`:'—'
 
-export function ImageBank(){
+export function ImageBank({createRequest=0}:{createRequest?:number}){
   const {data,createImageAsset,archiveImageAsset}=useCRM()
   const [tab,setTab]=useState<'Library'|'Storage & delivery'>('Library')
   const [query,setQuery]=useState('')
   const [collection,setCollection]=useState('All collections')
-  const [adding,setAdding]=useState(false)
+  const [adding,setAdding]=useState(Boolean(createRequest))
   const [expiryThreshold]=useState(()=>Date.now()+90*86400000)
   const collections=['All collections',...Array.from(new Set(data.imageAssets.map((asset)=>asset.collection)))]
   const assets=useMemo(()=>data.imageAssets.filter((asset)=>asset.status!=='Archived'&&(collection==='All collections'||asset.collection===collection)&&[asset.name,asset.alt,asset.credit,...asset.tags].join(' ').toLowerCase().includes(query.toLowerCase())),[collection,data.imageAssets,query])
