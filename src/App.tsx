@@ -30,9 +30,12 @@ import { PublicSite } from './PublicSite'
 import { ProductLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
+import { PortalApp, PublicSurvey } from './PortalApp'
+import { Automations, BusinessEvents, Campaigns, Communications, Engagement, MemberOpportunities, MemberValue, PRMedia, Surveys, TravelTrade, WebsiteHealth } from './views/PlatformModules'
+import { GlobalPlatformCreate, type PlatformCreateTarget } from './components/GlobalPlatformCreate'
 
-const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
-const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',people:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
+const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','surveys','websiteHealth','automations','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',people:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks',communications:'communications',memberValue:'memberValue',memberOpportunities:'coopOpportunities',campaigns:'campaigns',engagement:'memberValue',travelTrade:'travelTrade',businessEvents:'businessEvents',prMedia:'prMedia',surveys:'surveys',websiteHealth:'websiteHealth',automations:'automations'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -48,6 +51,7 @@ function CRMApp() {
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
   const [modal, setModal] = useState<'organisation' | 'invoice' | 'task' | null>(null)
   const [createRequest,setCreateRequest]=useState<{target:CreateTarget;token:number}|null>(null)
+  const [platformCreate,setPlatformCreate]=useState<PlatformCreateTarget|null>(null)
 
   useEffect(() => {
     const handleHash = () => setViewState(initialView())
@@ -76,9 +80,11 @@ function CRMApp() {
   const selectedOrganisation = data.organisations.find((item) => item.id === selectedOrganisationId)
   const selectedListing = data.listings.find((item) => item.id === selectedListingId)
   const requestCreate=(target:CreateTarget)=>{
+    const platformTargets:PlatformCreateTarget[]=['communication','memberValue','campaign','memberOpportunity','survey','buyer','tradeLead','businessEnquiry','prOpportunity']
+    if(platformTargets.includes(target as PlatformCreateTarget)){setPlatformCreate(target as PlatformCreateTarget);return}
     if(target==='organisation'||target==='invoice'||target==='task'){setCreateRequest(null);setModal(target);return}
-    const destinations:Record<Exclude<CreateTarget,'organisation'|'invoice'|'task'>,ViewKey>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',experiment:'experiments',agreement:'agreements'}
-    setView(destinations[target])
+    const destinations:Partial<Record<CreateTarget,ViewKey>>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',experiment:'experiments',agreement:'agreements'}
+    setView(destinations[target]??'dashboard')
     setCreateRequest({target,token:Date.now()})
   }
 
@@ -107,6 +113,17 @@ function CRMApp() {
       {activeView === 'billing' && <Billing onCreate={() => setModal('invoice')} />}
       {activeView === 'agreements' && <Agreements key={createRequest?.target==='agreement'?createRequest.token:0} createRequest={createRequest?.target==='agreement'?createRequest.token:0} />}
       {activeView === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
+      {activeView === 'communications' && <Communications />}
+      {activeView === 'memberValue' && <MemberValue />}
+      {activeView === 'memberOpportunities' && <MemberOpportunities />}
+      {activeView === 'campaigns' && <Campaigns />}
+      {activeView === 'engagement' && <Engagement />}
+      {activeView === 'travelTrade' && <TravelTrade />}
+      {activeView === 'businessEvents' && <BusinessEvents />}
+      {activeView === 'prMedia' && <PRMedia />}
+      {activeView === 'surveys' && <Surveys />}
+      {activeView === 'websiteHealth' && <WebsiteHealth navigate={setView} />}
+      {activeView === 'automations' && <Automations />}
       {activeView === 'settings' && <Settings />}
 
       {selectedOrganisation && <OrganisationDrawer key={selectedOrganisation.id} organisation={selectedOrganisation} onClose={() => setSelectedOrganisationId(null)} onEditListing={openListing} />}
@@ -114,6 +131,7 @@ function CRMApp() {
       {modal === 'organisation' && <AddOrganisationModal onClose={() => setModal(null)} onCreated={openOrganisation} />}
       {modal === 'invoice' && <CreateInvoiceModal onClose={() => setModal(null)} />}
       {modal === 'task' && <AddTaskModal onClose={() => setModal(null)} />}
+      {platformCreate && <GlobalPlatformCreate target={platformCreate} onClose={()=>setPlatformCreate(null)} navigate={setView}/>}
     </Layout>
   )
 }
@@ -121,7 +139,11 @@ function CRMApp() {
 export default function App() {
   const { user, loading } = useAuth()
   const isCRM = window.location.pathname.startsWith('/crm')
+  const isPortal = window.location.pathname.startsWith('/portal')
+  const surveySlug = window.location.pathname.match(/^\/survey\/([^/]+)/)?.[1]
 
+  if (surveySlug) return <PublicSurvey slug={decodeURIComponent(surveySlug)} />
+  if (isPortal) return <PortalApp />
   if (!isCRM) return <PublicSite />
   if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
   if (!user) return <LoginPage />

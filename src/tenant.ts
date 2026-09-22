@@ -39,6 +39,17 @@ export type FeatureKey =
   | 'reviewIntelligence'
   | 'socialInsights'
   | 'aiWebsiteEditor'
+  | 'memberPortal'
+  | 'memberValue'
+  | 'communications'
+  | 'automations'
+  | 'campaigns'
+  | 'coopOpportunities'
+  | 'businessEvents'
+  | 'prMedia'
+  | 'surveys'
+  | 'websiteHealth'
+  | 'aiAssistant'
 
 export const defaultFeatures: Record<FeatureKey, boolean> = {
   publicWebsite: true,
@@ -55,10 +66,21 @@ export const defaultFeatures: Record<FeatureKey, boolean> = {
   agreements: true,
   tasks: true,
   businessPortal: false,
-  travelTrade: false,
+  travelTrade: true,
   reviewIntelligence: true,
   socialInsights: true,
   aiWebsiteEditor: false,
+  memberPortal: true,
+  memberValue: true,
+  communications: true,
+  automations: true,
+  campaigns: true,
+  coopOpportunities: true,
+  businessEvents: true,
+  prMedia: true,
+  surveys: true,
+  websiteHealth: true,
+  aiAssistant: true,
 }
 
 /**

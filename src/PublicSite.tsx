@@ -738,6 +738,15 @@ export function PublicSite() {
   const actions = { savedIds, toggleSaved }
   const path = window.location.pathname
   const parts = path.split('/').filter(Boolean)
+  const schemaListing=parts[0]==='place'?published.find((item)=>item.id===parts[1]):undefined
+  const structuredData={
+    '@context':'https://schema.org',
+    '@graph':[
+      {'@type':'Organization','@id':`${window.location.origin}/#organisation`,name:data.workspace.destinationName,url:window.location.origin,email:data.workspace.contactEmail,address:data.workspace.address},
+      {'@type':'BreadcrumbList',itemListElement:[{ '@type':'ListItem',position:1,name:'Home',item:window.location.origin},...(path==='/'?[]:[{'@type':'ListItem',position:2,name:schemaListing?.name??document.title.split(' | ')[0],item:`${window.location.origin}${path}`}])]},
+      ...(schemaListing?[{'@type':schemaListing.category==='Accommodation'?'Hotel':schemaListing.category==='Food & drink'?'Restaurant':'TouristAttraction',name:schemaListing.name,description:schemaListing.shortDescription,url:`${window.location.origin}${path}`,image:mediaUrl(schemaListing.image),address:{'@type':'PostalAddress',addressLocality:schemaListing.town},telephone:schemaListing.phone,sameAs:schemaListing.website?[schemaListing.website]:[]}]:[]),
+    ],
+  }
   let page: ReactNode
   if (path === '/') page = <HomePage key={location} actions={actions} location={location} />
   else if(path==='/map'&&features.interactiveMap) page=<InteractiveMapPage savedCount={savedIds.length}/>
@@ -757,5 +766,5 @@ export function PublicSite() {
     const listing = published.find((item) => item.id === parts[1])
     page = listing ? <ListingPage listing={listing} actions={actions} /> : <NotFoundPage savedCount={savedIds.length} />
   } else { const managedPage=websitePageForPath(data.websitePages,path);const content=managedPage?websitePageContent(managedPage,new URLSearchParams(window.location.search).get('preview')==='true'):undefined;page=content?<ManagedLandingPage content={content} savedCount={savedIds.length}/>:<NotFoundPage savedCount={savedIds.length}/> }
-  return <>{page}<CookiePreferences/>{notice && <div className="site-toast" role="status"><Check size={16} />{notice}</div>}</>
+  return <><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(structuredData).replaceAll('<','\\u003c')}}/>{page}<CookiePreferences/>{notice && <div className="site-toast" role="status"><Check size={16} />{notice}</div>}</>
 }

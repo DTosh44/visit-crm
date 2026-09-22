@@ -3,7 +3,9 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { defaultFeatures, tenant, type FeatureKey } from './tenant'
 import { supabase } from './auth'
 
-const STORAGE_KEY = 'visit-valechester-features-v1'
+// Major platform releases use a fresh local key so newly introduced modules are
+// visible in the demo instead of inheriting stale development-only switches.
+const STORAGE_KEY = 'visit-valechester-features-v2'
 
 interface FeatureContextValue {
   features: Record<FeatureKey, boolean>

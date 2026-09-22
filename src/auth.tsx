@@ -3,7 +3,7 @@ import { createClient, type Session } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { tenant } from './tenant'
 
-export type UserRole = 'Administrator' | 'Membership manager' | 'Content editor' | 'Finance user'
+export type UserRole = 'Administrator' | 'Membership manager' | 'Content editor' | 'Finance user' | 'Marketing / PR' | 'Travel Trade' | 'Viewer / Reporting'
 export interface WorkspaceUser { id: string; email: string; name: string; role: UserRole; tenantId: string; initials: string; colour: string; active: boolean; lastActive?: string }
 
 export const seedUsers: WorkspaceUser[] = [
@@ -21,10 +21,13 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 const roleViews: Record<UserRole, string[]> = {
-  Administrator: ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings'],
-  'Membership manager': ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','agreements','tasks'],
-  'Content editor': ['dashboard','organisations','people','pages','images','experiments','map','listings','events','content','inbox','insights','tasks'],
-  'Finance user': ['dashboard','organisations','people','billing','tasks'],
+  Administrator: ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','surveys','websiteHealth','automations','settings'],
+  'Membership manager': ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','surveys','websiteHealth'],
+  'Content editor': ['dashboard','organisations','people','pages','images','experiments','map','listings','events','content','inbox','insights','tasks','campaigns','prMedia','surveys','websiteHealth'],
+  'Finance user': ['dashboard','organisations','people','billing','tasks','memberValue','campaigns'],
+  'Marketing / PR': ['dashboard','organisations','people','tasks','communications','campaigns','memberOpportunities','prMedia','surveys','insights','websiteHealth'],
+  'Travel Trade': ['dashboard','organisations','people','tasks','communications','memberValue','memberOpportunities','travelTrade','businessEvents','campaigns','insights'],
+  'Viewer / Reporting': ['dashboard','organisations','people','memberValue','campaigns','travelTrade','businessEvents','prMedia','surveys','insights','websiteHealth'],
 }
 export function canAccessView(role: UserRole | undefined, view: string) { return role ? roleViews[role].includes(view) : false }
 

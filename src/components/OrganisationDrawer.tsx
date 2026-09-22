@@ -3,7 +3,7 @@ import {
   Edit3, ExternalLink, FileSignature, Globe2, ListChecks, Mail, MapPin, MessageSquarePlus,
   Phone, Plus, Trash2, UsersRound,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useCRM } from '../store'
 import { imageLibrary } from '../siteData'
 import type { Contact, Listing, Organisation } from '../types'
@@ -11,8 +11,9 @@ import { currency, formatDate, timeAgo } from '../utils'
 import { Avatar, Badge, Button, Drawer, Field, Modal, Progress, Tabs } from './UI'
 import { downloadFile, openEmail } from '../actions'
 import { TagPicker } from './TagPicker'
+import { engagementScore, usePlatform } from '../platform'
 
-type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
+type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Value & engagement' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
 
 export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   organisation: Organisation
@@ -20,6 +21,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   onEditListing: (listing: Listing) => void
 }) {
   const { data, updateOrganisation, incrementBenefit, markInvoicePaid, addContact, updateContact, deleteContact, addActivity, createListing, createInvoice, createAgreement } = useCRM()
+  const {data:platform}=usePlatform()
   const [tab, setTab] = useState<OrgTab>('Overview')
   const [editing, setEditing] = useState(false)
   const [draftNotes, setDraftNotes] = useState(organisation.notes)
@@ -33,8 +35,12 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   const level = data.levels.find((item) => item.name === organisation.tier)
   const primaryContact = contacts.find((item) => item.primary) ?? contacts[0]
   const isMember = organisation.status !== 'Non-member' && organisation.tier !== 'No membership'
+  const valueRecords=platform.memberValue.filter((item)=>item.organisationId===organisation.id)
+  const campaigns=platform.campaigns.filter((item)=>item.organisationIds.includes(organisation.id))
+  const memberOpportunities=platform.memberOpportunities.filter((item)=>item.applications.some((application)=>application.organisationId===organisation.id))
+  const engagement=engagementScore({lastActivity:organisation.lastActivity,benefitsUsed:data.benefitUsage.filter((item)=>item.organisationId===organisation.id&&item.used>0).length,portal:contacts.some((item)=>item.portalAccess),listingCompleteness:listings.reduce((sum,item,_,rows)=>sum+item.completeness/rows.length,0),campaigns:campaigns.length,referrals:listings.reduce((sum,item)=>sum+item.enquiries,0),overdueInvoices:invoices.filter((item)=>item.status==='Overdue').length},platform.engagementSettings.weights)
 
-  const outstanding = useMemo(() => invoices.filter((item) => ['Sent', 'Overdue'].includes(item.status)).reduce((total, item) => total + item.total, 0), [invoices])
+  const outstanding = invoices.filter((item) => ['Sent', 'Overdue'].includes(item.status)).reduce((total, item) => total + item.total, 0)
 
   const saveNotes = () => {
     updateOrganisation(organisation.id, { notes: draftNotes })
@@ -50,7 +56,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
       </div>
       <div className="organisation-tag-strip">{organisation.tags.length?organisation.tags.map((tag)=><span key={tag}>{tag}</span>):<small>No organisation tags</small>}</div>
 
-      <Tabs items={['Overview','Contacts','Membership','Listings','Billing','Agreements','Activity'] as OrgTab[]} active={tab} onChange={setTab} />
+      <Tabs items={['Overview','Contacts','Membership','Value & engagement','Listings','Billing','Agreements','Activity'] as OrgTab[]} active={tab} onChange={setTab} />
 
       {tab === 'Overview' && <div className="org-tab-content">
         <div className="org-kpi-row">
@@ -126,6 +132,8 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
           {!level?.benefits.length && <div className="inline-empty">This level has no tracked benefits.</div>}
         </div>
       </div>}
+
+      {tab === 'Value & engagement' && <div className="org-tab-content"><div className="org-kpi-row"><div><span className="mini-icon purple"><UsersRound size={16}/></span><p><small>Engagement score</small><strong>{engagement}/100</strong></p></div><div><span className="mini-icon green"><CircleDollarSign size={16}/></span><p><small>Estimated value delivered</small><strong>{currency.format(valueRecords.reduce((sum,item)=>sum+item.estimatedValue,0))}</strong></p></div><div><span className="mini-icon blue"><Globe2 size={16}/></span><p><small>Website referrals</small><strong>{listings.reduce((sum,item)=>sum+item.enquiries,0)}</strong></p></div><div><span className="mini-icon amber"><Calendar size={16}/></span><p><small>Campaigns</small><strong>{campaigns.length}</strong></p></div></div><section className="subpanel"><header><div><h3>Activity & value</h3><p>Measured delivery, campaigns and opportunity participation for the current relationship.</p></div><Badge>{organisation.health}</Badge></header><div className="record-list">{valueRecords.map((item)=><div className="record-row" key={item.id}><span className="record-icon"><CheckCircle2 size={18}/></span><div><strong>{item.activity}</strong><span>{item.category} · {item.evidence}</span></div><div><strong>{item.quantity.toLocaleString()}</strong><span>{item.estimatedValue?`${currency.format(item.estimatedValue)} estimated value`:'Measured only'}</span></div><span>{formatDate(item.date)}</span></div>)}</div>{!valueRecords.length&&<div className="inline-empty">No member-value records have been added yet.</div>}</section><div className="org-overview-grid"><section className="subpanel"><header><div><h3>Campaign participation</h3><p>{campaigns.length} linked campaigns</p></div></header>{campaigns.map((item)=><div className="mini-contact" key={item.id}><div><strong>{item.name}</strong><span>{item.status} · {item.referrals} referrals</span></div></div>)}</section><section className="subpanel"><header><div><h3>Member opportunities</h3><p>{memberOpportunities.length} applications</p></div></header>{memberOpportunities.map((item)=><div className="mini-contact" key={item.id}><div><strong>{item.title}</strong><span>{item.applications.find((application)=>application.organisationId===organisation.id)?.status}</span></div></div>)}</section></div></div>}
 
       {tab === 'Listings' && <div className="org-tab-content">
         <div className="section-heading"><div><h3>Website listings</h3><p>Edit and publish this organisation’s public content from its CRM record.</p></div><Button icon={Plus} size="sm" onClick={()=>{const name=window.prompt('Listing name',organisation.name);if(name)onEditListing(createListing(organisation.id,name))}}>Add listing</Button></div>

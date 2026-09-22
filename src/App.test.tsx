@@ -5,9 +5,10 @@ import { CRMProvider } from './store'
 import { AuthProvider } from './auth'
 import { FeatureProvider } from './features'
 import { initialData } from './data'
+import { PlatformProvider } from './platform'
 
 function renderApp() {
-  return render(<AuthProvider><FeatureProvider><CRMProvider><App /></CRMProvider></FeatureProvider></AuthProvider>)
+  return render(<AuthProvider><FeatureProvider><CRMProvider><PlatformProvider><App /></PlatformProvider></CRMProvider></FeatureProvider></AuthProvider>)
 }
 
 describe('Visit CRM', () => {
@@ -500,6 +501,59 @@ describe('Visit CRM', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create draft' }))
     expect(screen.getByRole('heading', { name: 'Edit Autumn campaign' })).toBeInTheDocument()
     expect(screen.getByText('/autumn · Changes stay private until published.')).toBeInTheDocument()
+  })
+
+  it('creates campaigns from the CRM-wide Add new menu', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Add new'}))
+    fireEvent.click(within(screen.getByRole('region',{name:'Quick create'})).getByRole('button',{name:/^Campaign/}))
+    fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Spring by the river'}})
+    fireEvent.change(screen.getByLabelText('Objective'),{target:{value:'Increase spring member referrals'}})
+    fireEvent.change(screen.getByLabelText('Start / activity date'),{target:{value:'2027-03-01'}})
+    fireEvent.change(screen.getByLabelText('End / closing date'),{target:{value:'2027-04-30'}})
+    fireEvent.click(screen.getByRole('button',{name:'Create campaign'}))
+    expect(screen.getByRole('heading',{name:'Campaigns'})).toBeInTheDocument()
+    expect(screen.getByText('Spring by the river')).toBeInTheDocument()
+  })
+
+  it('records transparent estimated member value', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Member Value'}))
+    fireEvent.click(screen.getByRole('button',{name:'Record value'}))
+    fireEvent.change(screen.getByLabelText('Activity'),{target:{value:'Photography support'}})
+    fireEvent.change(screen.getByRole('spinbutton',{name:/Estimated value/}),{target:{value:'175'}})
+    fireEvent.change(screen.getByLabelText('Evidence'),{target:{value:'Winter image shoot'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save record'}))
+    expect(screen.getByText('Photography support')).toBeInTheDocument()
+    expect(screen.getAllByText(/Estimated value delivered/).length).toBeGreaterThan(0)
+  })
+
+  it('keeps the member portal scoped to the linked organisation', () => {
+    window.history.pushState({},'', '/portal')
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Sign in'}))
+    expect(screen.getByRole('heading',{name:'Valechester Castle'})).toBeInTheDocument()
+    expect(screen.getByText('Tier 1 membership · Active')).toBeInTheDocument()
+    expect(screen.queryByText('Relationship notes')).not.toBeInTheDocument()
+    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+  })
+
+  it('accepts a public survey response', () => {
+    window.history.pushState({},'', '/survey/member-satisfaction-2026')
+    renderApp()
+    fireEvent.click(screen.getByRole('radio',{name:'9'}))
+    fireEvent.change(screen.getByLabelText('What should we improve?'),{target:{value:'More trade opportunities'}})
+    fireEvent.click(screen.getByRole('button',{name:'Submit response'}))
+    expect(screen.getByRole('heading',{name:'Response received'})).toBeInTheDocument()
+  })
+
+  it('queries live workspace records through Ask VisitMade', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Ask VisitMade'}))
+    fireEvent.change(screen.getByLabelText('Ask about this workspace'),{target:{value:'Which invoices are overdue?'}})
+    fireEvent.click(screen.getByRole('button',{name:'Ask'}))
+    expect(screen.getByText(/results from overdue invoices/)).toBeInTheDocument()
+    expect(screen.getByText(/VV-2026-1018/)).toBeInTheDocument()
   })
 
   it('requires an account before opening the CRM', () => {

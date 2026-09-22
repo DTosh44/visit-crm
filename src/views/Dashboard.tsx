@@ -9,18 +9,20 @@ import type { Organisation, ViewKey } from '../types'
 import { currency, dateLabel, formatDate, timeAgo } from '../utils'
 import { Avatar, Button } from '../components/UI'
 import { supabase, useAuth } from '../auth'
+import { engagementScore, usePlatform } from '../platform'
 
-type WidgetId = 'active-members'|'new-members'|'membership-income'|'website-visitors'|'page-views'|'website-conversions'|'visitor-volume'|'visitor-spend'|'overnight-stays'|'pipeline'|'outstanding'|'bank-balance'|'member-tiers'|'review-trends'|'renewals'|'tasks'|'activity'
+type WidgetId = 'active-members'|'new-members'|'membership-income'|'website-visitors'|'page-views'|'website-conversions'|'visitor-volume'|'visitor-spend'|'overnight-stays'|'pipeline'|'outstanding'|'bank-balance'|'member-risk'|'average-engagement'|'member-value'|'active-campaigns'|'automation-failures'|'member-tiers'|'review-trends'|'renewals'|'tasks'|'activity'
 const DEFAULT_WIDGETS: WidgetId[] = ['active-members','new-members','membership-income','website-visitors','page-views','website-conversions','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance','member-tiers','review-trends','renewals','tasks','activity']
 const widgetNames: Record<WidgetId,string> = {
-  'active-members':'Active members','new-members':'New members','membership-income':'Membership income','website-visitors':'Website visitors','page-views':'Website page views','website-conversions':'Website conversions','visitor-volume':'Visitor volume','visitor-spend':'Visitor spend','overnight-stays':'Overnight stays','pipeline':'Open pipeline','outstanding':'Outstanding invoices','bank-balance':'Bank balance','member-tiers':'Members by tier','review-trends':'Visitor review trends','renewals':'Upcoming renewals','tasks':'My tasks','activity':'Recent activity'
+  'active-members':'Active members','new-members':'New members','membership-income':'Membership income','website-visitors':'Website visitors','page-views':'Website page views','website-conversions':'Website conversions','visitor-volume':'Visitor volume','visitor-spend':'Visitor spend','overnight-stays':'Overnight stays','pipeline':'Open pipeline','outstanding':'Outstanding invoices','bank-balance':'Bank balance','member-risk':'Members at risk','average-engagement':'Average engagement score','member-value':'Member value delivered','active-campaigns':'Active campaigns','automation-failures':'Automation failures','member-tiers':'Members by tier','review-trends':'Visitor review trends','renewals':'Upcoming renewals','tasks':'My tasks','activity':'Recent activity'
 }
-const metricWidgets: WidgetId[] = ['active-members','new-members','membership-income','website-visitors','page-views','website-conversions','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance']
+const metricWidgets: WidgetId[] = ['active-members','new-members','membership-income','website-visitors','page-views','website-conversions','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance','member-risk','average-engagement','member-value','active-campaigns','automation-failures']
 
 function loadWidgets(userId: string) { try { const saved=localStorage.getItem(`vv-dashboard-${userId}`); return saved ? JSON.parse(saved) as WidgetId[] : DEFAULT_WIDGETS } catch { return DEFAULT_WIDGETS } }
 
 export function Dashboard({ navigate, openOrganisation }: { navigate: (view: ViewKey) => void; openOrganisation: (org: Organisation) => void }) {
   const { data, toggleTask } = useCRM(); const { user } = useAuth()
+  const {data:platform}=usePlatform()
   const [widgets,setWidgets] = useState<WidgetId[]>(() => loadWidgets(user?.id ?? 'default'))
   const [configure,setConfigure] = useState(false); const [saved,setSaved] = useState(false); const [dragging,setDragging] = useState<WidgetId|null>(null)
   const openTasks=data.tasks.filter((task)=>!task.completed); const overdueInvoices=data.invoices.filter((i)=>i.status==='Overdue')
@@ -36,6 +38,7 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
   const websiteConversions=analytics30.filter((event)=>event.type==='form_submit'||event.type==='booking_completed').length
   const pipelineValue=useMemo(()=>data.opportunities.filter((o)=>o.stage!=='Won').reduce((t,o)=>t+o.value,0),[data.opportunities])
   const [firstName]=(user?.name??'there').split(' ')
+  const memberScores=data.organisations.filter((org)=>['Active','Renewing'].includes(org.status)).map((org)=>engagementScore({lastActivity:org.lastActivity,benefitsUsed:data.benefitUsage.filter((item)=>item.organisationId===org.id&&item.used>0).length,portal:data.contacts.some((item)=>item.organisationId===org.id&&item.portalAccess),listingCompleteness:data.listings.filter((item)=>item.organisationId===org.id).reduce((sum,item,_,rows)=>sum+item.completeness/rows.length,0),campaigns:platform.campaigns.filter((item)=>item.organisationIds.includes(org.id)).length,referrals:data.listings.filter((item)=>item.organisationId===org.id).reduce((sum,item)=>sum+item.enquiries,0),overdueInvoices:data.invoices.filter((item)=>item.organisationId===org.id&&item.status==='Overdue').length},platform.engagementSettings.weights))
   useEffect(()=>{ if(!supabase||!user)return; void supabase.from('user_preferences').select('dashboard_widgets').eq('user_id',user.id).eq('tenant_id',user.tenantId).maybeSingle().then(({data:preferences})=>{if(preferences?.dashboard_widgets)setWidgets(preferences.dashboard_widgets as WidgetId[])}) },[user])
   const saveLayout=()=>{localStorage.setItem(`vv-dashboard-${user?.id??'default'}`,JSON.stringify(widgets));if(supabase&&user)void supabase.from('user_preferences').upsert({user_id:user.id,tenant_id:user.tenantId,dashboard_widgets:widgets,updated_at:new Date().toISOString()},{onConflict:'user_id,tenant_id'});setSaved(true);setTimeout(()=>setSaved(false),1600)}
   const dropOn=(target:WidgetId)=>{if(!dragging||dragging===target)return;setWidgets((current)=>{const next=current.filter((id)=>id!==dragging);next.splice(next.indexOf(target),0,dragging);return next});setDragging(null)}
@@ -55,6 +58,11 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
       'pipeline':{value:currency.format(pipelineValue),detail:`${data.opportunities.filter((o)=>o.stage!=='Won').length} live opportunities`,icon:CalendarClock,tone:'amber'},
       'outstanding':{value:currency.format(unpaidTotal),detail:`${overdueInvoices.length} invoices overdue`,icon:PoundSterling,tone:'coral'},
       'bank-balance':{value:data.workspace.bankBalance!==undefined?currency.format(data.workspace.bankBalance):'Not connected',detail:data.workspace.bankBalance!==undefined?'Latest configured available balance':'Authorise an Open Banking provider in Settings',icon:WalletCards,tone:'purple'},
+      'member-risk':{value:String(memberScores.filter((score)=>score<45).length),detail:'members with engagement below 45',icon:CircleAlert,tone:'coral'},
+      'average-engagement':{value:`${Math.round(memberScores.reduce((sum,score)=>sum+score,0)/(memberScores.length||1))}/100`,detail:'configurable automated score',icon:Sparkles,tone:'purple'},
+      'member-value':{value:currency.format(platform.memberValue.reduce((sum,item)=>sum+item.estimatedValue,0)),detail:'estimated value delivered',icon:Star,tone:'green'},
+      'active-campaigns':{value:String(platform.campaigns.filter((item)=>item.status==='Active').length),detail:`${platform.campaigns.reduce((sum,item)=>sum+item.referrals,0)} website referrals`,icon:Globe2,tone:'blue'},
+      'automation-failures':{value:String(platform.automations.filter((item)=>item.error).length),detail:`${platform.automations.filter((item)=>item.active).length} active workflow rules`,icon:CircleAlert,tone:'amber'},
       'member-tiers':{value:'',detail:'',icon:Building2,tone:'purple'},'review-trends':{value:'',detail:'',icon:Star,tone:'amber'},'renewals':{value:'',detail:'',icon:CalendarClock,tone:'amber'},'tasks':{value:'',detail:'',icon:Check,tone:'green'},'activity':{value:'',detail:'',icon:Eye,tone:'purple'}
     }; const item=map[id], Icon=item.icon
     return <article className="dashboard-widget metric-widget"><div className="widget-top"><span className={`stat-icon ${item.tone}`}><Icon size={19}/></span><GripVertical size={17}/></div><p>{widgetNames[id]}</p><h2>{item.value}</h2><small>{item.detail}</small>{id==='bank-balance'&&<button className="widget-link" onClick={()=>navigate('settings')}>{data.workspace.bankBalance!==undefined?'Manage connection':'Set up connection'} <ArrowRight size={13}/></button>}</article>
