@@ -37,7 +37,7 @@ export function Pipeline() {
         <div><span className="summary-icon blue"><TrendingUp size={18} /></span><p><small>Weighted value</small><strong>{currency.format(weightedValue)}</strong></p></div>
         <div><p><small>Live opportunities</small><strong>{opportunities.filter((item) => item.stage !== 'Won').length}</strong></p></div>
         <div><p><small>Won this month</small><strong>{currency.format(opportunities.filter((item) => item.stage === 'Won').reduce((sum, item) => sum + item.value, 0))}</strong></p></div>
-        <div className="pipeline-search"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pipeline..." /></div>
+        <div className="pipeline-search"><Search size={16} /><input type="search" aria-label="Search membership pipeline" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search pipeline..." /></div>
       </section>
 
       <section className="kanban">
@@ -52,7 +52,7 @@ export function Pipeline() {
                 <h3>{item.organisationName}</h3>
                 <p className="opportunity-contact"><UserRound size={14} />{item.contactName}</p>
                 <div className="opportunity-value"><strong>{currency.format(item.value)}</strong><span>{item.probability}% probability</span></div>
-                <div className="opportunity-progress"><span style={{ width: `${item.probability}%`, background: stageColours[stage] }} /></div>
+                <div className="opportunity-progress" role="progressbar" aria-label={`${item.organisationName} probability`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={item.probability}><span style={{ width: `${item.probability}%`, background: stageColours[stage] }} /></div>
                 <div className="opportunity-action"><small>Next action</small><p>{item.nextAction}</p><span className={dateLabel(item.nextActionDate).includes('overdue') ? 'overdue' : ''}><CalendarDays size={13} />{dateLabel(item.nextActionDate)}</span></div>
                 <footer><span className="source-tag">{item.source}</span><span><Avatar name={item.owner} size="sm" />{item.stageEnteredAt?Math.max(0,Math.floor((Date.now()-new Date(item.stageEnteredAt).getTime())/86400000)):item.daysInStage}d</span><GripVertical size={16} /></footer>
               </article>)}
@@ -62,7 +62,7 @@ export function Pipeline() {
           </div>
         })}
       </section>
-      <p className="drag-hint"><GripVertical size={14} />Drag cards between stages to update the sales pipeline.</p>
+      <p className="drag-hint"><GripVertical size={14} aria-hidden="true" />Drag cards between stages, or choose Edit on a card and select a stage with the keyboard.</p>
       {adding&&<Modal title={editingId?'Edit opportunity':'Add opportunity'} subtitle="Maintain the value, stage, owner and next action." onClose={close}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();if(editingId)updateOpportunity(editingId,draft);else addOpportunity(draft);close()}}><div className="form-grid two"><Field label="Organisation"><input required autoFocus value={draft.organisationName} onChange={(e)=>setDraft({...draft,organisationName:e.target.value})}/></Field><Field label="Contact"><input required value={draft.contactName} onChange={(e)=>setDraft({...draft,contactName:e.target.value})}/></Field><Field label="Stage"><select value={draft.stage} onChange={(e)=>setDraft({...draft,stage:e.target.value as PipelineStage})}>{stages.map((stage)=><option key={stage}>{stage}</option>)}</select></Field><Field label="Proposed membership"><select value={draft.proposedLevel} onChange={(e)=>{const level=data.levels.find((item)=>item.name===e.target.value);setDraft({...draft,proposedLevel:e.target.value,value:level?.price??draft.value})}}>{data.levels.filter((level)=>level.active).map((level)=><option key={level.id}>{level.name}</option>)}</select></Field><Field label="Value"><input type="number" min="0" value={draft.value} onChange={(e)=>setDraft({...draft,value:Number(e.target.value)})}/></Field><Field label="Probability"><input type="number" min="0" max="100" value={draft.probability} onChange={(e)=>setDraft({...draft,probability:Number(e.target.value)})}/></Field><Field label="Next action"><input value={draft.nextAction} onChange={(e)=>setDraft({...draft,nextAction:e.target.value})}/></Field><Field label="Next action date"><input type="date" value={draft.nextActionDate} onChange={(e)=>setDraft({...draft,nextActionDate:e.target.value})}/></Field></div><div className="modal-actions"><Button type="button" variant="secondary" onClick={close}>Cancel</Button><Button type="submit">{editingId?'Save changes':'Add opportunity'}</Button></div></form></Modal>}
     </div>
   )
