@@ -372,7 +372,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     addOrganisation: (draft) => {
       const organisationId = id('org')
       const contactId = id('con')
-      const level = data.levels.find((item) => item.name === draft.tier)
+      const nonMember = draft.status === 'Non-member' || draft.tier === 'No membership'
+      const level = nonMember ? undefined : data.levels.find((item) => item.name === draft.tier)
       const organisation: Organisation = {
         id: organisationId,
         name: draft.name,
@@ -380,8 +381,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         town: draft.town,
         address: '',
         website: '',
-        tier: draft.tier,
-        status: draft.status,
+        tier: nonMember ? 'No membership' : draft.tier,
+        status: nonMember ? 'Non-member' : draft.status,
         health: 'OK',
         owner: user?.name ?? 'Morgan Lee',
         primaryContactId: contactId,
@@ -392,9 +393,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         lastActivity: new Date().toISOString(),
         nextAction: draft.nextAction,
         nextActionDate: todayISO(),
-        tags: draft.status === 'Prospect' ? ['Prospect'] : [],
+        tags: nonMember ? ['Non-member'] : draft.status === 'Prospect' ? ['Prospect'] : [],
         notes: '',
-        colour: level?.colour ?? '#376b87',
+        colour: level?.colour ?? '#64748b',
       }
       setData((current) => ({
         ...current,

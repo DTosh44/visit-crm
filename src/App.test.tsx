@@ -65,6 +65,18 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Press trip host')).toBeInTheDocument()
   })
 
+  it('adds an organisation without creating a membership', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
+    fireEvent.click(screen.getByRole('button',{name:'Add organisation'}))
+    fireEvent.change(screen.getByLabelText('Organisation name'),{target:{value:'Valechester PR Collective'}})
+    expect(screen.getByLabelText('Membership level')).toHaveValue('No membership')
+    expect(screen.getByLabelText('Relationship status')).toHaveValue('Non-member')
+    fireEvent.click(screen.getByRole('button',{name:'Create organisation'}))
+    expect(screen.getByRole('button',{name:'Valechester PR Collective'})).toBeInTheDocument()
+    expect(screen.getAllByText('Non-member').length).toBeGreaterThan(0)
+  })
+
   it('provides a searchable rights-managed image bank', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Image bank'}))

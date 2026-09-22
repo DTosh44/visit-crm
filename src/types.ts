@@ -19,7 +19,7 @@ export type ViewKey =
   | 'settings'
 
 export type Health = 'Happy' | 'OK' | 'Needs attention'
-export type MembershipStatus = 'Active' | 'Renewing' | 'Prospect' | 'Free listing' | 'Lapsed'
+export type MembershipStatus = 'Active' | 'Renewing' | 'Prospect' | 'Free listing' | 'Lapsed' | 'Non-member'
 export type ListingStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Overdue' | 'Paid' | 'Void'
 export type AgreementStatus = 'Draft' | 'Sent' | 'Viewed' | 'Signed' | 'Declined' | 'Expired'

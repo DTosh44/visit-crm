@@ -307,6 +307,7 @@ input[type="checkbox"] { accent-color: var(--primary); }
 .form-separator { position: relative; height: 17px; display: flex; align-items: center; }
 .form-separator::before { position: absolute; content: ""; inset: 50% 0 auto; border-top: 1px solid var(--line); }
 .form-separator span { z-index: 1; padding-right: 9px; color: #8b95a4; background: #fff; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.form-help { margin: -2px 0 0; padding: 10px 12px; color: #526071; font-size: 10px; line-height: 1.5; border: 1px solid #dce4ea; border-radius: 8px; background: #f7f9fb; }
 .prefix-input, .suffix-input, .colour-input { display: flex; align-items: center; overflow: hidden; border: 1px solid var(--line-dark); border-radius: 7px; background: #fff; }
 .prefix-input > span { padding-left: 10px; color: #6c7888; }
 .prefix-input input, .suffix-input input, .colour-input input { min-width: 0 !important; border: 0 !important; box-shadow: none !important; }

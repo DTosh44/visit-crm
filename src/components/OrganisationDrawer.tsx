@@ -32,6 +32,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   const activities = data.activities.filter((item) => item.organisationId === organisation.id)
   const level = data.levels.find((item) => item.name === organisation.tier)
   const primaryContact = contacts.find((item) => item.primary) ?? contacts[0]
+  const isMember = organisation.status !== 'Non-member' && organisation.tier !== 'No membership'
 
   const outstanding = useMemo(() => invoices.filter((item) => ['Sent', 'Overdue'].includes(item.status)).reduce((total, item) => total + item.total, 0), [invoices])
 
@@ -44,7 +45,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
     <Drawer title={organisation.name} subtitle={`${organisation.type} · ${organisation.town}`} onClose={onClose}>
       <div className="org-drawer-hero">
         <Avatar name={organisation.name} colour={organisation.colour} size="lg" />
-        <div className="org-drawer-title"><div><h2>{organisation.name}</h2><Badge>{organisation.status}</Badge></div><p><MapPin size={14} />{organisation.town}<span>·</span>{organisation.tier} membership</p></div>
+        <div className="org-drawer-title"><div><h2>{organisation.name}</h2><Badge>{organisation.status}</Badge></div><p><MapPin size={14} />{organisation.town}<span>·</span>{isMember ? `${organisation.tier} membership` : 'Non-member organisation'}</p></div>
         <div className="org-hero-actions"><Button variant="secondary" size="sm" onClick={()=>setTagDraft([...organisation.tags])}>Manage tags</Button><Button variant="secondary" icon={Mail} size="sm" onClick={()=>openEmail(primaryContact?.email??'',`Visit Valechester: ${organisation.name}`)}>Email</Button><Button icon={Plus} size="sm" onClick={()=>{const detail=window.prompt('Add a relationship action or note');if(detail)addActivity(organisation.id,'Relationship note',detail)}}>Add action</Button></div>
       </div>
       <div className="organisation-tag-strip">{organisation.tags.length?organisation.tags.map((tag)=><span key={tag}>{tag}</span>):<small>No organisation tags</small>}</div>
@@ -53,10 +54,10 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
 
       {tab === 'Overview' && <div className="org-tab-content">
         <div className="org-kpi-row">
-          <div><span className="mini-icon purple"><UsersRound size={16} /></span><p><small>Membership</small><strong>{organisation.tier}</strong></p></div>
-          <div><span className="mini-icon green"><CircleDollarSign size={16} /></span><p><small>Annual value</small><strong>{organisation.annualValue ? currency.format(organisation.annualValue) : 'Free'}</strong></p></div>
+          <div><span className="mini-icon purple"><UsersRound size={16} /></span><p><small>Relationship</small><strong>{isMember ? organisation.tier : 'Non-member'}</strong></p></div>
+          <div><span className="mini-icon green"><CircleDollarSign size={16} /></span><p><small>Annual value</small><strong>{!isMember ? 'Not applicable' : organisation.annualValue ? currency.format(organisation.annualValue) : 'Free'}</strong></p></div>
           <div><span className="mini-icon blue"><Globe2 size={16} /></span><p><small>Listings</small><strong>{listings.length} / {level?.listingAllowance ?? 1}</strong></p></div>
-          <div><span className="mini-icon amber"><Calendar size={16} /></span><p><small>Renewal</small><strong>{formatDate(organisation.renewalDate, { day: 'numeric', month: 'short' })}</strong></p></div>
+          <div><span className="mini-icon amber"><Calendar size={16} /></span><p><small>Renewal</small><strong>{isMember && organisation.renewalDate ? formatDate(organisation.renewalDate, { day: 'numeric', month: 'short' }) : 'Not applicable'}</strong></p></div>
         </div>
 
         <div className="org-overview-grid">
@@ -68,7 +69,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
               <div><dt>Phone</dt><dd>{primaryContact?.phone || 'Not set'}</dd></div>
               <div><dt>Website</dt><dd>{organisation.website ? <a href={organisation.website} target="_blank" rel="noreferrer">{organisation.website.replace(/^https?:\/\//,'')} <ExternalLink size={12} /></a> : 'Not set'}</dd></div>
               <div><dt>Relationship owner</dt><dd><span className="owner-inline"><Avatar name={organisation.owner} size="sm" />{organisation.owner}</span></dd></div>
-              <div><dt>Member since</dt><dd>{formatDate(organisation.membershipStart)}</dd></div>
+              <div><dt>Member since</dt><dd>{isMember && organisation.membershipStart ? formatDate(organisation.membershipStart) : 'Not applicable'}</dd></div>
             </dl>
           </section>
 
@@ -101,7 +102,9 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
         </article>)}</div>
       </div>}
 
-      {tab === 'Membership' && <div className="org-tab-content">
+      {tab === 'Membership' && !isMember && <div className="org-tab-content"><div className="inline-empty"><strong>No membership attached</strong><br/>This organisation is stored as a non-member relationship, so it has no renewal, annual membership value or tracked benefits.</div></div>}
+
+      {tab === 'Membership' && isMember && <div className="org-tab-content">
         <div className="membership-summary-card" style={{ '--level-colour': level?.colour } as React.CSSProperties}>
           <div><span className="membership-level-icon"><UsersRound size={22} /></span><div><small>Current membership</small><h3>{organisation.tier}</h3><p>{organisation.status} · {formatDate(organisation.membershipStart, { day: 'numeric', month: 'short', year: 'numeric' })} to {formatDate(organisation.renewalDate, { day: 'numeric', month: 'short', year: 'numeric' })}</p></div></div>
           <div className="membership-price"><strong>{organisation.annualValue ? currency.format(organisation.annualValue) : 'Free'}</strong><span>ex VAT / year</span></div>

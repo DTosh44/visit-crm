@@ -7,7 +7,7 @@ import { Button, Field, Modal } from './UI'
 
 export function AddOrganisationModal({ onClose, onCreated }: { onClose: () => void; onCreated: (organisation: Organisation) => void }) {
   const { data, addOrganisation } = useCRM()
-  const [draft, setDraft] = useState<OrganisationDraft>({ name: '', type: 'Attraction', town: 'Valechester', contactName: '', contactEmail: '', tier: 'Tier 1', status: 'Prospect', nextAction: 'Arrange introductory call' })
+  const [draft, setDraft] = useState<OrganisationDraft>({ name: '', type: 'Attraction', town: 'Valechester', contactName: '', contactEmail: '', tier: 'No membership', status: 'Non-member', nextAction: 'Arrange introductory call' })
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!draft.name.trim()) return
@@ -15,14 +15,17 @@ export function AddOrganisationModal({ onClose, onCreated }: { onClose: () => vo
     onClose()
     onCreated(organisation)
   }
-  return <Modal title="Add organisation" subtitle="Create the shared record once, then connect membership, listings and billing." onClose={onClose}>
+  const changeTier = (tier: string) => setDraft({ ...draft, tier, status: tier === 'No membership' ? 'Non-member' : draft.status === 'Non-member' ? 'Prospect' : draft.status })
+  const changeStatus = (status: MembershipStatus) => setDraft({ ...draft, status, tier: status === 'Non-member' ? 'No membership' : draft.tier === 'No membership' ? data.levels.find((level) => level.active)?.name ?? 'Free Listing' : draft.tier })
+  return <Modal title="Add organisation" subtitle="Create a member, prospect or non-member relationship in the shared CRM." onClose={onClose}>
     <form className="form-stack" onSubmit={submit}>
       <Field label="Organisation name"><input autoFocus required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Business or organisation name" /></Field>
       <div className="form-grid two"><Field label="Business type"><select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}>{typeOptions.map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Town"><select value={draft.town} onChange={(event) => setDraft({ ...draft, town: event.target.value })}>{townOptions.map((item) => <option key={item}>{item}</option>)}</select></Field></div>
       <div className="form-separator"><span>Primary contact</span></div>
       <div className="form-grid two"><Field label="Contact name"><input value={draft.contactName} onChange={(event) => setDraft({ ...draft, contactName: event.target.value })} placeholder="Full name" /></Field><Field label="Email address"><input type="email" value={draft.contactEmail} onChange={(event) => setDraft({ ...draft, contactEmail: event.target.value })} placeholder="name@business.co.uk" /></Field></div>
       <div className="form-separator"><span>Relationship</span></div>
-      <div className="form-grid two"><Field label="Membership level"><select value={draft.tier} onChange={(event) => setDraft({ ...draft, tier: event.target.value })}>{data.levels.filter((level)=>level.active).map((level) => <option key={level.id}>{level.name}</option>)}</select></Field><Field label="Status"><select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as MembershipStatus })}><option>Prospect</option><option>Active</option><option>Free listing</option></select></Field></div>
+      <div className="form-grid two"><Field label="Membership level"><select value={draft.tier} onChange={(event) => changeTier(event.target.value)}><option>No membership</option>{data.levels.filter((level)=>level.active).map((level) => <option key={level.id}>{level.name}</option>)}</select></Field><Field label="Relationship status"><select value={draft.status} onChange={(event) => changeStatus(event.target.value as MembershipStatus)}><option>Non-member</option><option>Prospect</option><option>Active</option><option>Renewing</option><option>Free listing</option><option>Lapsed</option></select></Field></div>
+      {draft.status === 'Non-member' && <p className="form-help">This organisation will be stored for relationship management only. No membership value, renewal or benefits will be created.</p>}
       <Field label="Next action"><input value={draft.nextAction} onChange={(event) => setDraft({ ...draft, nextAction: event.target.value })} /></Field>
       <div className="modal-actions"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">Create organisation</Button></div>
     </form>
