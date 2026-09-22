@@ -35,7 +35,7 @@ export function Listings({ onEdit }: { onEdit: (listing: Listing) => void }) {
         <div className="table-toolbar">
           <div className="table-search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search listings..." /></div>
           <div className="toolbar-filters">
-            <label className="select-wrap"><select value={status} onChange={(event) => setStatus(event.target.value)}><option>All statuses</option><option>Published</option><option>Draft</option><option>In review</option><option>Changes requested</option></select><ChevronDown size={14} /></label>
+            <label className="select-wrap"><select aria-label="Filter listings by status" value={status} onChange={(event) => setStatus(event.target.value)}><option>All statuses</option><option>Published</option><option>Draft</option><option>In review</option><option>Changes requested</option></select><ChevronDown size={14} /></label>
             <div className="view-toggle"><button className={layout === 'grid' ? 'active' : ''} onClick={() => setLayout('grid')} aria-label="Grid view"><Grid2X2 size={16} /></button><button className={layout === 'list' ? 'active' : ''} onClick={() => setLayout('list')} aria-label="List view"><List size={17} /></button></div>
           </div>
         </div>
