@@ -43,7 +43,7 @@ export function coordinatesFor(town: string, id: string): [number, number] {
 
 export function listingMapPoint(listing: Listing): MapPoint {
   const fallback = coordinatesFor(listing.town, listing.id)
-  return { id: `place-${listing.id}`, entityId: listing.id, kind: 'Place', title: listing.name, category: listing.category, town: listing.town, description: listing.shortDescription, image: listing.image, latitude: listing.mapLatitude ?? fallback[0], longitude: listing.mapLongitude ?? fallback[1], featured: listing.mapFeatured ?? listing.completeness >= 95, path: `/place/${listing.id}` }
+  return { id: `place-${listing.id}`, entityId: listing.id, kind: 'Place', title: listing.name, category: listing.category, town: listing.town, description: listing.shortDescription, image: listing.image, latitude: listing.mapLatitude ?? fallback[0], longitude: listing.mapLongitude ?? fallback[1], featured: listing.mapFeatured ?? false, path: `/place/${listing.id}` }
 }
 
 export function eventMapPoint(event: DestinationEvent): MapPoint {

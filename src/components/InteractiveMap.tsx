@@ -1,6 +1,7 @@
-import { CalendarDays, Crosshair, List, Map as MapIcon, MapPin, Search, X } from 'lucide-react'
+import { CalendarDays, Crosshair, List, Map as MapIcon, MapPin, Search, Star, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { imageLibrary } from '../siteData'
 import { mapCentre, type MapPoint } from '../mapData'
@@ -12,6 +13,11 @@ function MapFocus({ point, userPosition }: { point?: MapPoint; userPosition?: [n
     if (target) map.flyTo(target, point ? 16 : 14, { duration: .7 })
   }, [map, point, userPosition])
   return null
+}
+
+function pointIcon(point:MapPoint,selected:boolean){
+  const size=selected?38:point.featured?34:26
+  return divIcon({className:'map-location-marker-shell',html:`<span class="map-location-marker ${point.kind==='Event'?'event':'place'}${point.featured?' featured':''}${selected?' selected':''}">${point.featured?'<b aria-hidden="true">★</b>':''}</span>`,iconSize:[size,size],iconAnchor:[size/2,size/2],popupAnchor:[0,-size/2]})
 }
 
 export function InteractiveMap({ points, onOpen }: { points: MapPoint[]; onOpen: (point: MapPoint) => void }) {
@@ -33,7 +39,7 @@ export function InteractiveMap({ points, onOpen }: { points: MapPoint[]; onOpen:
       <label className="map-search"><Search size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search places, events or towns" aria-label="Search the map"/></label>
       <div className="map-kind-filters" aria-label="Map categories">{(['All','Place','Event'] as const).map((item) => <button key={item} className={kind === item ? 'active' : ''} aria-pressed={kind === item} onClick={() => setKind(item)}>{item === 'All' ? 'Everything' : `${item}s`}</button>)}</div>
       <div className="map-result-count" role="status">{filtered.length} mapped {filtered.length === 1 ? 'location' : 'locations'}</div>
-      <div className="map-result-list">{filtered.map((point) => <button key={point.id} className={selectedId === point.id ? 'active' : ''} onClick={() => setSelectedId(point.id)}><img src={imageLibrary[point.image] ?? point.image ?? imageLibrary.park} alt=""/><span><small>{point.kind} · {point.category}</small><strong>{point.title}</strong><em><MapPin size={12}/>{point.town}{point.date && <><CalendarDays size={12}/>{new Date(`${point.date}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</>}</em></span></button>)}</div>
+      <div className="map-result-list">{filtered.map((point) => <button key={point.id} className={selectedId === point.id ? 'active' : ''} onClick={() => setSelectedId(point.id)}><img src={imageLibrary[point.image] ?? point.image ?? imageLibrary.park} alt=""/><span><small>{point.kind} · {point.category}{point.featured&&<i className="map-featured-label"><Star size={9}/>Featured</i>}</small><strong>{point.title}</strong><em><MapPin size={12}/>{point.town}{point.date && <><CalendarDays size={12}/>{new Date(`${point.date}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</>}</em></span></button>)}</div>
     </aside>
     <div className="map-canvas-wrap">
       {!listOpen && <button className="map-show-results" onClick={() => setListOpen(true)}><List size={17}/>Show results</button>}
@@ -43,7 +49,7 @@ export function InteractiveMap({ points, onOpen }: { points: MapPoint[]; onOpen:
         <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
         <MapFocus point={selected} userPosition={userPosition}/>
         {userPosition && <CircleMarker center={userPosition} radius={8} pathOptions={{ color: '#245c9c', fillColor: '#4d93df', fillOpacity: 1, weight: 3 }}><Popup>You are here</Popup></CircleMarker>}
-        {filtered.map((point) => <CircleMarker key={point.id} center={[point.latitude, point.longitude]} radius={selectedId === point.id ? 12 : point.featured ? 10 : 8} pathOptions={{ color: '#fff', fillColor: point.kind === 'Event' ? '#f0785e' : '#6d294f', fillOpacity: 1, weight: selectedId === point.id ? 4 : 2 }} eventHandlers={{ click: () => setSelectedId(point.id) }}><Popup><article className="map-popup"><img src={imageLibrary[point.image] ?? point.image ?? imageLibrary.park} alt=""/><small>{point.kind} · {point.category}</small><strong>{point.title}</strong><span><MapPin size={12}/>{point.town}</span><button onClick={() => onOpen(point)}>View details</button></article></Popup></CircleMarker>)}
+        {filtered.map((point) => <Marker key={point.id} position={[point.latitude, point.longitude]} icon={pointIcon(point,selectedId===point.id)} zIndexOffset={point.featured?1000:0} title={`${point.title}${point.featured?' · Featured':''}`} eventHandlers={{ click: () => setSelectedId(point.id) }}><Popup><article className="map-popup"><img src={imageLibrary[point.image] ?? point.image ?? imageLibrary.park} alt=""/><small>{point.kind} · {point.category}{point.featured?' · Featured':''}</small><strong>{point.title}</strong><span><MapPin size={12}/>{point.town}</span><button onClick={() => onOpen(point)}>View details</button></article></Popup></Marker>)}
       </MapContainer>
       {selected && <article className="map-selection-card"><button onClick={() => setSelectedId(null)} aria-label="Close selected location"><X size={16}/></button><span><small>{selected.kind} · {selected.category}</small><strong>{selected.title}</strong><em><MapPin size={12}/>{selected.town}</em></span><button onClick={() => onOpen(selected)}>Explore <MapIcon size={14}/></button></article>}
     </div>
