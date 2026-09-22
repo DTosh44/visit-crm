@@ -135,7 +135,7 @@ export function Drawer({ title, subtitle, onClose, children, width = 'wide' }: {
       <aside ref={dialogRef} tabIndex={-1} className={classNames('drawer', `drawer-${width}`)} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? descriptionId : undefined}>
         <header className="drawer-header">
           <div><h2 id={titleId}>{title}</h2>{subtitle && <p id={descriptionId}>{subtitle}</p>}</div>
-          <button className="icon-button" onClick={onClose} aria-label={`Close ${title}`}><X size={19} /></button>
+          <button className="icon-button" onClick={onClose} aria-label="Close" title={`Close ${title}`}><X size={19} /></button>
         </header>
         <div className="drawer-body">{children}</div>
       </aside>
