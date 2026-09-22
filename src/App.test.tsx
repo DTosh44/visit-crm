@@ -20,6 +20,8 @@ describe('Visit CRM', () => {
 
   it('renders the destination dashboard', () => {
     renderApp()
+    expect(screen.getByRole('img',{name:'VisitMade'})).toBeInTheDocument()
+    expect(screen.getByRole('img',{name:'Visit Valechester'})).toBeInTheDocument()
     expect(screen.getByText(/Good (morning|afternoon|evening), Alex/)).toBeInTheDocument()
     expect(screen.getByText('Membership income')).toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()

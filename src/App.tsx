@@ -27,7 +27,7 @@ import { useAuth } from './auth'
 import { canAccessView } from './auth'
 import { LoginPage } from './LoginPage'
 import { PublicSite } from './PublicSite'
-import { BrandLogo } from './components/BrandLogo'
+import { ProductLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 
@@ -116,7 +116,7 @@ export default function App() {
   const isCRM = window.location.pathname.startsWith('/crm')
 
   if (!isCRM) return <PublicSite />
-  if (loading) return <div className="auth-loading"><BrandLogo /><span>Opening your workspace…</span></div>
+  if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
   if (!user) return <LoginPage />
   return <CRMApp />
 }

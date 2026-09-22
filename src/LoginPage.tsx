@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { BrandLogo } from './components/BrandLogo'
+import { ProductLogo } from './components/BrandLogo'
 import { DEFAULT_PASSWORD, seedUsers, useAuth } from './auth'
 import { tenant } from './tenant'
 
@@ -25,7 +25,7 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-story">
         <a className="login-back" href="/"><ArrowLeft size={16} /> View destination website</a>
-        <BrandLogo inverse />
+        <ProductLogo inverse />
         <div className="login-story-copy">
           <span className="login-kicker">Destination workspace</span>
           <h1>One place to grow a place.</h1>

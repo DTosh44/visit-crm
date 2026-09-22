@@ -8,7 +8,7 @@ import { useCRM } from '../store'
 import type { Organisation, ViewKey } from '../types'
 import { classNames } from '../utils'
 import { Avatar, useDialogFocus } from './UI'
-import { BrandLogo } from './BrandLogo'
+import { BrandLogo, ProductLogo } from './BrandLogo'
 import { type FeatureKey } from '../tenant'
 import { canAccessView, useAuth } from '../auth'
 import { useFeatures } from '../features'
@@ -134,13 +134,13 @@ export function Layout({
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside id="crm-sidebar-navigation" className={classNames('sidebar', sidebarOpen && 'sidebar-open')} aria-label="Workspace navigation">
         <div className="brand">
-          <BrandLogo inverse />
+          <ProductLogo inverse />
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
 
         <div className="workspace-switcher">
-          <span className="workspace-logo">VV</span>
-          <span><small>Destination</small><strong>{data.workspace.destinationName}</strong></span>
+          <small>Destination</small>
+          <BrandLogo inverse />
         </div>
 
         <nav className="nav" aria-label="CRM sections">
