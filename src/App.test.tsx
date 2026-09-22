@@ -595,6 +595,37 @@ describe('Visit CRM', () => {
     expect(savedTasks.some((item)=>item.title==='Prepare campaign creative'&&Boolean(item.campaignId))).toBe(true)
   })
 
+  it('creates an opportunity and persists an organisation invitation', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Opportunities'}))
+    fireEvent.click(screen.getByRole('button',{name:'New opportunity'}))
+    fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Autumn member showcase'}})
+    fireEvent.change(screen.getByLabelText('Description'),{target:{value:'A featured place in the destination campaign.'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save opportunity'}))
+    expect(screen.getByRole('heading',{name:'Autumn member showcase'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab',{name:'Applicants'}))
+    fireEvent.change(screen.getByLabelText('Invite organisation'),{target:{value:'org-001'}})
+    fireEvent.click(screen.getByRole('button',{name:'Invite'}))
+    expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
+    const saved=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}').memberOpportunities as Array<{title:string;invitedOrganisationIds:string[]}>
+    expect(saved.find((item)=>item.title==='Autumn member showcase')?.invitedOrganisationIds).toContain('org-001')
+  })
+
+  it('records opportunity participation once in member value', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Opportunities'}))
+    const card=screen.getByText('Christmas campaign partner feature').closest('article')!
+    fireEvent.click(within(card).getByRole('button',{name:'Open opportunity'}))
+    fireEvent.click(screen.getByRole('tab',{name:'Applicants'}))
+    fireEvent.click(screen.getByRole('button',{name:'Approve'}))
+    fireEvent.click(screen.getByRole('button',{name:'Confirm'}))
+    fireEvent.click(screen.getByRole('button',{name:'Record participation'}))
+    const saved=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}') as typeof initialPlatformData
+    expect(saved.memberOpportunities[0].applications[0].participated).toBe(true)
+    expect(saved.memberValue.filter((entry)=>entry.opportunityId==='member-opp-001'&&entry.organisationId==='org-003')).toHaveLength(1)
+    expect(screen.queryByRole('button',{name:'Record participation'})).not.toBeInTheDocument()
+  })
+
   it('creates and edits a FAM trip with linked buyers and organisations', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Buyers, leads & FAMs'}))

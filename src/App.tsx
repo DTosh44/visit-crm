@@ -118,7 +118,7 @@ function CRMApp() {
       {activeView === 'tasks' && <Tasks onAdd={() => setModal('task')} openOrganisation={openOrganisation} />}
       {activeView === 'communications' && <Communications />}
       {activeView === 'memberValue' && <MemberValue />}
-      {activeView === 'memberOpportunities' && <MemberOpportunities />}
+      {activeView === 'memberOpportunities' && <MemberOpportunities onNavigateCommunications={()=>setView('communications')} />}
       {activeView === 'campaigns' && <Campaigns />}
       {activeView === 'engagement' && <Engagement />}
       {activeView === 'travelTrade' && <TravelTrade />}

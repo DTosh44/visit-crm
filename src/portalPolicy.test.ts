@@ -6,7 +6,7 @@ const target:PortalTarget={tenantId:'tenant-a',organisationId:'org-a',entity:'li
 
 describe('portal server access rules',()=>{
   it('denies every operation when a record ID resolves to another organisation or tenant',()=>{
-    const operations:PortalOperation[]=['read','propose','save_event_draft','submit_event','manage_contact','set_primary','express_interest','apply','confirm']
+    const operations:PortalOperation[]=['read','propose','save_event_draft','submit_event','manage_contact','set_primary','express_interest','apply','confirm','withdraw']
     for(const operation of operations){
       expect(canPortalAccess(grant,{...target,organisationId:'org-b'},operation)).toBe(false)
       expect(canPortalAccess(grant,{...target,tenantId:'tenant-b'},operation)).toBe(false)

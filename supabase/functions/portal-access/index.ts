@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { canPortalAccess, eventProposalFields, listingProposalFields, organisationProposalFields, pickFields, type PortalGrant, type PortalRole } from '../../../src/portalPolicy.ts'
+import { canMoveApplication, normaliseOpportunity, opportunityCapacity, opportunityEligible } from '../../../src/opportunityModel.ts'
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type'}
 const json=(value:unknown,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cors,'Content-Type':'application/json'}})
@@ -36,7 +37,7 @@ async function portalBundle(tenantId:string,grant:PortalGrant,state:Record<strin
   const {data:platformRow}=await admin.from('platform_states').select('data').eq('tenant_id',tenantId).maybeSingle()
   const platform=platformRow?.data??{}
   const {data:requests}=await admin.from('portal_change_requests').select('id,entity_type,entity_id,proposed,status,review_note,created_at,updated_at').eq('tenant_id',tenantId).eq('organisation_id',org.id).order('created_at',{ascending:false})
-  const opportunities=(platform.memberOpportunities??[]).filter((item:any)=>item.status==='Open'&&item.eligibleLevels?.includes(org.tier)).map((item:any)=>({id:item.id,title:item.title,description:item.description,category:item.category,requirements:item.requirements,closingDate:item.closingDate,price:item.price,capacity:item.capacity,applications:(item.applications??[]).filter((entry:any)=>entry.organisationId===org.id).map((entry:any)=>pickFields(entry,['id','contactId','response','status','amount']))}))
+  const opportunities=(platform.memberOpportunities??[]).map(normaliseOpportunity).filter((item:any)=>opportunityEligible(item,org,now().slice(0,10))||item.applications.some((entry:any)=>entry.organisationId===org.id)).map((item:any)=>({id:item.id,title:item.title,description:item.description,type:item.type,category:item.category,requirements:item.requirements,eligibilityCriteria:item.eligibilityCriteria,openingDate:item.openingDate,closingDate:item.closingDate,activityStartDate:item.activityStartDate,activityEndDate:item.activityEndDate,price:item.price,subsidisedValue:item.subsidisedValue,capacity:item.capacity,placesAvailable:opportunityCapacity(item).placesAvailable,status:item.status,links:item.links,applications:item.applications.filter((entry:any)=>entry.organisationId===org.id).map((entry:any)=>pickFields(entry,['id','contactId','response','status','amount','participated','outcome']))}))
   const level=(state.levels??[]).find((item:any)=>item.name===org.tier)
   return {role:grant.role,contact:safeContact(contact),organisation:safeOrganisation(org),contacts:(state.contacts??[]).filter((item:any)=>item.organisationId===org.id).map(safeContact),listings:(state.listings??[]).filter((item:any)=>item.organisationId===org.id).map(safeListing),events:(state.events??[]).filter((item:any)=>item.organisationId===org.id).map(safeEvent),benefits:(level?.benefits??[]).map((id:string)=>{const benefit=(state.benefits??[]).find((item:any)=>item.id===id);const usage=(state.benefitUsage??[]).find((item:any)=>item.organisationId===org.id&&item.benefitId===id);return benefit?{id,name:benefit.name,kind:benefit.kind,category:benefit.category,allowance:benefit.allowance,used:usage?.used??0,note:usage?.note??'',dateUsed:usage?.updatedAt??''}:null}).filter(Boolean),opportunities,documents:(platform.resources??[]).filter((item:any)=>item.published&&/^https:\/\//.test(item.url??'')&&(!item.membershipLevels?.length||item.membershipLevels.includes(org.tier))).map((item:any)=>pickFields(item,['id','title','category','description','url','updatedAt'])),agreements:(state.agreements??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','membershipLevel','status','validUntil'])),invoices:grant.role==='Billing contact'||grant.role==='Member admin'?(state.invoices??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','description','dueDate','total','status'])):[],requests:requests??[],destination:{name:state.workspace?.destinationName??'',email:state.workspace?.contactEmail??'',logoUrl:state.workspace?.destinationLogoUrl??''}}
 }
@@ -175,21 +176,24 @@ Deno.serve(async(request)=>{
       }else state.contacts=state.contacts.map((item:any)=>item.id===targetId?{...item,name:text(changes.name??item.name,150),jobTitle:text(changes.jobTitle??item.jobTitle,150),phone:text(changes.phone??item.phone,60)}:item)
       await saveWorkspace(tenantId,user.id,state)
       await audit(tenantId,user.id,org.id,action,targetId)
-    }else if(['express_interest','apply','confirm'].includes(action)){
-      const {data:platformRow,error}=await admin.from('platform_states').select('data').eq('tenant_id',tenantId).single()
+    }else if(['express_interest','apply','confirm','withdraw'].includes(action)){
+      const {data:platformRow,error}=await admin.from('platform_states').select('data,version,updated_at').eq('tenant_id',tenantId).single()
       if(error)throw error
-      const platform=platformRow.data,opportunity=(platform.memberOpportunities??[]).find((item:any)=>item.id===targetId)
-      if(!opportunity||!canPortalAccess(grant,{tenantId,organisationId:org.id,entity:'opportunity',id:targetId,status:opportunity.status,eligibleTiers:opportunity.eligibleLevels,tier:org.tier},action as 'express_interest'|'apply'|'confirm'))return deny()
+      const platform=platformRow.data,raw=(platform.memberOpportunities??[]).find((item:any)=>item.id===targetId)
+      if(!raw)return deny()
+      const opportunity=normaliseOpportunity(raw)
+      if(!canPortalAccess(grant,{tenantId,organisationId:org.id,entity:'opportunity',id:targetId,status:opportunity.status,eligibleTiers:opportunity.eligibleLevels,tier:org.tier},action as 'express_interest'|'apply'|'confirm'|'withdraw'))return deny()
+      if(['express_interest','apply'].includes(action)&&!opportunityEligible(opportunity,org,now().slice(0,10)))return deny()
       const current=(opportunity.applications??[]).find((item:any)=>item.organisationId===org.id)
-      if(action==='confirm'&&current?.status!=='Approved')return deny()
-      if(action==='express_interest'&&current)return json({error:'An interest or application already exists'},409)
-      if(action==='apply'&&current&&!['Interested','Information requested'].includes(current.status))return json({error:'An application already exists'},409)
+      const nextStatus=action==='express_interest'?'Interested':action==='apply'?'Applied':action==='confirm'?'Confirmed':'Withdrawn'
+      if(!canMoveApplication(opportunity,current,nextStatus))return json({error:'This application cannot make that transition or the opportunity is full'},409)
       const response=text(changes.response,2000)
       if(action==='apply'&&!response)return json({error:'Tell us how you would like to participate'},400)
-      const application=current?{...current,status:action==='confirm'?'Confirmed':'Applied',response:response||current.response}:{id:`application-${crypto.randomUUID()}`,organisationId:org.id,contactId:grant.contactId,response,status:action==='express_interest'?'Interested':'Applied',notes:'',amount:opportunity.price??0}
+      const application=current?{...current,status:nextStatus,response:response||current.response,updatedAt:now()}:{id:`application-${crypto.randomUUID()}`,organisationId:org.id,contactId:grant.contactId,response,status:nextStatus,notes:'',amount:opportunity.price??0,createdAt:now(),updatedAt:now()}
       platform.memberOpportunities=platform.memberOpportunities.map((item:any)=>item.id===targetId?{...item,applications:[...(item.applications??[]).filter((entry:any)=>entry.organisationId!==org.id),application]}:item)
-      const {error:saveError}=await admin.from('platform_states').update({data:platform,updated_by:null,updated_at:now()}).eq('tenant_id',tenantId)
+      const {data:saved,error:saveError}=await admin.from('platform_states').update({data:platform,version:platformRow.version+1,updated_by:null,updated_at:now()}).eq('tenant_id',tenantId).eq('version',platformRow.version).eq('updated_at',platformRow.updated_at).select('tenant_id')
       if(saveError)throw saveError
+      if(!saved?.length)return json({error:'The opportunity changed while you were responding. Refresh and try again.'},409)
       await audit(tenantId,user.id,org.id,action,targetId)
     }else return deny()
     return json(await portalBundle(tenantId,grant,state))
