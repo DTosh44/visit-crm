@@ -3,13 +3,15 @@ import { useCRM } from '../store'
 import { makePlatformId, usePlatform } from '../platform'
 import type { CreateTarget, ViewKey } from '../types'
 import { Button, Field, Modal } from './UI'
+import { FamTripEditor } from './FamTripEditor'
 
-export type PlatformCreateTarget=Extract<CreateTarget,'communication'|'memberValue'|'campaign'|'memberOpportunity'|'survey'|'buyer'|'tradeLead'|'businessEnquiry'|'prOpportunity'>
-const titles:Record<PlatformCreateTarget,string>={communication:'Communication',memberValue:'Member value record',campaign:'Campaign',memberOpportunity:'Member opportunity',survey:'Survey',buyer:'Travel trade buyer',tradeLead:'Travel trade lead',businessEnquiry:'Business events enquiry',prOpportunity:'PR opportunity'}
-const destinations:Record<PlatformCreateTarget,ViewKey>={communication:'communications',memberValue:'memberValue',campaign:'campaigns',memberOpportunity:'memberOpportunities',survey:'surveys',buyer:'travelTrade',tradeLead:'travelTrade',businessEnquiry:'businessEvents',prOpportunity:'prMedia'}
+export type PlatformCreateTarget=Extract<CreateTarget,'communication'|'memberValue'|'campaign'|'memberOpportunity'|'survey'|'buyer'|'tradeLead'|'famTrip'|'businessEnquiry'|'prOpportunity'>
+const titles:Record<PlatformCreateTarget,string>={communication:'Communication',memberValue:'Member value record',campaign:'Campaign',memberOpportunity:'Member opportunity',survey:'Survey',buyer:'Travel trade buyer',tradeLead:'Travel trade lead',famTrip:'FAM trip',businessEnquiry:'Business events enquiry',prOpportunity:'PR opportunity'}
+const destinations:Record<PlatformCreateTarget,ViewKey>={communication:'communications',memberValue:'memberValue',campaign:'campaigns',memberOpportunity:'memberOpportunities',survey:'surveys',buyer:'travelTrade',tradeLead:'travelTrade',famTrip:'travelTrade',businessEnquiry:'businessEvents',prOpportunity:'prMedia'}
 
 export function GlobalPlatformCreate({target,onClose,navigate}:{target:PlatformCreateTarget;onClose:()=>void;navigate:(view:ViewKey)=>void}){
   const {data:crm}=useCRM();const {data,addRecord}=usePlatform();const today=new Date().toISOString().slice(0,10);const [draft,setDraft]=useState({name:'',description:'',date:today,endDate:today,category:'',amount:'0',organisationId:crm.organisations[0]?.id??'',relatedId:'',contact:'',country:'UK',size:'0'});const set=(key:keyof typeof draft,value:string)=>setDraft((current)=>({...current,[key]:value}))
+  if(target==='famTrip')return <FamTripEditor onClose={onClose} onSave={(trip)=>{addRecord('famTrips',trip);navigate('travelTrade');onClose()}}/>
   const submit=(event:FormEvent)=>{event.preventDefault();const id=makePlatformId(target);switch(target){
     case 'communication':addRecord('communications',{id,name:draft.name,subject:draft.description,body:'',status:'Draft',recipientCount:0,createdAt:new Date().toISOString()});break
     case 'memberValue':addRecord('memberValue',{id,organisationId:draft.organisationId,date:draft.date,category:(draft.category||'Marketing') as 'Marketing',activity:draft.name,quantity:Number(draft.size)||1,estimatedValue:Number(draft.amount),evidence:draft.description});break

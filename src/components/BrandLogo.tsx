@@ -13,6 +13,7 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 
 export function BrandLogo({ inverse = false, compact = false }: { inverse?: boolean; compact?: boolean }) {
   const {data}=useCRM()
+  if(data.workspace.destinationLogoUrl)return <span className={`vale-logo${inverse?' inverse':''}${compact?' compact':''}`} role="img" aria-label={data.workspace.destinationName}><img className="destination-logo-image" src={data.workspace.destinationLogoUrl} alt=""/></span>
   const words=data.workspace.destinationName.trim().split(/\s+/)
   const prefix=words[0]?.toLowerCase()==='visit'?'Visit':''
   const name=prefix?words.slice(1).join(' '):data.workspace.destinationName

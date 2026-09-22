@@ -80,7 +80,7 @@ function CRMApp() {
   const selectedOrganisation = data.organisations.find((item) => item.id === selectedOrganisationId)
   const selectedListing = data.listings.find((item) => item.id === selectedListingId)
   const requestCreate=(target:CreateTarget)=>{
-    const platformTargets:PlatformCreateTarget[]=['communication','memberValue','campaign','memberOpportunity','survey','buyer','tradeLead','businessEnquiry','prOpportunity']
+    const platformTargets:PlatformCreateTarget[]=['communication','memberValue','campaign','memberOpportunity','survey','buyer','tradeLead','famTrip','businessEnquiry','prOpportunity']
     if(platformTargets.includes(target as PlatformCreateTarget)){setPlatformCreate(target as PlatformCreateTarget);return}
     if(target==='organisation'||target==='invoice'||target==='task'){setCreateRequest(null);setModal(target);return}
     const destinations:Partial<Record<CreateTarget,ViewKey>>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',experiment:'experiments',agreement:'agreements'}

@@ -516,6 +516,28 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Spring by the river')).toBeInTheDocument()
   })
 
+  it('creates and edits a FAM trip with linked buyers and organisations', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Buyers, leads & FAMs'}))
+    fireEvent.click(screen.getByRole('tab',{name:'FAM Trips'}))
+    fireEvent.click(screen.getByRole('button',{name:'New FAM trip'}))
+    fireEvent.change(screen.getByLabelText('Trip title'),{target:{value:'Autumn gardens FAM'}})
+    fireEvent.change(screen.getByLabelText('Start date'),{target:{value:'2027-10-12'}})
+    fireEvent.change(screen.getByLabelText('End date'),{target:{value:'2027-10-14'}})
+    fireEvent.change(screen.getByLabelText('Target market'),{target:{value:'Germany'}})
+    fireEvent.change(screen.getByLabelText('Add buyers'),{target:{value:'buyer-001'}})
+    fireEvent.change(screen.getByLabelText('Add participating members'),{target:{value:'org-001'}})
+    fireEvent.change(screen.getByLabelText('Itinerary'),{target:{value:'Day 1: gardens and welcome dinner.'}})
+    fireEvent.click(screen.getByRole('button',{name:'Create FAM trip'}))
+    expect(screen.getByRole('heading',{name:'Autumn gardens FAM'})).toBeInTheDocument()
+    expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
+    expect(screen.getByText(/1 buyers · 0 places/)).toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button',{name:'Edit FAM trip'}).at(-1)!)
+    fireEvent.change(screen.getByLabelText('Itinerary'),{target:{value:'Day 1: gardens. Day 2: castle and dinner.'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save FAM trip'}))
+    expect(screen.getByText('castle and dinner.')).toBeInTheDocument()
+  })
+
   it('records transparent estimated member value', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Member Value'}))

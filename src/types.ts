@@ -29,7 +29,7 @@ export type ViewKey =
   | 'automations'
   | 'settings'
 
-export type CreateTarget = 'organisation' | 'person' | 'opportunity' | 'membership' | 'listing' | 'event' | 'content' | 'page' | 'image' | 'experiment' | 'invoice' | 'agreement' | 'task' | 'communication' | 'memberValue' | 'campaign' | 'memberOpportunity' | 'survey' | 'buyer' | 'tradeLead' | 'businessEnquiry' | 'prOpportunity'
+export type CreateTarget = 'organisation' | 'person' | 'opportunity' | 'membership' | 'listing' | 'event' | 'content' | 'page' | 'image' | 'experiment' | 'invoice' | 'agreement' | 'task' | 'communication' | 'memberValue' | 'campaign' | 'memberOpportunity' | 'survey' | 'buyer' | 'tradeLead' | 'famTrip' | 'businessEnquiry' | 'prOpportunity'
 
 export type Health = 'Happy' | 'OK' | 'Needs attention'
 export type MembershipStatus = 'Active' | 'Renewing' | 'Prospect' | 'Free listing' | 'Lapsed' | 'Non-member'
@@ -436,6 +436,9 @@ export interface WorkspaceSettings {
   legalName: string
   strapline: string
   contactEmail: string
+  contactPhone?: string
+  publicWebsiteUrl?: string
+  destinationLogoUrl?: string
   address: string
   timezone: string
   currency: string
