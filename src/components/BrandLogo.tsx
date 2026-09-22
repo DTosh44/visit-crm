@@ -25,8 +25,5 @@ export function BrandLogo({ inverse = false, compact = false }: { inverse?: bool
 }
 
 export function ProductLogo({ inverse = false }: { inverse?: boolean }) {
-  return <span className={`made-logo${inverse ? ' inverse' : ''}`} role="img" aria-label="VisitMade">
-    <span className="made-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M9 36V12h7l8 12 8-12h7v24h-7V23l-8 12-8-12v13H9Z" fill="currentColor"/><path d="M12 39c8-4 16-4 24 0" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg></span>
-    <span className="made-wordmark"><small>Visit</small><strong>Made</strong></span>
-  </span>
+  return <span className={`made-logo${inverse ? ' inverse' : ''}`} role="img" aria-label="VisitMade"><span className="made-brand-art" aria-hidden="true" /></span>
 }

@@ -134,7 +134,7 @@ export function Layout({
       <a className="skip-link" href="#main-content">Skip to main content</a>
       <aside id="crm-sidebar-navigation" className={classNames('sidebar', sidebarOpen && 'sidebar-open')} aria-label="Workspace navigation">
         <div className="brand">
-          <ProductLogo inverse />
+          <ProductLogo />
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
 
