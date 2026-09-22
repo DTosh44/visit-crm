@@ -180,7 +180,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
         </aside>
       </div>
 
-      <footer className="drawer-actionbar"><span>{saved ? <><Check size={15} /> Changes saved</> : 'Changes stay in draft until published'}</span><div><Button variant="secondary" icon={Save} onClick={save}>Save draft</Button><Button icon={Send} onClick={publish}>{listing.status === 'Published' ? 'Publish changes' : 'Approve & publish'}</Button></div></footer>
+      <footer className="drawer-actionbar"><span role="status" aria-live="polite">{saved ? <><Check size={15} /> Changes saved</> : 'Changes stay in draft until published'}</span><div><Button variant="secondary" icon={Save} onClick={save}>Save draft</Button><Button icon={Send} onClick={publish}>{listing.status === 'Published' ? 'Publish changes' : 'Approve & publish'}</Button></div></footer>
     </Drawer>
   )
 }
