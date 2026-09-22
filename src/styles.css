@@ -1607,3 +1607,14 @@ button { min-width: 24px; min-height: 24px; }
     forced-color-adjust: auto;
   }
 }
+
+.search-trigger,
+.kanban-column > header span,
+.invoice-sheet th,
+.task-group > header span,
+.social-footer,
+.module-toggle strong em,
+.visitor-filter-panel em,
+.role-summary span {
+  color: #667286;
+}
