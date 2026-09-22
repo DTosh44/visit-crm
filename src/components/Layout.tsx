@@ -98,6 +98,7 @@ export function Layout({
 
   useEffect(() => {
     document.title = `${pageNames[view]} | ${data.workspace.destinationName} CRM`
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus())
   }, [data.workspace.destinationName, view])
 
   const searchResults = useMemo(() => {
@@ -167,7 +168,7 @@ export function Layout({
 
       {sidebarOpen && <button className="sidebar-scrim" onClick={() => setSidebarOpen(false)} aria-label="Close navigation" />}
 
-      <div className="main-shell">
+      <div className="main-shell" inert={sidebarOpen || undefined}>
         <header className="topbar">
           <div className="topbar-left">
             <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Open navigation" aria-expanded={sidebarOpen} aria-controls="crm-sidebar-navigation"><Menu size={21} /></button>
@@ -177,11 +178,11 @@ export function Layout({
             <button className="search-trigger" onClick={() => {setActiveResult(0);setSearchOpen(true)}} aria-haspopup="dialog" aria-expanded={searchOpen} aria-controls="command-palette">
               <Search size={17} /><span>Search organisations...</span><kbd>⌘ K</kbd>
             </button>
-            <div className="notification-wrap"><button className="icon-button notification-button" aria-label="Notifications" aria-expanded={notificationsOpen} aria-controls="notification-panel" onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div id="notification-panel" className="notification-panel" role="region" aria-label="Notifications"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div>{notifications.length>0&&<button onClick={dismissNotifications}>Mark all read</button>}<button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
+            <div className="notification-wrap"><button className="icon-button notification-button" aria-label={`Notifications${notifications.length ? `, ${notifications.length} requiring attention` : ', none requiring attention'}`} aria-expanded={notificationsOpen} aria-controls="notification-panel" onClick={()=>setNotificationsOpen((value)=>!value)} title={`${notifications.length} notifications`}><Bell size={19} />{notifications.length>0&&<i />}</button>{notificationsOpen&&<div id="notification-panel" className="notification-panel" role="region" aria-label="Notifications"><header><div><strong>Notifications</strong><span>{notifications.length} requiring attention</span></div>{notifications.length>0&&<button onClick={dismissNotifications}>Mark all read</button>}<button onClick={()=>setNotificationsOpen(false)} aria-label="Close notifications"><X size={16}/></button></header><div>{notifications.length?notifications.map((item)=><button key={item.id} onClick={()=>{navigate(item.view);setNotificationsOpen(false)}}><span><strong>{item.title}</strong><small>{item.detail}</small></span></button>):<p>You’re all caught up.</p>}</div></div>}</div>
             <div className="quick-wrap">
-              <button className="button button-primary button-md" onClick={() => setQuickOpen((value) => !value)} aria-expanded={quickOpen} aria-controls="quick-create-menu" aria-haspopup="menu"><Plus size={17} />Add new</button>
+              <button className="button button-primary button-md" onClick={() => setQuickOpen((value) => !value)} aria-expanded={quickOpen} aria-controls="quick-create-menu"><Plus size={17} />Add new</button>
               {quickOpen && (
-                <div id="quick-create-menu" className="quick-menu" role="menu" aria-label="Quick create">
+                <div id="quick-create-menu" className="quick-menu" role="group" aria-label="Quick create">
                   <span>Quick create</span>
                   {canAccessView(user?.role, 'organisations') && <button onClick={() => { setQuickOpen(false); onAddOrganisation() }}><Building2 size={17} /><div><strong>Organisation</strong><small>Add a member or prospect</small></div></button>}
                   {canAccessView(user?.role, 'tasks') && <button onClick={() => { setQuickOpen(false); onAddTask() }}><ClipboardCheck size={17} /><div><strong>Task</strong><small>Create a follow-up</small></div></button>}
@@ -198,16 +199,16 @@ export function Layout({
       {searchOpen && (
         <div className="command-overlay" onMouseDown={(event) => event.target === event.currentTarget && setSearchOpen(false)}>
           <div id="command-palette" ref={commandRef} tabIndex={-1} className="command-palette" role="dialog" aria-modal="true" aria-label="Search organisations">
-            <div className="command-input"><Search size={20} /><input ref={searchRef} data-dialog-initial-focus aria-label="Search organisations, contacts and listings" value={query} onChange={(event) => {setQuery(event.target.value);setActiveResult(0)}} placeholder="Search organisations, contacts and listings..." /><kbd>esc</kbd></div>
-            <div className="command-results">
-              <span className="command-label">{query ? 'Results' : 'Recently viewed'}</span>
+            <div className="command-input"><Search size={20} aria-hidden="true" /><input ref={searchRef} data-dialog-initial-focus type="search" role="combobox" aria-label="Search organisations, contacts and listings" aria-expanded="true" aria-controls="command-search-results" aria-autocomplete="list" aria-activedescendant={searchResults[activeResult] ? `command-result-${searchResults[activeResult].id}` : undefined} value={query} onChange={(event) => {setQuery(event.target.value);setActiveResult(0)}} placeholder="Search organisations, contacts and listings..." /><kbd>esc</kbd></div>
+            <div id="command-search-results" className="command-results" role="listbox" aria-label={query ? 'Search results' : 'Recently viewed organisations'}>
+              <span className="command-label" aria-hidden="true">{query ? 'Results' : 'Recently viewed'}</span>
               {searchResults.length ? searchResults.map((org,index) => (
-                <button key={org.id} className={index===activeResult?'active':''} onMouseEnter={()=>setActiveResult(index)} onClick={() => { setSearchOpen(false); setQuery(''); onOpenOrganisation(org) }}>
+                <button type="button" id={`command-result-${org.id}`} role="option" aria-selected={index===activeResult} key={org.id} className={index===activeResult?'active':''} onMouseEnter={()=>setActiveResult(index)} onClick={() => { setSearchOpen(false); setQuery(''); onOpenOrganisation(org) }}>
                   <span className="search-result-avatar" style={{ background: org.colour }}>{org.name.slice(0, 2).toUpperCase()}</span>
                   <span><strong>{org.name}</strong><small>{org.type} · {org.town}</small></span>
                   <span className="search-result-meta">{org.tier}</span>
                 </button>
-              )) : <div className="command-empty"><Search size={24} /><p>No matching organisations</p></div>}
+              )) : <div className="command-empty" role="status"><Search size={24} aria-hidden="true" /><p>No matching organisations</p></div>}
             </div>
             <footer><span><kbd>↑</kbd><kbd>↓</kbd> to navigate</span><span><kbd>↵</kbd> to open</span></footer>
           </div>
