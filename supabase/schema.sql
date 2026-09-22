@@ -80,6 +80,10 @@ create table public.public_listings (
 );
 
 alter table public.public_listings add column if not exists media jsonb not null default '[]'::jsonb;
+alter table public.public_listings add column if not exists map_latitude double precision;
+alter table public.public_listings add column if not exists map_longitude double precision;
+alter table public.public_listings add column if not exists map_visible boolean not null default true;
+alter table public.public_listings add column if not exists map_featured boolean not null default false;
 
 -- Event organisers use standard Supabase Auth accounts. Events can be submitted
 -- by any authenticated organiser and are deliberately independent of membership.
@@ -122,6 +126,11 @@ create table public.events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.events add column if not exists map_latitude double precision;
+alter table public.events add column if not exists map_longitude double precision;
+alter table public.events add column if not exists map_visible boolean not null default true;
+alter table public.events add column if not exists map_featured boolean not null default false;
 
 -- Normalised metrics are ready for scheduled social API imports. The current
 -- local workspace also keeps a copy in workspace_states so it works without credentials.
@@ -318,7 +327,7 @@ values (
   'Visit Valechester',
   'Valechester Visitor Economy Partnership',
   '{"primary":"#6d294f","primaryDark":"#4f1b39","accent":"#f0785e","sage":"#7a9a83","ink":"#22152b","strapline":"Past, present, perfectly placed."}'::jsonb,
-  '{"publicWebsite":true,"organisations":true,"salesPipeline":true,"memberships":true,"listings":true,"events":true,"itineraries":true,"billing":true,"agreements":true,"tasks":true,"businessPortal":false,"travelTrade":false,"reviewIntelligence":false,"socialInsights":true,"aiWebsiteEditor":false}'::jsonb
+  '{"publicWebsite":true,"interactiveMap":true,"organisations":true,"salesPipeline":true,"memberships":true,"listings":true,"events":true,"itineraries":true,"billing":true,"agreements":true,"tasks":true,"businessPortal":false,"travelTrade":false,"reviewIntelligence":false,"socialInsights":true,"aiWebsiteEditor":false}'::jsonb
 )
 on conflict (id) do update set
   name = excluded.name,

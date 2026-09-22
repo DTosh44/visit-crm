@@ -83,6 +83,27 @@ describe('Visit CRM', () => {
     expect(document.querySelectorAll('.site-card')).toHaveLength(12)
   })
 
+  it('lets visitors search and filter the interactive map', () => {
+    window.history.pushState({}, '', '/map')
+    renderApp()
+    expect(screen.getByRole('heading', { name: 'Explore Valechester your way.' })).toBeInTheDocument()
+    expect(screen.getByText(/mapped locations/)).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search the map' }), { target: { value: 'Valechester Castle' } })
+    expect(screen.getByRole('button', { name: /Valechester Castle.*Castle Quarter/ })).toBeInTheDocument()
+    expect(screen.getByText('1 mapped location')).toBeInTheDocument()
+  })
+
+  it('manages map visibility and featured pins in the CRM', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: 'Interactive map' }))
+    expect(screen.getByRole('heading', { name: 'Interactive map' })).toBeInTheDocument()
+    const featureButton = screen.getByRole('button', { name: 'Feature Valechester Castle' })
+    fireEvent.click(featureButton)
+    expect(screen.getByRole('button', { name: 'Unfeature Valechester Castle' })).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Search map locations...'), { target: { value: 'Valechester Castle' } })
+    expect(screen.getByText(/52\./)).toBeInTheDocument()
+  })
+
   it('provides at least fifteen published businesses for every membership type', () => {
     const publishedOrganisations = new Set(initialData.listings.filter((listing) => listing.status === 'Published').map((listing) => listing.organisationId))
     for (const level of initialData.levels) {
@@ -370,7 +391,7 @@ describe('Visit CRM', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Pages' }))
     expect(screen.getByRole('heading', { name: 'Pages' })).toBeInTheDocument()
-    expect(screen.getAllByText('13').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('14').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: 'Edit Homepage' }))
     fireEvent.change(screen.getByLabelText('Page title'), { target: { value: 'A new story in every direction.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))

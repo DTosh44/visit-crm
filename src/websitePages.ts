@@ -42,6 +42,7 @@ const page = (
 export const initialWebsitePages: WebsitePage[] = [
   page('webpage-home', 'Homepage', '/', 'Home', content('Find your kind of remarkable', 'A town with stories in every direction.', 'Past, present, perfectly placed.', 'Home', true, 'hero')),
   page('webpage-events', "What's on", '/events', 'Collection', content("What's on", 'Make a date of Valechester.', 'Markets, live performance, family evenings and the kind of local events worth building a trip around.', "What's on", true, 'restaurant')),
+  page('webpage-map', 'Interactive map', '/map', 'Service', content('Find your way', 'Explore Valechester your way.', 'Search places, events and neighbourhoods on one interactive map, then open anything that catches your eye.', 'Explore the map', true)),
   page('webpage-guides', 'Visitor guides', '/guides', 'Collection', content('Ideas and inspiration', 'Guides for your visit.', 'Practical recommendations to help you choose what to do.', 'Ideas & inspiration', true)),
   page('webpage-itineraries', 'Itineraries', '/itineraries', 'Collection', content('Ideas and inspiration', 'Itineraries for your visit.', 'Ready made plans for making the most of your time in Valechester.', 'Itineraries', false)),
   page('webpage-trails', 'Trails', '/trails', 'Collection', content('Ideas and inspiration', 'Trails for your visit.', 'Follow Valechester stories, landmarks and landscapes at your own pace.', 'Trails', false)),
@@ -62,4 +63,3 @@ export function websitePageContent(page: WebsitePage, preview: boolean) {
 export function websitePageForPath(pages: WebsitePage[], path: string) {
   return pages.find((page) => page.path === path)
 }
-

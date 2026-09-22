@@ -118,12 +118,16 @@ interface PublicListingRow {
   good_to_know?: string[]
   awards?: string[]
   image_rights_confirmed?: boolean
+  map_latitude?: number
+  map_longitude?: number
+  map_visible?: boolean
+  map_featured?: boolean
   updated_at: string
 }
 
-type EventRow = {id:string;organisation_id?:string;submitted_by_label:string;title:string;category:string;format:DestinationEvent['format'];description:string;start_date:string;end_date:string;start_time:string;end_time:string;venue_name:string;address:string;town:string;postcode:string;price:string;booking_url:string;contact_name:string;contact_email:string;image:string;accessibility:string;status:DestinationEvent['status'];moderation_note?:string;recurrence?:DestinationEvent['recurrence'];recurrence_until?:string;updated_at:string}
-function fromEventRow(row:EventRow):DestinationEvent{return{id:row.id,organisationId:row.organisation_id,title:row.title,category:row.category,format:row.format,description:row.description,startDate:row.start_date,endDate:row.end_date,startTime:row.start_time.slice(0,5),endTime:row.end_time.slice(0,5),venueName:row.venue_name,address:row.address,town:row.town,postcode:row.postcode,price:row.price,bookingUrl:row.booking_url,contactName:row.contact_name,contactEmail:row.contact_email,image:row.image,accessibility:row.accessibility,status:row.status,submittedBy:row.submitted_by_label,moderationNote:row.moderation_note,recurrence:row.recurrence??'None',recurrenceUntil:row.recurrence_until??'',lastUpdated:row.updated_at.slice(0,10)}}
-function toEventRow(event:DestinationEvent,submittedBy?:string){return{id:event.id,tenant_id:tenant.id,organisation_id:event.organisationId??null,submitted_by:submittedBy??null,submitted_by_label:event.submittedBy,title:event.title,category:event.category,format:event.format,description:event.description,start_date:event.startDate,end_date:event.endDate,start_time:event.startTime,end_time:event.endTime,venue_name:event.venueName,address:event.address,town:event.town,postcode:event.postcode,price:event.price,booking_url:event.bookingUrl,contact_name:event.contactName,contact_email:event.contactEmail,image:event.image,accessibility:event.accessibility,status:event.status,moderation_note:event.moderationNote??'',recurrence:event.recurrence??'None',recurrence_until:event.recurrenceUntil||null,updated_at:new Date().toISOString()}}
+type EventRow = {id:string;organisation_id?:string;submitted_by_label:string;title:string;category:string;format:DestinationEvent['format'];description:string;start_date:string;end_date:string;start_time:string;end_time:string;venue_name:string;address:string;town:string;postcode:string;price:string;booking_url:string;contact_name:string;contact_email:string;image:string;accessibility:string;status:DestinationEvent['status'];moderation_note?:string;recurrence?:DestinationEvent['recurrence'];recurrence_until?:string;map_latitude?:number;map_longitude?:number;map_visible?:boolean;map_featured?:boolean;updated_at:string}
+function fromEventRow(row:EventRow):DestinationEvent{return{id:row.id,organisationId:row.organisation_id,title:row.title,category:row.category,format:row.format,description:row.description,startDate:row.start_date,endDate:row.end_date,startTime:row.start_time.slice(0,5),endTime:row.end_time.slice(0,5),venueName:row.venue_name,address:row.address,town:row.town,postcode:row.postcode,price:row.price,bookingUrl:row.booking_url,contactName:row.contact_name,contactEmail:row.contact_email,image:row.image,accessibility:row.accessibility,status:row.status,submittedBy:row.submitted_by_label,moderationNote:row.moderation_note,recurrence:row.recurrence??'None',recurrenceUntil:row.recurrence_until??'',mapLatitude:row.map_latitude,mapLongitude:row.map_longitude,mapVisible:row.map_visible,mapFeatured:row.map_featured,lastUpdated:row.updated_at.slice(0,10)}}
+function toEventRow(event:DestinationEvent,submittedBy?:string){return{id:event.id,tenant_id:tenant.id,organisation_id:event.organisationId??null,submitted_by:submittedBy??null,submitted_by_label:event.submittedBy,title:event.title,category:event.category,format:event.format,description:event.description,start_date:event.startDate,end_date:event.endDate,start_time:event.startTime,end_time:event.endTime,venue_name:event.venueName,address:event.address,town:event.town,postcode:event.postcode,price:event.price,booking_url:event.bookingUrl,contact_name:event.contactName,contact_email:event.contactEmail,image:event.image,accessibility:event.accessibility,status:event.status,moderation_note:event.moderationNote??'',recurrence:event.recurrence??'None',recurrence_until:event.recurrenceUntil||null,map_latitude:event.mapLatitude??null,map_longitude:event.mapLongitude??null,map_visible:event.mapVisible??true,map_featured:event.mapFeatured??false,updated_at:new Date().toISOString()}}
 
 function fromPublicListing(row: PublicListingRow): Listing {
   return {
@@ -148,6 +152,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     media: row.media ?? [],
     lastUpdated: row.updated_at.slice(0, 10),
     searchTags: row.search_tags ?? [], visitorTaxonomy: row.visitor_taxonomy ?? [], reviewHighlights: row.review_highlights ?? [], reviewSites: row.review_sites ?? [], goodToKnow: row.good_to_know ?? [], awards: row.awards ?? [], imageRightsConfirmed: row.image_rights_confirmed ?? false,
+    mapLatitude: row.map_latitude, mapLongitude: row.map_longitude, mapVisible: row.map_visible, mapFeatured: row.map_featured,
   }
 }
 
@@ -180,6 +185,10 @@ function toPublicListing(listing: Listing) {
     good_to_know: listing.goodToKnow,
     awards: listing.awards ?? [],
     image_rights_confirmed: listing.imageRightsConfirmed ?? false,
+    map_latitude: listing.mapLatitude ?? null,
+    map_longitude: listing.mapLongitude ?? null,
+    map_visible: listing.mapVisible ?? true,
+    map_featured: listing.mapFeatured ?? false,
     published_at: listing.status === 'Published' ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   }

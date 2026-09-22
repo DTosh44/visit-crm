@@ -16,6 +16,8 @@ import { downloadCalendarEvent } from './actions'
 import { publishedPages } from './contentPublishing'
 import type { WebsiteAnalyticsEvent } from './types'
 import { websitePageContent, websitePageForPath } from './websitePages'
+import { InteractiveMap } from './components/InteractiveMap'
+import { publicMapPoints, type MapPoint } from './mapData'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
 const visitorJourneys = [
@@ -157,7 +159,7 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeMenu = () => setMenuOpen(false)
   const publishedPage = (path: string) => websitePageForPath(data.websitePages, path)?.published
-  const extraNavigation = data.websitePages.filter((page) => page.published?.showInNavigation && !['/', '/events', '/guides', '/plan'].includes(page.path))
+  const extraNavigation = data.websitePages.filter((page) => page.published?.showInNavigation && !['/', '/events', '/guides', '/map', '/plan'].includes(page.path))
   useEffect(() => {
     if (!menuOpen) return
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -172,7 +174,7 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
   }, [menuOpen])
   return (
     <>
-      <div className="site-utility"><div><span>{data.workspace.address.split(',').slice(-2).join(',').trim()}</span><nav><SiteLink to="/plan">Plan your visit</SiteLink><SiteLink to="/accessibility">Accessibility</SiteLink><SiteLink to="/saved">Saved places{savedCount ? ` (${savedCount})` : ''}</SiteLink><SiteLink to="/account">Event organiser login</SiteLink><a href="/crm">Partner login</a></nav></div></div>
+      <div className="site-utility"><div><span>{data.workspace.address.split(',').slice(-2).join(',').trim()}</span><nav>{features.interactiveMap&&<SiteLink to="/map">Interactive map</SiteLink>}<SiteLink to="/plan">Plan your visit</SiteLink><SiteLink to="/accessibility">Accessibility</SiteLink><SiteLink to="/saved">Saved places{savedCount ? ` (${savedCount})` : ''}</SiteLink><SiteLink to="/account">Event organiser login</SiteLink><a href="/crm">Partner login</a></nav></div></div>
       <header className="site-header">
         <SiteLink to="/" className="site-logo" aria-label={`${data.workspace.destinationName} home`}><BrandLogo /></SiteLink>
         <nav id="site-primary-navigation" className={menuOpen ? 'site-nav open' : 'site-nav'} aria-label="Main navigation">
@@ -181,6 +183,7 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
           <SiteLink to="/?category=Places%20to%20stay#discover" onClick={closeMenu}>Stay</SiteLink>
           <SiteLink to="/?category=Food%20%26%20drink#discover" onClick={closeMenu}>Food & drink</SiteLink>
           {features.itineraries && <SiteLink to="/guides" onClick={closeMenu}>{publishedPage('/guides')?.navigationLabel || 'Ideas & inspiration'}</SiteLink>}
+          {features.interactiveMap && <SiteLink to="/map" onClick={closeMenu}>{publishedPage('/map')?.navigationLabel || 'Explore the map'}</SiteLink>}
           <SiteLink to="/plan" onClick={closeMenu}>{publishedPage('/plan')?.navigationLabel || 'Plan your visit'}</SiteLink>
           {extraNavigation.map((page) => <SiteLink key={page.id} to={page.path} onClick={closeMenu}>{page.published!.navigationLabel || page.name}</SiteLink>)}
         </nav>
@@ -293,6 +296,8 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
       {features.events && <section className="site-events" id="events"><div className="site-container"><header className="editorial-heading"><span className="site-eyebrow plum">What’s on</span><h2>Events worth planning for.</h2><button aria-label="View full calendar" onClick={() => siteNavigate('/events')}>View all events <ArrowRight size={16}/></button></header><div className="site-event-grid">{recurringEvents(data.events.filter((event)=>event.status==='Published')).sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,4).map((event) => <article key={event.id}><button className="event-image-link" onClick={() => siteNavigate(`/events#${event.id}`)} aria-label={`View ${event.title}`}><img src={imageLibrary[event.image]??event.image??imageLibrary.theatre} alt="" loading="lazy" decoding="async"/><span>{event.category}</span></button><div className="site-event-copy"><h3>{event.title}</h3><p><CalendarDays size={13}/>{eventDay(event)} {eventMonth(event)}</p><p><MapPin size={13}/>{event.town}</p><button className="event-card-link" onClick={() => siteNavigate(`/events#${event.id}`)}>View event <ArrowRight size={13}/></button></div></article>)}</div></div></section>}
 
       <section className="site-neighbourhoods" id="communities"><div className="site-container"><header className="editorial-heading"><span className="site-eyebrow plum">Featured towns and neighbourhoods</span><h2>Find your corner of the Vale.</h2><p>Each part of Valechester has its own pace, people and reasons to stay a little longer.</p></header><div className="site-neighbourhood-grid">{neighbourhoods.slice(0,4).map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async"/><div><span>Explore</span><h3>{place.name}</h3><p>{place.detail}</p><button onClick={() => siteNavigate(`/neighbourhood/${place.slug}`)} aria-label={`Explore ${place.name}`}><ArrowRight size={18}/></button></div></article>)}</div></div></section>
+
+      {features.interactiveMap && <section className="site-map-promo"><div className="site-container"><div><span className="site-eyebrow">Interactive map</span><h2>Wander further.<br/><em>Find what’s nearby.</em></h2><p>Put places, events and neighbourhoods into context. Search the whole Vale, filter what matters and open every result directly from the map.</p><button onClick={() => siteNavigate('/map')}>Explore the map <ArrowRight size={16}/></button></div><div className="map-promo-visual" aria-hidden="true"><span className="map-road road-one"/><span className="map-road road-two"/><span className="map-river"/>{publicMapPoints(data.listings,data.events).filter((point)=>point.featured).slice(0,6).map((point,index)=><i key={point.id} style={{left:`${18+(index*14)%70}%`,top:`${20+(index*23)%62}%`}}><MapPin size={15}/></i>)}</div></div></section>}
 
       <section className="site-discover site-container" id="discover">
         <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Search by place, practical needs, who you are travelling with or the kind of experience you want.</p></header>
@@ -617,6 +622,13 @@ function ManagedLandingPage({ content, savedCount }: { content: WebsitePageConte
   return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{content.title}</h1><p>{content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
 }
 
+function InteractiveMapPage({ savedCount }: { savedCount: number }) {
+  const { data } = useCRM()
+  const points = useMemo(() => publicMapPoints(data.listings, data.events), [data.events, data.listings])
+  const open = (point: MapPoint) => siteNavigate(point.path)
+  return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Find your way" title="Explore Valechester your way." description="Search places, events and neighbourhoods on one interactive map, then open anything that catches your eye."/><section className="public-map-page site-container"><InteractiveMap points={points} onOpen={open}/></section></main></PublicShell>
+}
+
 const infoPages: Record<string, { eyebrow: string; title: string; description: string; sections: Array<[string, string]> }> = {
   privacy: { eyebrow: 'Visitor information', title: 'Privacy', description: 'How Visit Valechester handles visitor information.', sections: [['What we collect', 'We collect only the information needed to answer enquiries, provide requested updates and improve your visit planning. Saved places remain on your device unless you choose to share them.'], ['Production approach', 'We keep personal information only for as long as it is needed, use approved service providers and respect your data protection rights.']] },
   cookies: { eyebrow: 'Visitor information', title: 'Cookies', description: 'How this website uses cookies and local storage.', sections: [['Essential storage', 'Essential local storage remembers saved places, cookie choices and account session details.'], ['Analytics and marketing', 'Analytics and marketing cookies are used only with consent. You can change your choice at any time.']] },
@@ -663,7 +675,7 @@ export function PublicSite() {
     const listing=parts[0]==='place'?data.listings.find((item)=>item.id===parts[1]):undefined
     const preview=new URLSearchParams(window.location.search).get('preview')==='true'
     const content=contentTypeByPath[parts[0]]?(preview?data.contentPages:liveContent).find((item)=>item.slug===parts[1]):undefined
-    const titles:Record<string,string>={'/':'Visit Valechester','/events':"What's on in Valechester",'/plan':'Plan your visit to Valechester','/guides':'Valechester visitor guides','/itineraries':'Valechester itineraries','/trails':'Valechester trails','/saved':'Saved places','/contact':'Contact Visit Valechester','/accessibility':'Accessible Valechester','/privacy':'Privacy','/cookies':'Cookies'}
+    const titles:Record<string,string>={'/':'Visit Valechester','/events':"What's on in Valechester",'/map':'Explore the Valechester map','/plan':'Plan your visit to Valechester','/guides':'Valechester visitor guides','/itineraries':'Valechester itineraries','/trails':'Valechester trails','/saved':'Saved places','/contact':'Contact Visit Valechester','/accessibility':'Accessible Valechester','/privacy':'Privacy','/cookies':'Cookies'}
     const websitePage=websitePageForPath(data.websitePages,path)
     const websiteContent=websitePage?websitePageContent(websitePage,preview):undefined
     const title=listing?.name??content?.metaTitle??content?.title??websiteContent?.metaTitle??websiteContent?.title??titles[path]??'Visit Valechester'
@@ -707,6 +719,7 @@ export function PublicSite() {
   const parts = path.split('/').filter(Boolean)
   let page: ReactNode
   if (path === '/') page = <HomePage key={location} actions={actions} location={location} />
+  else if(path==='/map'&&features.interactiveMap) page=<InteractiveMapPage savedCount={savedIds.length}/>
   else if (path === '/events' && features.events) page = <EventsPage savedCount={savedIds.length} />
   else if (path === '/account' && features.events) page = <EventAccountPage key={location} savedCount={savedIds.length} />
   else if (path === '/submit-event' && features.events) page = <SubmitEventPage key={location} savedCount={savedIds.length} />

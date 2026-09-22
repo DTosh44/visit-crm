@@ -6,6 +6,7 @@ export type ViewKey =
   | 'listings'
   | 'events'
   | 'pages'
+  | 'map'
   | 'content'
   | 'inbox'
   | 'insights'
@@ -132,6 +133,10 @@ export interface Listing {
   media?: ListingMedia[]
   awards?: string[]
   imageRightsConfirmed?: boolean
+  mapLatitude?: number
+  mapLongitude?: number
+  mapVisible?: boolean
+  mapFeatured?: boolean
 }
 
 export interface DestinationEvent {
@@ -161,6 +166,10 @@ export interface DestinationEvent {
   recurrenceUntil?: string
   organisationId?: string
   lastUpdated: string
+  mapLatitude?: number
+  mapLongitude?: number
+  mapVisible?: boolean
+  mapFeatured?: boolean
 }
 
 export interface Invoice {
