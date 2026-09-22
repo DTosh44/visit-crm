@@ -123,7 +123,7 @@ function CRMApp() {
       {activeView === 'campaigns' && <Campaigns />}
       {activeView === 'engagement' && <Engagement />}
       {activeView === 'travelTrade' && <TravelTrade onNavigateCommunications={()=>setView('communications')} onNavigateMemberOpportunities={()=>setView('memberOpportunities')} />}
-      {activeView === 'businessEvents' && <BusinessEvents />}
+      {activeView === 'businessEvents' && <BusinessEvents onNavigateCommunications={()=>setView('communications')} />}
       {activeView === 'prMedia' && <PRMedia />}
       {activeView === 'surveys' && <Surveys />}
       {activeView === 'websiteHealth' && <WebsiteHealth navigate={setView} />}

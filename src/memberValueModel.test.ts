@@ -39,4 +39,10 @@ describe('member value calculations',()=>{
     expect(exposure.views).toBe(initialData.listings.filter((item)=>item.organisationId==='org-001').reduce((sum,item)=>sum+item.views,0))
     expect(exposure).not.toHaveProperty('estimatedValue')
   })
+  it('links MICE lead shares and confirmed wins without assigning attendee spend',()=>{
+    const lead={id:'mice-test',name:'Annual congress',organisationId:'org-001',client:'Annual congress',organisation:'Buyer',contact:'',eventType:'Congress',preferredDates:'2027-05-10',delegates:120,roomNights:200,bedrooms:80,requirements:'Plenary',budget:50000,location:'',source:'Website',economicValue:150000,stage:'Won' as const,owner:'Alex',nextAction:'',invitedVenueIds:[],responses:[],distributions:[{organisationId:'org-003',listingId:'list-004',sharedAt:'2026-09-20',response:'Proposal submitted' as const,availability:'Yes',proposalStatus:'Submitted',notes:''}],winningVenueId:'list-004',wonAt:'2026-09-22'}
+    const rows=memberValueRows(initialData,{...initialPlatformData,businessEnquiries:[lead]})
+    expect(rows.find((item)=>item.id==='mice-share-mice-test-org-003')).toMatchObject({estimatedValue:0,source:'Business events lead share'})
+    expect(rows.find((item)=>item.id==='mice-win-mice-test-org-003')).toMatchObject({estimatedValue:0,source:'Business events confirmed win'})
+  })
 })

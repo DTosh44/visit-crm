@@ -684,6 +684,35 @@ describe('Visit CRM', () => {
     expect(screen.getAllByText('Recorded conversions').length).toBeGreaterThan(0)
   })
 
+  it('creates a business events enquiry linked to the shared organisation and contact', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Enquiries & venues'}))
+    fireEvent.click(screen.getByRole('button',{name:'New enquiry'}))
+    fireEvent.change(screen.getByLabelText('Enquiry name'),{target:{value:'Spring association congress'}})
+    fireEvent.change(screen.getByLabelText('Buyer organisation'),{target:{value:'org-001'}})
+    fireEvent.change(screen.getByLabelText('Buyer contact'),{target:{value:'con-001'}})
+    fireEvent.change(screen.getByLabelText('Event type'),{target:{value:'Congress'}})
+    fireEvent.change(screen.getByLabelText('Lead source'),{target:{value:'Website enquiry'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save enquiry'}))
+    const platform=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}') as typeof initialPlatformData
+    expect(platform.businessEnquiries.find((item)=>item.name==='Spring association congress')).toMatchObject({organisationId:'org-001',contactId:'con-001',stage:'New'})
+    expect(screen.getByText('Spring association congress')).toBeInTheDocument()
+  })
+
+  it('classifies a shared organisation as a business events buyer', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Enquiries & venues'}))
+    fireEvent.click(screen.getByRole('tab',{name:'Buyers'}))
+    fireEvent.click(screen.getByRole('button',{name:'New buyer'}))
+    fireEvent.change(screen.getByLabelText('CRM organisation'),{target:{value:'org-003'}})
+    fireEvent.change(screen.getByLabelText(/Markets/),{target:{value:'UK, Ireland'}})
+    fireEvent.click(screen.getByRole('button',{name:'Save buyer'}))
+    const crm=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}') as typeof initialData
+    const platform=JSON.parse(localStorage.getItem(`visitmade-platform-v2-${tenant.id}`)??'{}') as typeof initialPlatformData
+    expect(crm.organisations.find((item)=>item.id==='org-003')?.tags).toContain('Business Events')
+    expect(platform.businessBuyers.find((item)=>item.organisationId==='org-003')).toMatchObject({markets:['UK','Ireland'],type:'Corporate'})
+  })
+
   it('records transparent estimated member value', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Member Value'}))

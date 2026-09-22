@@ -239,6 +239,7 @@ export interface CRMTask {
   opportunityId?: string
   tradeShowId?: string
   tradeLeadId?: string
+  businessEnquiryId?: string
   dueDate: string
   dueTime?: string
   priority: TaskPriority
@@ -496,6 +497,7 @@ export interface TaskDraft {
   opportunityId?: string
   tradeShowId?: string
   tradeLeadId?: string
+  businessEnquiryId?: string
   dueDate: string
   priority: TaskPriority
   category: CRMTask['category']
