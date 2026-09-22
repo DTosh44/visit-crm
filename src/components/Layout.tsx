@@ -98,6 +98,7 @@ export function Layout({
 
   useEffect(() => {
     document.title = `${pageNames[view]} – ${data.workspace.destinationName} CRM`
+    window.requestAnimationFrame(() => document.getElementById('main-content')?.focus())
   }, [data.workspace.destinationName, view])
 
   const searchResults = useMemo(() => {
