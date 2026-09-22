@@ -11,6 +11,7 @@ import { Dashboard } from './views/Dashboard'
 import { Listings } from './views/Listings'
 import { Memberships } from './views/Memberships'
 import { Organisations } from './views/Organisations'
+import { People } from './views/People'
 import { Pipeline } from './views/Pipeline'
 import { Settings } from './views/Settings'
 import { Tasks } from './views/Tasks'
@@ -30,8 +31,8 @@ import { BrandLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 
-const views: ViewKey[] = ['dashboard','organisations','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
-const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
+const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',people:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -84,6 +85,7 @@ function CRMApp() {
     >
       {activeView === 'dashboard' && <Dashboard navigate={setView} openOrganisation={openOrganisation} />}
       {activeView === 'organisations' && <Organisations onAdd={() => setModal('organisation')} onOpen={openOrganisation} />}
+      {activeView === 'people' && <People />}
       {activeView === 'pipeline' && <Pipeline />}
       {activeView === 'memberships' && <Memberships openOrganisation={openOrganisation} />}
       {activeView === 'listings' && <Listings onEdit={openListing} />}

@@ -35,6 +35,36 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Valechester Castle')).toBeInTheDocument()
   })
 
+  it('manages organisation-linked and independent people with tags', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'People'}))
+    expect(screen.getByRole('heading',{name:'People'})).toBeInTheDocument()
+    expect(screen.getByText('Amelia Grant')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Add person'}))
+    fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Priya Nair'}})
+    fireEvent.change(screen.getByLabelText('Job title'),{target:{value:'Inbound product manager'}})
+    fireEvent.change(screen.getByLabelText('Email'),{target:{value:'priya@example.com'}})
+    const tagInput=screen.getByLabelText('Add tags')
+    fireEvent.change(tagInput,{target:{value:'International'}})
+    fireEvent.keyDown(tagInput,{key:'Enter'})
+    fireEvent.click(screen.getByRole('button',{name:'Save person'}))
+    expect(screen.getByText('Priya Nair')).toBeInTheDocument()
+    expect(screen.getAllByText('Independent').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('International').length).toBeGreaterThan(0)
+  })
+
+  it('adds searchable tags to an organisation', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
+    fireEvent.click(screen.getByRole('button',{name:'Valechester Castle'}))
+    fireEvent.click(screen.getByRole('button',{name:'Manage tags'}))
+    const input=screen.getByLabelText('Add tags')
+    fireEvent.change(input,{target:{value:'Press trip host'}})
+    fireEvent.keyDown(input,{key:'Enter'})
+    fireEvent.click(screen.getByRole('button',{name:'Save tags'}))
+    expect(screen.getByText('Press trip host')).toBeInTheDocument()
+  })
+
   it('provides a searchable rights-managed image bank', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Image bank'}))

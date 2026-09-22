@@ -21,10 +21,10 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 const roleViews: Record<UserRole, string[]> = {
-  Administrator: ['dashboard','organisations','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings'],
-  'Membership manager': ['dashboard','organisations','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','agreements','tasks'],
-  'Content editor': ['dashboard','organisations','pages','images','experiments','map','listings','events','content','inbox','insights','tasks'],
-  'Finance user': ['dashboard','organisations','billing','tasks'],
+  Administrator: ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','settings'],
+  'Membership manager': ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','agreements','tasks'],
+  'Content editor': ['dashboard','organisations','people','pages','images','experiments','map','listings','events','content','inbox','insights','tasks'],
+  'Finance user': ['dashboard','organisations','people','billing','tasks'],
 }
 export function canAccessView(role: UserRole | undefined, view: string) { return role ? roleViews[role].includes(view) : false }
 

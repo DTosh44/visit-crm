@@ -226,6 +226,7 @@ function normalizeCRMData(parsed: CRMData): CRMData {
     imageAssets: normalized.imageAssets ?? initialData.imageAssets,
     websiteExperiments: normalized.websiteExperiments ?? initialData.websiteExperiments,
     submissions: normalized.submissions ?? initialData.submissions,
+    contacts: (normalized.contacts ?? initialData.contacts).map((contact)=>({...contact,tags:contact.tags??[]})),
     levels: normalized.levels.map((level) => {
       const baseline = initialData.levels.find((item) => item.id === level.id)
       const legacy = legacyMediaAllowances[level.id]

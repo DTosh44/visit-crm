@@ -1,7 +1,7 @@
 import {
   Bell, BarChart3, BookOpen, Building2, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine, PanelsTopLeft,
   FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings, CalendarDays,
-  Inbox as InboxIcon, UsersRound, X, MapPinned, Images, FlaskConical,
+  Inbox as InboxIcon, UsersRound, X, MapPinned, Images, FlaskConical, ContactRound,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useCRM } from '../store'
@@ -17,6 +17,7 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
   { label: 'Workspace', items: [
     { key: 'dashboard', label: 'Dashboard', icon: Gauge },
     { key: 'organisations', label: 'Organisations', icon: Building2, feature: 'organisations' },
+    { key: 'people', label: 'People', icon: ContactRound, feature: 'organisations' },
     { key: 'pipeline', label: 'Sales pipeline', icon: Handshake, feature: 'salesPipeline' },
     { key: 'tasks', label: 'Tasks', icon: ListTodo, feature: 'tasks' },
   ] },
@@ -44,7 +45,7 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
 ]
 
 const pageNames: Record<ViewKey, string> = {
-  dashboard: 'Dashboard', organisations: 'Organisations', pipeline: 'Sales pipeline', memberships: 'Memberships',
+  dashboard: 'Dashboard', organisations: 'Organisations', people: 'People', pipeline: 'Sales pipeline', memberships: 'Memberships',
   pages: 'Pages', images: 'Image bank', experiments: 'A/B testing', map: 'Interactive map', listings: 'Listings', events: 'Events', content: 'Guides, itineraries & trails', inbox: 'Website inbox', insights: 'Reviews & social insights', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', settings: 'Settings',
 }
 

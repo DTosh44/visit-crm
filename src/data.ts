@@ -121,6 +121,10 @@ export const initialData: CRMData = {
     { id: 'con-010', organisationId: 'org-010', name: 'Parks Team', jobTitle: 'Place Operations', email: 'parks@example.com', phone: '01926 000 010', roles: ['Primary'], primary: true, portalAccess: false },
     { id: 'con-011', organisationId: 'org-011', name: 'Hannah Ellis', jobTitle: 'Launch Marketing Manager', email: 'hannah.ellis@example.com', phone: '020 7000 0111', roles: ['Primary', 'Marketing'], primary: true, portalAccess: false },
     { id: 'con-012', organisationId: 'org-012', name: 'Mark Collins', jobTitle: 'Managing Director', email: 'mark.collins@example.com', phone: '01789 000 121', roles: ['Primary', 'Signatory'], primary: true, portalAccess: false },
+    { id: 'con-press-001', organisationId: '', name: 'Amelia Grant', jobTitle: 'Travel editor', email: 'amelia.grant@example.com', phone: '020 7946 0124', roles: ['Media'], tags: ['National media','Press trip','Culture'], primary: false, portalAccess: false },
+    { id: 'con-trade-001', organisationId: '', name: 'Jon Bell', jobTitle: 'Product manager', email: 'jon.bell@example.com', phone: '020 7946 0148', roles: ['Travel Trade'], tags: ['Tour operator','Groups','UK inbound'], primary: false, portalAccess: false },
+    { id: 'con-pr-001', organisationId: '', name: 'Nadia Shah', jobTitle: 'PR account director', email: 'nadia.shah@example.com', phone: '020 7946 0162', roles: ['PR'], tags: ['Agency','Media relations','Campaign partner'], primary: false, portalAccess: false },
+    { id: 'con-influencer-001', organisationId: '', name: 'Leo Marsh', jobTitle: 'Travel creator', email: 'leo.marsh@example.com', phone: '', roles: ['Creator'], tags: ['Family travel','Instagram','Press trip'], primary: false, portalAccess: false },
     ...expandedContacts,
   ],
   benefits: [

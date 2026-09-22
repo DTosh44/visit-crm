@@ -1,6 +1,7 @@
 export type ViewKey =
   | 'dashboard'
   | 'organisations'
+  | 'people'
   | 'pipeline'
   | 'memberships'
   | 'listings'
@@ -36,6 +37,7 @@ export interface Contact {
   email: string
   phone: string
   roles: string[]
+  tags?: string[]
   primary?: boolean
   portalAccess?: boolean
 }
