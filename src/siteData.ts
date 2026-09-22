@@ -50,4 +50,7 @@ export const neighbourhoods = [
   { slug: 'castle-quarter', name: 'Castle Quarter', detail: 'Heritage, hidden lanes and skyline views', intro: 'The historic heart of Valechester, where old walls, gardens and independent streets reward an unhurried wander.', image: imageLibrary.castle },
   { slug: 'riverside', name: 'Riverside', detail: 'Theatre, gardens and waterside dining', intro: 'Follow the River Vale between performance, green spaces and relaxed places to eat with a view.', image: imageLibrary.park },
   { slug: 'market-vale', name: 'Market Vale', detail: 'Independents, makers and lively evenings', intro: 'A sociable neighbourhood of bookshops, makers, market stalls and characterful places to meet.', image: imageLibrary.books },
+  { slug: 'eastgate', name: 'Eastgate', detail: 'Museums, creative spaces and family discoveries', intro: 'A lively cultural quarter where hands-on museums, studios and welcoming places to eat make an easy day out.', image: imageLibrary.museum },
+  { slug: 'north-vale', name: 'North Vale', detail: 'Open parkland, galleries and big skies', intro: 'The greener side of Valechester, pairing contemporary culture with spacious parks and slower afternoons.', image: imageLibrary.gallery },
+  { slug: 'willowmere', name: 'Willowmere', detail: 'Country lanes, local flavours and seasonal gatherings', intro: 'A relaxed village escape known for makers, gardens and food-and-drink experiences rooted in the Vale.', image: imageLibrary.distillery },
 ]

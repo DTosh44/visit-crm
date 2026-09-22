@@ -209,7 +209,7 @@ describe('Visit CRM', () => {
     expect(screen.getByText('What would you like to do?')).toBeInTheDocument()
     expect(screen.getByText('Who are you visiting with?')).toBeInTheDocument()
     fireEvent.click(screen.getByText('History & heritage'))
-    fireEvent.click(screen.getByText('Families'))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Families/ }))
     expect(screen.getByText(/places? match your choices/)).toBeInTheDocument()
     expect(screen.getByLabelText('Selected filters')).toBeInTheDocument()
   })
@@ -317,6 +317,18 @@ describe('Visit CRM', () => {
     fireEvent.click(screen.getByRole('button', { name: /View full calendar/ }))
     expect(screen.getByRole('heading', { name: 'Make a date of Valechester.' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Harvest & Makers Market' })).toBeInTheDocument()
+  })
+
+  it('uses homepage visitor cards without replacing the existing search experience', () => {
+    window.history.pushState({}, '', '/')
+    renderApp()
+    expect(screen.getByRole('heading', { name: 'Who’s visiting?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Events worth planning for.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Find your corner of the Vale.' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Explore Eastgate' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Families/ }))
+    expect(screen.getByRole('heading', { name: 'Results for “family”' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Search Valechester')).toHaveValue('family')
   })
 
   it('filters public events by search, date, location, event type and format', () => {

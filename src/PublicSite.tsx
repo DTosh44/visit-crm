@@ -18,6 +18,14 @@ import type { WebsiteAnalyticsEvent } from './types'
 import { websitePageContent, websitePageForPath } from './websitePages'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
+const visitorJourneys = [
+  { title: 'Families', detail: 'Big discoveries for curious minds', query: 'family', image: imageLibrary.castle },
+  { title: 'Couples', detail: 'Slow days and memorable evenings', query: 'romantic', image: imageLibrary.restaurant },
+  { title: 'Friends', detail: 'Shared experiences worth the trip', query: 'group', image: imageLibrary.distillery },
+  { title: 'Culture seekers', detail: 'Stories, stages and local character', query: 'heritage', image: imageLibrary.theatre },
+  { title: 'Food lovers', detail: 'Independent tables and Vale flavours', query: 'food', image: imageLibrary.restaurant },
+  { title: 'Accessible explorers', detail: 'Plan with confidence and detail', query: 'accessible', image: imageLibrary.park },
+]
 const SAVED_KEY = 'visit-valechester-saved-v1'
 const EVENT_ACCOUNTS_KEY = 'visit-valechester-event-accounts-v1'
 const EVENT_SESSION_KEY = 'visit-valechester-event-session-v1'
@@ -277,6 +285,15 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
 
       <section className="site-intro site-container"><span className="site-eyebrow plum">Welcome to Valechester</span><div><h2>Historic at heart.<br /><em>Independent by nature.</em></h2><p>{data.workspace.strapline} Come for the landmark sights, stay for the unexpected finds—and make the story your own.</p></div></section>
 
+      <section className="site-audiences site-container" id="visitors" aria-labelledby="audience-heading">
+        <header className="editorial-heading"><span className="site-eyebrow plum">Make it your Valechester</span><h2 id="audience-heading">Who’s visiting?</h2><p>Choose the kind of trip you’re planning and we’ll bring the most useful places and experiences to the top.</p></header>
+        <div className="site-audience-grid">{visitorJourneys.map((journey) => <button key={journey.title} onClick={() => runSearch(journey.query)}><img src={journey.image} alt="" loading="lazy" decoding="async"/><span><strong>{journey.title}</strong><small>{journey.detail}</small><i><ArrowRight size={16}/></i></span></button>)}</div>
+      </section>
+
+      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="editorial-heading"><span className="site-eyebrow plum">What’s on</span><h2>Events worth planning for.</h2><button aria-label="View full calendar" onClick={() => siteNavigate('/events')}>View all events <ArrowRight size={16}/></button></header><div className="site-event-grid">{recurringEvents(data.events.filter((event)=>event.status==='Published')).sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,4).map((event) => <article key={event.id}><button className="event-image-link" onClick={() => siteNavigate(`/events#${event.id}`)} aria-label={`View ${event.title}`}><img src={imageLibrary[event.image]??event.image??imageLibrary.theatre} alt="" loading="lazy" decoding="async"/><span>{event.category}</span></button><div className="site-event-copy"><h3>{event.title}</h3><p><CalendarDays size={13}/>{eventDay(event)} {eventMonth(event)}</p><p><MapPin size={13}/>{event.town}</p><button className="event-card-link" onClick={() => siteNavigate(`/events#${event.id}`)}>View event <ArrowRight size={13}/></button></div></article>)}</div></div></section>}
+
+      <section className="site-neighbourhoods" id="communities"><div className="site-container"><header className="editorial-heading"><span className="site-eyebrow plum">Featured towns and neighbourhoods</span><h2>Find your corner of the Vale.</h2><p>Each part of Valechester has its own pace, people and reasons to stay a little longer.</p></header><div className="site-neighbourhood-grid">{neighbourhoods.slice(0,4).map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async"/><div><span>Explore</span><h3>{place.name}</h3><p>{place.detail}</p><button onClick={() => siteNavigate(`/neighbourhood/${place.slug}`)} aria-label={`Explore ${place.name}`}><ArrowRight size={18}/></button></div></article>)}</div></div></section>
+
       <section className="site-discover site-container" id="discover">
         <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Search by place, practical needs, who you are travelling with or the kind of experience you want.</p></header>
         <div className="site-category-tabs">{categories.map((item) => <button key={item} aria-pressed={category === item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
@@ -295,11 +312,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
         </div>
       </section>
 
-      {features.events && <section className="site-events" id="events"><div className="site-container"><header className="site-section-heading inverse"><div><span className="site-eyebrow">Make a date of it</span><h2>What’s on next</h2></div><button onClick={() => siteNavigate('/events')}>View full calendar <ArrowRight size={16} /></button></header><div className="site-event-grid">{recurringEvents(data.events.filter((event)=>event.status==='Published')).sort((a,b)=>a.startDate.localeCompare(b.startDate)).slice(0,4).map((event) => <article key={event.id}><img src={imageLibrary[event.image]??event.image??imageLibrary.theatre} alt="" loading="lazy" decoding="async" /><div className="site-date"><strong>{eventDay(event)}</strong><span>{eventMonth(event)}</span></div><div><span>{event.category}</span><h3>{event.title}</h3><p><MapPin size={13} />{event.venueName}</p><button className="event-card-link" onClick={() => siteNavigate(`/events#${event.id}`)}>View event <ArrowRight size={13} /></button></div></article>)}</div></div></section>}
-
       {features.itineraries && <section className="site-ideas site-container" id="ideas"><header className="site-section-heading"><div><span className="site-eyebrow plum">Ideas worth travelling for</span><h2>Follow your curiosity</h2></div><button onClick={() => siteNavigate('/plan')}>Build your own itinerary <ArrowRight size={16} /></button></header><div className="site-guide-grid">{guides.map((guide) => <article key={guide.title}><img src={guide.image} alt="" loading="lazy" decoding="async" /><div><span>{guide.eyebrow}</span><h3>{guide.title}</h3><p>{guide.description}</p><button onClick={() => siteNavigate(`/guide/${guide.slug}`)}>Read the guide <ArrowRight size={15} /></button></div></article>)}</div></section>}
-
-      <section className="site-neighbourhoods"><div className="site-container"><div className="site-section-heading inverse"><div><span className="site-eyebrow">Pick a neighbourhood</span><h2>Three sides of the same story</h2></div></div><div className="site-neighbourhood-grid">{neighbourhoods.map((place) => <article key={place.name}><img src={place.image} alt="" loading="lazy" decoding="async" /><div><h3>{place.name}</h3><p>{place.detail}</p><button onClick={() => siteNavigate(`/neighbourhood/${place.slug}`)} aria-label={`Explore ${place.name}`}><ArrowRight size={18} /></button></div></article>)}</div></div></section>
 
       <section className="site-planner site-container" id="plan"><div><span className="planner-icon"><Sparkles size={24} /></span><span className="site-eyebrow plum">Made for your kind of trip</span><h2>Not sure where to start?</h2><p>Tell us who’s coming, what you love and how long you have. We’ll shape a Valechester itinerary around you.</p><button onClick={() => siteNavigate('/plan')}>Build my itinerary <ArrowRight size={17} /></button></div><aside><span><TrainFront size={21} /><strong>42 mins</strong><small>by direct train from Birmingham</small></span><span><Accessibility size={21} /><strong>Accessible</strong><small>routes and venue details</small></span><span><Clock3 size={21} /><strong>2–3 days</strong><small>to see the town at its best</small></span></aside></section>
 
