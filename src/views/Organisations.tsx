@@ -85,9 +85,9 @@ export function Organisations({ onAdd, onOpen }: { onAdd: () => void; onOpen: (o
               <thead><tr><th className="checkbox-cell"><input type="checkbox" aria-label="Select all matching organisations" checked={selected.length === organisations.length && organisations.length > 0} onChange={toggleAll} /></th><th>Organisation</th><th>Membership</th><th>Health</th><th>Location</th><th>Renewal</th><th>Value</th><th>Owner</th><th /></tr></thead>
               <tbody>{organisations.map((org) => {
                 const contact = data.contacts.find((item) => item.id === org.primaryContactId)
-                return <tr key={org.id} onClick={() => onOpen(org)}>
+                return <tr key={org.id}>
                   <td className="checkbox-cell" onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`Select ${org.name}`} checked={selected.includes(org.id)} onChange={() => toggle(org.id)} /></td>
-                  <td><div className="org-cell"><Avatar name={org.name} colour={org.colour} /><div><strong>{org.name}</strong><small>{contact?.name ?? 'No primary contact'} · {org.type}</small></div></div></td>
+                  <td><div className="org-cell"><Avatar name={org.name} colour={org.colour} /><div><button className="table-primary-action" onClick={() => onOpen(org)}>{org.name}</button><small>{contact?.name ?? 'No primary contact'} · {org.type}</small></div></div></td>
                   <td><div className="membership-cell"><strong>{org.tier}</strong><Badge>{org.status}</Badge></div></td>
                   <td><Badge dot>{org.health}</Badge></td>
                   <td><span>{org.town}</span></td>
