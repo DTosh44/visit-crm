@@ -62,6 +62,14 @@ export interface Organisation {
   town: string
   address: string
   website: string
+  email?: string
+  phone?: string
+  socialLinks?: string[]
+  description?: string
+  accessibility?: string
+  facilities?: string[]
+  logoUrl?: string
+  images?: string[]
   tier: string
   status: MembershipStatus
   health: Health
@@ -139,6 +147,7 @@ export interface Listing {
   phone: string
   email: string
   openingHours: string
+  accessibility?: string
   facilities: string[]
   visitorTaxonomy?: string[]
   searchTags: string[]

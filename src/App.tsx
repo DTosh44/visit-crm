@@ -30,7 +30,8 @@ import { PublicSite } from './PublicSite'
 import { ProductLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
-import { PortalApp, PublicSurvey } from './PortalApp'
+import { PublicSurvey } from './PortalApp'
+import { SecurePortalApp } from './SecurePortalApp'
 import { BusinessEvents, Campaigns, Engagement, MemberOpportunities, MemberValue, PRMedia, Surveys, TravelTrade, WebsiteHealth } from './views/PlatformModules'
 import { Communications } from './views/Communications'
 import { Automations } from './views/Automations'
@@ -145,7 +146,7 @@ export default function App() {
   const surveySlug = window.location.pathname.match(/^\/survey\/([^/]+)/)?.[1]
 
   if (surveySlug) return <PublicSurvey slug={decodeURIComponent(surveySlug)} />
-  if (isPortal) return <PortalApp />
+  if (isPortal) return <SecurePortalApp />
   if (!isCRM) return <PublicSite />
   if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
   if (!user) return <LoginPage />

@@ -8,6 +8,7 @@ import { initialData } from './data'
 import { PlatformProvider } from './platform'
 import { initialPlatformData } from './platformData'
 import { tenant } from './tenant'
+import { SecurePortalApp } from './SecurePortalApp'
 
 function renderApp() {
   return render(<AuthProvider><FeatureProvider><CRMProvider><PlatformProvider><App /></PlatformProvider></CRMProvider></FeatureProvider></AuthProvider>)
@@ -601,14 +602,11 @@ describe('Visit CRM', () => {
     expect(screen.getAllByText(/Estimated value delivered/).length).toBeGreaterThan(0)
   })
 
-  it('keeps the member portal scoped to the linked organisation', () => {
+  it('does not expose CRM seed data or demo sign-in through the secure portal', async () => {
     window.history.pushState({},'', '/portal')
-    renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Sign in'}))
-    expect(screen.getByRole('heading',{name:'Valechester Castle'})).toBeInTheDocument()
-    expect(screen.getByText('Tier 1 membership · Active')).toBeInTheDocument()
-    expect(screen.queryByText('Relationship notes')).not.toBeInTheDocument()
-    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+    render(<SecurePortalApp />)
+    expect(await screen.findByText(/Demo access is disabled/)).toBeInTheDocument()
+    expect(screen.queryByText('Valechester Castle')).not.toBeInTheDocument()
   })
 
   it('accepts a public survey response', () => {

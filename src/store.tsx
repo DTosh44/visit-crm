@@ -120,6 +120,7 @@ interface PublicListingRow {
   email: string
   opening_hours: string
   facilities: string[]
+  accessibility?: string
   image: string
   media?: Listing['media']
   search_tags?: string[]
@@ -159,6 +160,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     email: row.email,
     openingHours: row.opening_hours,
     facilities: row.facilities,
+    accessibility: row.accessibility ?? '',
     image: row.image,
     media: row.media ?? [],
     lastUpdated: row.updated_at.slice(0, 10),
@@ -187,6 +189,7 @@ function toPublicListing(listing: Listing) {
     email: listing.email,
     opening_hours: listing.openingHours,
     facilities: listing.facilities,
+    accessibility: listing.accessibility ?? '',
     image: listing.image,
     media: listing.media ?? [],
     search_tags: listing.searchTags,
