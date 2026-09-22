@@ -7,7 +7,7 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([type="hi
 export function useDialogFocus<T extends HTMLElement>(active: boolean, onClose: () => void) {
   const ref = useRef<T>(null)
   const closeRef = useRef(onClose)
-  closeRef.current = onClose
+  useEffect(() => { closeRef.current = onClose }, [onClose])
 
   useEffect(() => {
     if (!active) return
