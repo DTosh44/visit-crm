@@ -5,7 +5,7 @@ import { tenant } from '../tenant'
 import { imageLibrary } from '../siteData'
 import { useCRM } from '../store'
 import type { DestinationEvent, EventDraft, EventFormat, EventRecurrence, EventStatus } from '../types'
-import { Badge, Button, EmptyState, PageHeader } from '../components/UI'
+import { Badge, Button, EmptyState, PageHeader, useDialogFocus } from '../components/UI'
 
 const categories = ['Music & Shows','Festivals & Seasonal','Food & Drink','Family','Arts & Culture','Talks & Workshops','Tours & Heritage','Outdoors & Sport','Wellbeing','Social']
 const formats: EventFormat[] = ['One-off and short run','Ongoing events','Online events']
@@ -21,10 +21,11 @@ function EventEditor({ event, onClose }: { event?: DestinationEvent; onClose: ()
   const [draft, setDraft] = useState<EventDraft>(event ? { ...event } : blankEvent(user?.name ?? 'Destination team'))
   const set = <K extends keyof EventDraft>(key: K, value: EventDraft[K]) => setDraft((current) => ({ ...current, [key]: value }))
   const [error,setError]=useState('')
+  const dialogRef = useDialogFocus<HTMLFormElement>(true,onClose)
   const submit = (formEvent: FormEvent) => { formEvent.preventDefault();setError('');if(draft.endDate<draft.startDate){setError('The end date must be on or after the start date.');return}if(draft.endDate===draft.startDate&&draft.endTime<=draft.startTime){setError('The end time must be after the start time.');return}if((draft.recurrence??'None')!=='None'&&draft.recurrenceUntil&&draft.recurrenceUntil<draft.startDate){setError('The repeat-until date must be on or after the start date.');return}if(!event&&data.events.some((item)=>item.title.toLowerCase()===draft.title.toLowerCase()&&item.startDate===draft.startDate&&item.venueName.toLowerCase()===draft.venueName.toLowerCase())){setError('A matching event already exists for this date and venue.');return} if (event) updateEvent(event.id, draft); else createEvent(draft); onClose() }
   const uploadImage=async(file?:File)=>{if(!file||!['image/jpeg','image/png','image/webp'].includes(file.type))return;if(supabase){const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,'-');const path=`${tenant.id}/${event?.id??'draft'}/${Date.now()}-${safe}`;const {error:uploadError}=await supabase.storage.from('event-media').upload(path,file,{contentType:file.type});if(!uploadError){set('image',supabase.storage.from('event-media').getPublicUrl(path).data.publicUrl);return}}const reader=new FileReader();reader.onload=()=>set('image',String(reader.result));reader.readAsDataURL(file)}
-  return <div className="modal-backdrop" role="presentation"><form className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-label={event ? `Edit ${event.title}` : 'Add event'}>
-    <header><div><span className="eyebrow">Website content</span><h2>{event ? 'Edit event' : 'Add event'}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={20}/></button></header>
+  return <div className="modal-backdrop" role="presentation"><form ref={dialogRef} tabIndex={-1} className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="event-editor-title">
+    <header><div><span className="eyebrow">Website content</span><h2 id="event-editor-title">{event ? 'Edit event' : 'Add event'}</h2></div><button type="button" className="icon-button" onClick={onClose} aria-label="Close event editor"><X size={20} aria-hidden="true"/></button></header>
     <div className="event-form-grid">
       <label className="event-field-wide">Event title<input required value={draft.title} onChange={(e)=>set('title',e.target.value)}/></label>
       <label>Category<select value={draft.category} onChange={(e)=>set('category',e.target.value)}>{categories.map((item)=><option key={item}>{item}</option>)}</select></label>
@@ -73,7 +74,7 @@ export function Events() {
         <td><strong>{new Date(`${event.startDate}T12:00:00`).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}</strong><small>{event.startTime}–{event.endTime}</small></td>
         <td><strong>{event.venueName}</strong><small><MapPin size={12}/>{event.town}</small></td>
         <td>{event.submittedBy}</td><td><Badge>{event.status}</Badge></td>
-        <td><div className="event-row-actions">{event.status!=='Published'&&<button className="publish-icon" onClick={()=>publishEvent(event.id)} title="Publish"><CheckCircle2 size={17}/></button>}<button className="icon-button" onClick={()=>setEditing(event)} aria-label={`Edit ${event.title}`}><Edit3 size={17}/></button><button className="icon-button danger" onClick={()=>{if(window.confirm(`Delete ${event.title}?`))deleteEvent(event.id)}} aria-label={`Delete ${event.title}`}><Trash2 size={17}/></button></div></td>
+        <td><div className="event-row-actions">{event.status!=='Published'&&<button type="button" className="publish-icon" onClick={()=>publishEvent(event.id)} title="Publish" aria-label={`Publish ${event.title}`}><CheckCircle2 size={17}/></button>}<button className="icon-button" onClick={()=>setEditing(event)} aria-label={`Edit ${event.title}`}><Edit3 size={17}/></button><button className="icon-button danger" onClick={()=>{if(window.confirm(`Delete ${event.title}?`))deleteEvent(event.id)}} aria-label={`Delete ${event.title}`}><Trash2 size={17}/></button></div></td>
       </tr>)}</tbody></table></div>:<EmptyState icon={Search} title="No events found" description="Try changing the search or status filter."/>}
       <footer className="table-footer"><span>Showing {filtered.length} of {data.events.length} events</span></footer>
     </section>
