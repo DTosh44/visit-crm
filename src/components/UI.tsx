@@ -1,5 +1,5 @@
 import { X, type LucideIcon } from 'lucide-react'
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { classNames, initials } from '../utils'
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -7,25 +7,39 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([type="hi
 export function useDialogFocus<T extends HTMLElement>(active: boolean, onClose: () => void) {
   const ref = useRef<T>(null)
   const closeRef = useRef(onClose)
-  useEffect(() => { closeRef.current = onClose }, [onClose])
+
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     if (!active) return
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const dialog = ref.current
-    const focusFirst = () => {
-      const first = dialog?.querySelector<HTMLElement>('[data-dialog-initial-focus]') ?? dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
-      ;(first ?? dialog)?.focus()
-    }
-    const timer = window.setTimeout(focusFirst, 0)
+    if (!dialog) return
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const getFocusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      .filter((element) => !element.hasAttribute('hidden') && element.getAttribute('aria-hidden') !== 'true')
+
+    const frame = window.requestAnimationFrame(() => {
+      const preferred = dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]')
+      const first = preferred ?? getFocusable()[0]
+      ;(first ?? dialog).focus()
+    })
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        event.stopPropagation()
         closeRef.current()
         return
       }
-      if (event.key !== 'Tab' || !dialog) return
-      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => element.getAttribute('aria-hidden') !== 'true')
+      if (event.key !== 'Tab') return
+
+      const focusable = getFocusable()
       if (!focusable.length) {
         event.preventDefault()
         dialog.focus()
@@ -41,11 +55,13 @@ export function useDialogFocus<T extends HTMLElement>(active: boolean, onClose: 
         first.focus()
       }
     }
-    document.addEventListener('keydown', handleKeyDown)
+
+    dialog.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('keydown', handleKeyDown)
-      previousFocus?.focus()
+      window.cancelAnimationFrame(frame)
+      dialog.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) window.requestAnimationFrame(() => previousFocus.focus())
     }
   }, [active])
 
@@ -66,7 +82,7 @@ export function Button({
 }) {
   return (
     <button className={classNames('button', `button-${variant}`, `button-${size}`, className)} {...props}>
-      {Icon && <Icon size={size === 'sm' ? 15 : 17} strokeWidth={2} />}
+      {Icon && <Icon size={size === 'sm' ? 15 : 17} strokeWidth={2} aria-hidden="true" />}
       {children}
     </button>
   )
@@ -82,16 +98,16 @@ const toneByLabel: Record<string, string> = {
 
 export function Badge({ children, tone, dot = false }: { children: ReactNode; tone?: string; dot?: boolean }) {
   const label = String(children)
-  return <span className={classNames('badge', `badge-${tone ?? toneByLabel[label] ?? 'grey'}`)}>{dot && <i />}{children}</span>
+  return <span className={classNames('badge', `badge-${tone ?? toneByLabel[label] ?? 'grey'}`)}>{dot && <i aria-hidden="true" />}{children}</span>
 }
 
 export function Avatar({ name, colour, size = 'md' }: { name: string; colour?: string; size?: 'sm' | 'md' | 'lg' }) {
-  return <span className={classNames('avatar', `avatar-${size}`)} style={{ '--avatar-colour': colour ?? '#365c7d' } as React.CSSProperties}>{initials(name)}</span>
+  return <span aria-hidden="true" className={classNames('avatar', `avatar-${size}`)} style={{ '--avatar-colour': colour ?? '#365c7d' } as React.CSSProperties}>{initials(name)}</span>
 }
 
 export function Progress({ value, colour }: { value: number; colour?: string }) {
   return (
-    <div className="progress" role="progressbar" aria-label="Completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.max(0, Math.min(100, value))}>
+    <div className="progress" role="progressbar" aria-label="Completion" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(Math.max(0, Math.min(100, value)))} aria-valuetext={`${Math.round(Math.max(0, Math.min(100, value)))}% complete`}>
       <span style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: colour }} />
     </div>
   )
@@ -112,7 +128,7 @@ export function Modal({ title, subtitle, onClose, children, width = 'md' }: {
       <section ref={dialogRef} tabIndex={-1} className={classNames('modal', `modal-${width}`)} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? descriptionId : undefined}>
         <header className="modal-header">
           <div><h2 id={titleId}>{title}</h2>{subtitle && <p id={descriptionId}>{subtitle}</p>}</div>
-          <button className="icon-button" onClick={onClose} aria-label="Close" title={`Close ${title}`}><X size={19} /></button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label={`Close ${title}`}><X size={19} aria-hidden="true" /></button>
         </header>
         <div className="modal-body">{children}</div>
       </section>
@@ -135,7 +151,7 @@ export function Drawer({ title, subtitle, onClose, children, width = 'wide' }: {
       <aside ref={dialogRef} tabIndex={-1} className={classNames('drawer', `drawer-${width}`)} role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={subtitle ? descriptionId : undefined}>
         <header className="drawer-header">
           <div><h2 id={titleId}>{title}</h2>{subtitle && <p id={descriptionId}>{subtitle}</p>}</div>
-          <button className="icon-button" onClick={onClose} aria-label="Close" title={`Close ${title}`}><X size={19} /></button>
+          <button type="button" className="icon-button" onClick={onClose} aria-label={`Close ${title}`}><X size={19} aria-hidden="true" /></button>
         </header>
         <div className="drawer-body">{children}</div>
       </aside>
@@ -171,7 +187,7 @@ export function EmptyState({ icon: Icon, title, description, action }: {
   description: string
   action?: ReactNode
 }) {
-  return <div className="empty-state"><span className="empty-icon"><Icon size={23} /></span><h3>{title}</h3><p>{description}</p>{action}</div>
+  return <div className="empty-state"><span className="empty-icon"><Icon size={23} aria-hidden="true" /></span><h3>{title}</h3><p>{description}</p>{action}</div>
 }
 
 export function StatDelta({ value, label, positive = true }: { value: string; label: string; positive?: boolean }) {
@@ -179,5 +195,17 @@ export function StatDelta({ value, label, positive = true }: { value: string; la
 }
 
 export function Tabs<T extends string>({ items, active, onChange }: { items: T[]; active: T; onChange: (item: T) => void }) {
-  return <div className="tabs" role="tablist" aria-label="Sections">{items.map((item) => <button key={item} type="button" role="tab" aria-selected={active === item} className={active === item ? 'active' : ''} onClick={() => onChange(item)}>{item}</button>)}</div>
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const onKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next = index
+    if (event.key === 'ArrowRight') next = (index + 1) % items.length
+    else if (event.key === 'ArrowLeft') next = (index - 1 + items.length) % items.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = items.length - 1
+    else return
+    event.preventDefault()
+    onChange(items[next])
+    window.requestAnimationFrame(() => tabsRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus())
+  }
+  return <div className="tabs" role="tablist" aria-label="Sections" ref={tabsRef}>{items.map((item,index) => <button key={item} type="button" role="tab" aria-selected={active === item} tabIndex={active === item ? 0 : -1} className={active === item ? 'active' : ''} onKeyDown={(event)=>onKeyDown(event,index)} onClick={() => onChange(item)}>{item}</button>)}</div>
 }
