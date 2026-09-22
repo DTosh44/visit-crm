@@ -1,6 +1,7 @@
 export type PlatformCollection = keyof PlatformData
 
-export interface MemberValueEntry { id:string; organisationId:string; campaignId?:string; opportunityId?:string; date:string; category:'Website'|'Marketing'|'PR'|'Travel trade'|'MICE'|'Engagement'; activity:string; quantity:number; estimatedValue:number; evidence:string }
+export type MemberValueType='Website listing exposure'|'Campaign participation'|'Newsletter feature'|'Social promotion'|'PR/media opportunity'|'Travel trade opportunity'|'Familiarisation visit'|'Business event lead'|'Events/networking'|'Training'|'Research/data'|'Member offer'|'Membership benefit used'|'Other'
+export interface MemberValueEntry { id:string; organisationId:string; campaignId?:string; opportunityId?:string; benefitId?:string; relatedId?:string; date:string; type?:MemberValueType; category:'Website'|'Marketing'|'PR'|'Travel trade'|'MICE'|'Engagement'; activity:string; quantity:number; estimatedValue:number; actualValue?:number; source?:string; calculation?:'automatic'|'manual'; notes?:string; evidence:string }
 export interface MemberResource { id:string; title:string; category:string; description:string; url:string; membershipLevels:string[]; published:boolean; updatedAt:string }
 export interface CommunicationTemplate { id:string; name:string; category:string; subject:string; previewText:string; body:string; senderName:string; replyTo?:string; ctaLabel?:string; ctaUrl?:string; updatedAt:string }
 export interface ContactSegment { id:string; name:string; description:string; filters:Array<{field:string;operator:string;value:string}>; dynamic:boolean; contactIds?:string[]; updatedAt:string }

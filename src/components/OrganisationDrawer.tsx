@@ -14,6 +14,7 @@ import { TagPicker } from './TagPicker'
 import { engagementScore, usePlatform } from '../platform'
 import { useCommunicationHistory } from '../communicationHistory'
 import { PortalAdministration } from './PortalAdministration'
+import { inPeriod, memberValueRows, membershipPeriod } from '../memberValueModel'
 
 type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Value & engagement' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
 
@@ -38,7 +39,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
   const level = data.levels.find((item) => item.name === organisation.tier)
   const primaryContact = contacts.find((item) => item.primary) ?? contacts[0]
   const isMember = organisation.status !== 'Non-member' && organisation.tier !== 'No membership'
-  const valueRecords=platform.memberValue.filter((item)=>item.organisationId===organisation.id)
+  const valueRecords=memberValueRows(data,platform).filter((item)=>item.organisationId===organisation.id&&inPeriod(item.date,membershipPeriod(organisation)))
   const campaigns=platform.campaigns.filter((item)=>item.organisationIds.includes(organisation.id))
   const memberOpportunities=platform.memberOpportunities.filter((item)=>item.applications.some((application)=>application.organisationId===organisation.id))
   const engagement=engagementScore({lastActivity:organisation.lastActivity,benefitsUsed:data.benefitUsage.filter((item)=>item.organisationId===organisation.id&&item.used>0).length,portal:contacts.some((item)=>item.portalAccess),listingCompleteness:listings.reduce((sum,item,_,rows)=>sum+item.completeness/rows.length,0),campaigns:campaigns.length,referrals:listings.reduce((sum,item)=>sum+item.enquiries,0),overdueInvoices:invoices.filter((item)=>item.status==='Overdue').length},platform.engagementSettings.weights)

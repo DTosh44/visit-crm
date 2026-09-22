@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { BriefcaseBusiness, CheckCircle2, Download, FileSearch, Globe2, Newspaper, Plus, ShieldCheck } from 'lucide-react'
 import { useCRM } from '../store'
-import { engagementScore, makePlatformId, usePlatform } from '../platform'
-import type { MediaCoverage, MemberValueEntry, Survey, WebsiteHealthIssue } from '../platformTypes'
-import { Badge, Button, EmptyState, Field, Modal, PageHeader, Progress, Tabs } from '../components/UI'
+import { engagementScore, usePlatform } from '../platform'
+import type { MediaCoverage, Survey, WebsiteHealthIssue } from '../platformTypes'
+import { Badge, Button, EmptyState, Modal, PageHeader, Progress, Tabs } from '../components/UI'
 import { currency, formatDate } from '../utils'
 import { downloadCsv } from '../actions'
 import { FamTripEditor } from '../components/FamTripEditor'
@@ -13,19 +13,7 @@ import { downloadFamTripPdf, famTripMemberDetails, parseFamItinerary } from '../
 
 function Summary({items}:{items:Array<{label:string;value:string|number;detail?:string}>}){return <section className="platform-summary">{items.map((item)=><article key={item.label}><span>{item.label}</span><strong>{item.value}</strong>{item.detail&&<small>{item.detail}</small>}</article>)}</section>}
 function Panel({title,description,action,children}:{title:string;description?:string;action?:ReactNode;children:ReactNode}){return <section className="panel platform-panel"><header><div><h2>{title}</h2>{description&&<p>{description}</p>}</div>{action}</header>{children}</section>}
-function DateFilter({value,onChange}:{value:string;onChange:(value:string)=>void}){return <label className="compact-filter"><span>Period</span><select value={value} onChange={(event)=>onChange(event.target.value)}><option value="current">Current membership year</option><option value="previous">Previous membership year</option><option value="all">All records</option></select></label>}
-
-export function MemberValue(){
-  const {data:crm}=useCRM();const {data,addRecord}=usePlatform();const [period,setPeriod]=useState('current');const [adding,setAdding]=useState(false)
-  const rows=data.memberValue.filter((item)=>period==='all'||(period==='current'?item.date>='2026-09-01':item.date<'2026-09-01'))
-  const delivered=rows.reduce((sum,item)=>sum+item.estimatedValue,0);const referrals=rows.filter((item)=>item.activity.toLowerCase().includes('referral')).reduce((sum,item)=>sum+item.quantity,0)
-  const save=(input:Omit<MemberValueEntry,'id'>)=>{addRecord('memberValue',{...input,id:makePlatformId('value')});setAdding(false)}
-  return <div><PageHeader eyebrow="Membership" title="Member Value" description="Evidence of the activity, exposure and support delivered to members. Monetary figures are indicative estimates, not objective financial returns." actions={<><DateFilter value={period} onChange={setPeriod}/><Button icon={Plus} onClick={()=>setAdding(true)}>Record value</Button></>}/>
-    <Summary items={[{label:'Estimated value delivered',value:currency.format(delivered),detail:'Clearly labelled estimate'},{label:'Member activities',value:rows.length},{label:'Website referrals',value:referrals},{label:'Members receiving value',value:new Set(rows.map((item)=>item.organisationId)).size}]}/>
-    <Panel title="Value delivery ledger" description="Filterable evidence across website, marketing, PR, travel trade, MICE and engagement."><div className="table-scroll"><table className="data-table"><thead><tr><th>Date</th><th>Member</th><th>Category</th><th>Activity</th><th>Quantity</th><th>Estimated value</th><th>Evidence</th></tr></thead><tbody>{rows.map((item)=><tr key={item.id}><td>{formatDate(item.date)}</td><td><strong>{crm.organisations.find((org)=>org.id===item.organisationId)?.name??'Unknown member'}</strong></td><td><Badge>{item.category}</Badge></td><td>{item.activity}</td><td>{item.quantity}</td><td>{item.estimatedValue?currency.format(item.estimatedValue):'Measured only'}</td><td>{item.evidence}</td></tr>)}</tbody></table></div></Panel>
-    {adding&&<ValueModal onClose={()=>setAdding(false)} onSave={save}/>}</div>
-}
-function ValueModal({onClose,onSave}:{onClose:()=>void;onSave:(value:Omit<MemberValueEntry,'id'>)=>void}){const {data}=useCRM();const [draft,setDraft]=useState<Omit<MemberValueEntry,'id'>>({organisationId:data.organisations[0]?.id??'',date:new Date().toISOString().slice(0,10),category:'Marketing',activity:'',quantity:1,estimatedValue:0,evidence:''});return <Modal title="Record member value" subtitle="Record a measured activity and, where appropriate, an explicitly estimated value." onClose={onClose}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();onSave(draft)}}><Field label="Member"><select required value={draft.organisationId} onChange={(e)=>setDraft({...draft,organisationId:e.target.value})}>{data.organisations.filter((org)=>!['Prospect','Non-member'].includes(org.status)).map((org)=><option value={org.id} key={org.id}>{org.name}</option>)}</select></Field><div className="form-grid two"><Field label="Date"><input required type="date" value={draft.date} onChange={(e)=>setDraft({...draft,date:e.target.value})}/></Field><Field label="Category"><select value={draft.category} onChange={(e)=>setDraft({...draft,category:e.target.value as MemberValueEntry['category']})}>{['Website','Marketing','PR','Travel trade','MICE','Engagement'].map((item)=><option key={item}>{item}</option>)}</select></Field></div><Field label="Activity"><input required autoFocus value={draft.activity} onChange={(e)=>setDraft({...draft,activity:e.target.value})}/></Field><div className="form-grid two"><Field label="Quantity"><input type="number" min="0" value={draft.quantity} onChange={(e)=>setDraft({...draft,quantity:Number(e.target.value)})}/></Field><Field label="Estimated value (£)" hint="Optional and always shown as an estimate."><input type="number" min="0" value={draft.estimatedValue} onChange={(e)=>setDraft({...draft,estimatedValue:Number(e.target.value)})}/></Field></div><Field label="Evidence"><textarea required rows={3} value={draft.evidence} onChange={(e)=>setDraft({...draft,evidence:e.target.value})}/></Field><div className="modal-actions"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit">Save record</Button></div></form></Modal>}
+export { MemberValue } from './MemberValueManagement'
 
 export { Campaigns } from './CampaignManagement'
 

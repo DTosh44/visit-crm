@@ -1,12 +1,7 @@
 import type { PlatformData } from './platformTypes'
 
 export const initialPlatformData:PlatformData={
-  memberValue:[
-    {id:'value-001',organisationId:'org-001',date:'2026-09-12',category:'Marketing',activity:'Autumn newsletter feature',quantity:1,estimatedValue:100,evidence:'September visitor newsletter'},
-    {id:'value-002',organisationId:'org-001',date:'2026-09-18',category:'Website',activity:'Outbound website referrals',quantity:184,estimatedValue:0,evidence:'First-party website analytics'},
-    {id:'value-003',organisationId:'org-003',date:'2026-08-29',category:'PR',activity:'Weekend travel article inclusion',quantity:1,estimatedValue:240,evidence:'Vale & County magazine'},
-    {id:'value-004',organisationId:'org-004',date:'2026-09-04',category:'Travel trade',activity:'German group buyer introduction',quantity:2,estimatedValue:250,evidence:'Destination Britain follow-up'},
-  ],
+  memberValue:[],
   resources:[
     {id:'resource-001',title:'VisitMade member brand toolkit',category:'Toolkit',description:'Logos, usage guidance and campaign-ready assets.',url:'#',membershipLevels:[],published:true,updatedAt:'2026-09-12'},
     {id:'resource-002',title:'Accessible visitor information guide',category:'Member guide',description:'Practical steps for clear and inclusive pre-arrival information.',url:'#',membershipLevels:['Tier 1','Tier 2','Tier 3','Tier 4'],published:true,updatedAt:'2026-09-05'},

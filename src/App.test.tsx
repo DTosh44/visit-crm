@@ -652,12 +652,12 @@ describe('Visit CRM', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Member Value'}))
     fireEvent.click(screen.getByRole('button',{name:'Record value'}))
-    fireEvent.change(screen.getByLabelText('Activity'),{target:{value:'Photography support'}})
+    fireEvent.change(screen.getByLabelText('Description'),{target:{value:'Photography support'}})
     fireEvent.change(screen.getByRole('spinbutton',{name:/Estimated value/}),{target:{value:'175'}})
     fireEvent.change(screen.getByLabelText('Evidence'),{target:{value:'Winter image shoot'}})
     fireEvent.click(screen.getByRole('button',{name:'Save record'}))
     expect(screen.getByText('Photography support')).toBeInTheDocument()
-    expect(screen.getAllByText(/Estimated value delivered/).length).toBeGreaterThan(0)
+    expect(screen.getByText('£175 estimated')).toBeInTheDocument()
   })
 
   it('does not expose CRM seed data or demo sign-in through the secure portal', async () => {
