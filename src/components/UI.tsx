@@ -77,7 +77,7 @@ const toneByLabel: Record<string, string> = {
   Active: 'green', Published: 'green', Paid: 'green', Signed: 'green', Happy: 'green', Won: 'green',
   Renewing: 'amber', Sent: 'blue', Viewed: 'blue', 'In review': 'blue', OK: 'blue', Qualified: 'blue',
   Overdue: 'red', 'Needs attention': 'red', Declined: 'red', 'Changes requested': 'red', Expired: 'red',
-  Draft: 'grey', Prospect: 'purple', Proposal: 'purple', Decision: 'amber', 'New lead': 'grey',
+  Draft: 'grey', 'Draft changes': 'amber', Prospect: 'purple', Proposal: 'purple', Decision: 'amber', 'New lead': 'grey',
   'Free listing': 'teal', Void: 'grey', Lapsed: 'grey', High: 'red', Medium: 'amber', Low: 'grey',
 }
 

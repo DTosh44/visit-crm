@@ -141,6 +141,19 @@ create table public.social_metrics (
   unique (tenant_id, source, channel, metric_key, period)
 );
 
+create table public.website_analytics_events (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  event_type text not null check (event_type in ('page_view','form_submit','cta_click','booking_completed')),
+  path text not null,
+  title text not null default '',
+  visitor_id text not null,
+  source text not null default 'Direct',
+  campaign text,
+  occurred_at timestamptz not null default now()
+);
+create index website_analytics_events_tenant_date_idx on public.website_analytics_events (tenant_id, occurred_at desc);
+
 create table public.audit_log (
   id bigint generated always as identity primary key,
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -191,6 +204,7 @@ alter table public.public_listings enable row level security;
 alter table public.event_organisers enable row level security;
 alter table public.events enable row level security;
 alter table public.social_metrics enable row level security;
+alter table public.website_analytics_events enable row level security;
 alter table public.audit_log enable row level security;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -265,6 +279,11 @@ create policy "members update social metrics" on public.social_metrics
   for update using (public.is_tenant_member(tenant_id)) with check (public.is_tenant_member(tenant_id));
 create policy "members delete social metrics" on public.social_metrics
   for delete using (public.is_tenant_member(tenant_id));
+
+create policy "anyone creates consented analytics events" on public.website_analytics_events
+  for insert with check (true);
+create policy "tenant members read analytics events" on public.website_analytics_events
+  for select using (public.is_tenant_member(tenant_id));
 
 create policy "members read audit" on public.audit_log
   for select using (public.is_tenant_member(tenant_id));

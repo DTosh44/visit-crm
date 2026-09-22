@@ -1,7 +1,7 @@
 import {
   ArrowRight, Banknote, BedDouble, Building2, CalendarClock, Check, CircleAlert,
   CircleDollarSign, Eye, GripVertical, PoundSterling,
-  Settings2, Sparkles, Star, UserPlus, UsersRound, WalletCards, X,
+  Globe2, MousePointerClick, Settings2, Sparkles, Star, UserPlus, UsersRound, WalletCards, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCRM } from '../store'
@@ -10,12 +10,12 @@ import { currency, dateLabel, formatDate, timeAgo } from '../utils'
 import { Avatar, Button } from '../components/UI'
 import { supabase, useAuth } from '../auth'
 
-type WidgetId = 'active-members'|'new-members'|'membership-income'|'visitor-volume'|'visitor-spend'|'overnight-stays'|'pipeline'|'outstanding'|'bank-balance'|'member-tiers'|'review-trends'|'renewals'|'tasks'|'activity'
-const DEFAULT_WIDGETS: WidgetId[] = ['active-members','new-members','membership-income','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance','member-tiers','review-trends','renewals','tasks','activity']
+type WidgetId = 'active-members'|'new-members'|'membership-income'|'website-visitors'|'page-views'|'website-conversions'|'visitor-volume'|'visitor-spend'|'overnight-stays'|'pipeline'|'outstanding'|'bank-balance'|'member-tiers'|'review-trends'|'renewals'|'tasks'|'activity'
+const DEFAULT_WIDGETS: WidgetId[] = ['active-members','new-members','membership-income','website-visitors','page-views','website-conversions','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance','member-tiers','review-trends','renewals','tasks','activity']
 const widgetNames: Record<WidgetId,string> = {
-  'active-members':'Active members','new-members':'New members','membership-income':'Membership income','visitor-volume':'Visitor volume','visitor-spend':'Visitor spend','overnight-stays':'Overnight stays','pipeline':'Open pipeline','outstanding':'Outstanding invoices','bank-balance':'Bank balance','member-tiers':'Members by tier','review-trends':'Visitor review trends','renewals':'Upcoming renewals','tasks':'My tasks','activity':'Recent activity'
+  'active-members':'Active members','new-members':'New members','membership-income':'Membership income','website-visitors':'Website visitors','page-views':'Website page views','website-conversions':'Website conversions','visitor-volume':'Visitor volume','visitor-spend':'Visitor spend','overnight-stays':'Overnight stays','pipeline':'Open pipeline','outstanding':'Outstanding invoices','bank-balance':'Bank balance','member-tiers':'Members by tier','review-trends':'Visitor review trends','renewals':'Upcoming renewals','tasks':'My tasks','activity':'Recent activity'
 }
-const metricWidgets: WidgetId[] = ['active-members','new-members','membership-income','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance']
+const metricWidgets: WidgetId[] = ['active-members','new-members','membership-income','website-visitors','page-views','website-conversions','visitor-volume','visitor-spend','overnight-stays','pipeline','outstanding','bank-balance']
 
 function loadWidgets(userId: string) { try { const saved=localStorage.getItem(`vv-dashboard-${userId}`); return saved ? JSON.parse(saved) as WidgetId[] : DEFAULT_WIDGETS } catch { return DEFAULT_WIDGETS } }
 
@@ -30,6 +30,10 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
   const activeMembers=data.organisations.filter((org)=>(org.status==='Active'||org.status==='Renewing')&&org.tier!=='Free Listing').length
   const threeMonthsAgo=new Date(today);threeMonthsAgo.setMonth(today.getMonth()-3);const newMembers=data.organisations.filter((org)=>org.membershipStart&&new Date(`${org.membershipStart}T12:00:00`)>=threeMonthsAgo).length
   const reviewThemes=Object.entries(data.listings.flatMap((listing)=>listing.reviewHighlights).reduce<Record<string,number>>((counts,item)=>({...counts,[item]:(counts[item]??0)+1}),{})).sort((a,b)=>b[1]-a[1]).slice(0,3)
+  const analytics30=data.analyticsEvents.filter((event)=>new Date(event.occurredAt)>=new Date(today.getTime()-30*86400000))
+  const websiteVisitors=new Set(analytics30.map((event)=>event.visitorId)).size
+  const pageViews=analytics30.filter((event)=>event.type==='page_view').length
+  const websiteConversions=analytics30.filter((event)=>event.type==='form_submit'||event.type==='booking_completed').length
   const pipelineValue=useMemo(()=>data.opportunities.filter((o)=>o.stage!=='Won').reduce((t,o)=>t+o.value,0),[data.opportunities])
   const [firstName]=(user?.name??'there').split(' ')
   useEffect(()=>{ if(!supabase||!user)return; void supabase.from('user_preferences').select('dashboard_widgets').eq('user_id',user.id).eq('tenant_id',user.tenantId).maybeSingle().then(({data:preferences})=>{if(preferences?.dashboard_widgets)setWidgets(preferences.dashboard_widgets as WidgetId[])}) },[user])
@@ -42,6 +46,9 @@ export function Dashboard({ navigate, openOrganisation }: { navigate: (view: Vie
       'active-members':{value:String(activeMembers),detail:'current paid members',icon:Building2,tone:'purple'},
       'new-members':{value:String(newMembers),detail:'joined in the last 3 months',icon:UserPlus,tone:'green'},
       'membership-income':{value:currency.format(membershipValue),detail:`Across ${activeMembers} current paid members`,icon:CircleDollarSign,tone:'green'},
+      'website-visitors':{value:Intl.NumberFormat('en-GB').format(websiteVisitors),detail:'consented visitors in the last 30 days',icon:Globe2,tone:'purple'},
+      'page-views':{value:Intl.NumberFormat('en-GB').format(pageViews),detail:'first-party page views in the last 30 days',icon:Eye,tone:'blue'},
+      'website-conversions':{value:Intl.NumberFormat('en-GB').format(websiteConversions),detail:pageViews?`${((websiteConversions/pageViews)*100).toFixed(1)}% of page views converted`:'No tracked page views yet',icon:MousePointerClick,tone:'green'},
       'visitor-volume':{value:Intl.NumberFormat('en-GB',{notation:'compact',maximumFractionDigits:1}).format(data.workspace.visitorVolume),detail:'latest configured visitor-economy figure',icon:UsersRound,tone:'purple'},
       'visitor-spend':{value:currency.format(data.workspace.visitorSpend),detail:data.workspace.visitorVolume?`${currency.format(data.workspace.visitorSpend/data.workspace.visitorVolume)} average spend per visit`:'Add visitor data in Settings',icon:Banknote,tone:'green'},
       'overnight-stays':{value:Intl.NumberFormat('en-GB',{notation:'compact',maximumFractionDigits:2}).format(data.workspace.overnightStays),detail:'latest configured overnight-stay figure',icon:BedDouble,tone:'amber'},

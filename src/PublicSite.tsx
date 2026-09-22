@@ -13,6 +13,8 @@ import { supabase } from './auth'
 import { filtersForVisitorQuery, matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
 import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing } from './types'
 import { downloadCalendarEvent } from './actions'
+import { publishedPages } from './contentPublishing'
+import type { WebsiteAnalyticsEvent } from './types'
 
 const categories = ['All', 'Things to do', 'Places to stay', 'Food & drink', 'Shopping']
 const SAVED_KEY = 'visit-valechester-saved-v1'
@@ -65,6 +67,18 @@ function recordSubmission(key: string, value: Record<string, unknown>) {
   const submittedAt=new Date().toISOString();try { const current = JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[]; localStorage.setItem(key, JSON.stringify([{ ...value, submittedAt }, ...current])) } catch { localStorage.setItem(key, JSON.stringify([{ ...value, submittedAt }])) }
   window.dispatchEvent(new CustomEvent('website-submission',{detail:{id:`submission-${Date.now()}`,kind:key.replace(/^vv-/,''),payload:value,createdAt:submittedAt,status:'New'}}))
   if(supabase)void supabase.from('public_submissions').insert({tenant_id:tenant.id,kind:key.replace(/^vv-/,''),payload:value})
+  recordAnalytics('form_submit', `${key.replace(/^vv-/, '').replaceAll('-', ' ')} submitted`)
+}
+
+const ANALYTICS_VISITOR_KEY='visit-analytics-visitor-v1'
+function analyticsVisitorId(){let value=localStorage.getItem(ANALYTICS_VISITOR_KEY);if(!value){value=`visitor-${crypto.randomUUID()}`;localStorage.setItem(ANALYTICS_VISITOR_KEY,value)}return value}
+function analyticsSource(){try{if(!document.referrer)return'Direct';const host=new URL(document.referrer).hostname;if(host.includes('google.'))return'Google';if(host.includes('facebook.'))return'Facebook';if(host.includes('instagram.'))return'Instagram';return host}catch{return'Direct'}}
+function recordAnalytics(type:WebsiteAnalyticsEvent['type'],title=document.title){
+  if(localStorage.getItem('visit-cookie-consent')!=='analytics')return
+  const params=new URLSearchParams(window.location.search)
+  const event:WebsiteAnalyticsEvent={id:crypto.randomUUID(),type,path:window.location.pathname,title:title.replace(/ \| .*$/,''),visitorId:analyticsVisitorId(),source:params.get('utm_source')??analyticsSource(),campaign:params.get('utm_campaign')??undefined,occurredAt:new Date().toISOString()}
+  window.dispatchEvent(new CustomEvent('website-analytics',{detail:event}))
+  if(supabase)void supabase.from('website_analytics_events').insert({id:event.id,tenant_id:tenant.id,event_type:event.type,path:event.path,title:event.title,visitor_id:event.visitorId,source:event.source,campaign:event.campaign??null,occurred_at:event.occurredAt})
 }
 
 function categoryGroup(listing: Listing) {
@@ -563,7 +577,7 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
 }
 
 const contentTypeByPath:Record<string,ContentPage['type']>={guides:'Guide',itineraries:'Itinerary',trails:'Trail'}
-function ContentDirectoryPage({kind,savedCount}:{kind:ContentPage['type'];savedCount:number}){const {data}=useCRM();const pages=data.contentPages.filter((page)=>page.type===kind&&page.status==='Published');const plural=kind==='Itinerary'?'itineraries':`${kind.toLowerCase()}s`;return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Ideas and inspiration" title={`${kind}s for your visit.`} description={kind==='Guide'?'Practical recommendations to help you choose what to do.':kind==='Itinerary'?'Ready made plans for making the most of your time in Valechester.':'Follow Valechester stories, landmarks and landscapes at your own pace.'}/><section className="content-directory site-container"><div className="site-card-grid">{pages.map((page)=><article className="site-card content-card" key={page.id}><button className="site-card-open" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}><img src={mediaUrl(page.image)} alt=""/></button><div className="site-card-copy"><span>{page.type}</span><h2>{page.title}</h2><p>{page.summary}</p><button className="site-text-link" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}>Read more <ArrowRight size={15}/></button></div></article>)}</div>{!pages.length&&<div className="visitor-empty">The destination team is preparing new {kind.toLowerCase()}s.</div>}</section></main></PublicShell>}
+function ContentDirectoryPage({kind,savedCount}:{kind:ContentPage['type'];savedCount:number}){const {data}=useCRM();const pages=publishedPages(data.contentPages).filter((page)=>page.type===kind);const plural=kind==='Itinerary'?'itineraries':`${kind.toLowerCase()}s`;return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow="Ideas and inspiration" title={`${kind}s for your visit.`} description={kind==='Guide'?'Practical recommendations to help you choose what to do.':kind==='Itinerary'?'Ready made plans for making the most of your time in Valechester.':'Follow Valechester stories, landmarks and landscapes at your own pace.'}/><section className="content-directory site-container"><div className="site-card-grid">{pages.map((page)=><article className="site-card content-card" key={page.id}><button className="site-card-open" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}><img src={mediaUrl(page.image)} alt=""/></button><div className="site-card-copy"><span>{page.type}</span><h2>{page.title}</h2><p>{page.summary}</p><button className="site-text-link" onClick={()=>siteNavigate(`/${plural}/${page.slug}`)}>Read more <ArrowRight size={15}/></button></div></article>)}</div>{!pages.length&&<div className="visitor-empty">The destination team is preparing new {kind.toLowerCase()}s.</div>}</section></main></PublicShell>}
 function ContentDetailPage({page,savedCount}:{page:ContentPage;savedCount:number}){return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow={page.type} title={page.title} description={page.summary} image={mediaUrl(page.image)}/><article className="content-detail site-container">{page.body.split(/\n+/).filter(Boolean).map((paragraph,index)=>paragraph.startsWith('## ')?<h2 key={index}>{paragraph.slice(3)}</h2>:paragraph.startsWith('- ')?<ul key={index}><li>{paragraph.slice(2)}</li></ul>:index===0?<p className="place-lede" key={index}>{paragraph}</p>:<p key={index}>{paragraph}</p>)}</article></main></PublicShell>}
 
 const infoPages: Record<string, { eyebrow: string; title: string; description: string; sections: Array<[string, string]> }> = {
@@ -595,7 +609,7 @@ function CookiePreferences(){
   const [choice,setChoice]=useState(()=>localStorage.getItem('visit-cookie-consent'))
   const [custom,setCustom]=useState(false)
   if(choice)return null
-  const save=(value:'essential'|'analytics')=>{localStorage.setItem('visit-cookie-consent',value);setChoice(value)}
+  const save=(value:'essential'|'analytics')=>{localStorage.setItem('visit-cookie-consent',value);setChoice(value);if(value==='analytics')recordAnalytics('page_view')}
   return <aside className="cookie-preferences" role="region" aria-label="Cookie preferences"><div><strong>Choose your cookie settings</strong><p>Essential storage keeps saved places and account sessions working. Optional analytics can help the destination team improve the site.</p>{custom&&<label><input type="checkbox" disabled checked/> Essential storage</label>}</div><div>{custom?<><button onClick={()=>save('essential')}>Save essential only</button><button onClick={()=>save('analytics')}>Allow analytics</button></>:<><button onClick={()=>save('essential')}>Essential only</button><button onClick={()=>setCustom(true)}>Choose settings</button><button onClick={()=>save('analytics')}>Accept optional cookies</button></>}</div></aside>
 }
 
@@ -605,11 +619,13 @@ export function PublicSite() {
   const [location, setLocation] = useState(() => `${window.location.pathname}${window.location.search}${window.location.hash}`)
   const [savedIds, setSavedIds] = useState<string[]>(readSavedPlaces)
   const [notice, setNotice] = useState('')
+  const liveContent=useMemo(()=>publishedPages(data.contentPages),[data.contentPages])
   useEffect(()=>{
     const path=window.location.pathname
     const parts=path.split('/').filter(Boolean)
     const listing=parts[0]==='place'?data.listings.find((item)=>item.id===parts[1]):undefined
-    const content=contentTypeByPath[parts[0]]?data.contentPages.find((item)=>item.slug===parts[1]):undefined
+    const preview=new URLSearchParams(window.location.search).get('preview')==='true'
+    const content=contentTypeByPath[parts[0]]?(preview?data.contentPages:liveContent).find((item)=>item.slug===parts[1]):undefined
     const titles:Record<string,string>={'/':'Visit Valechester','/events':"What's on in Valechester",'/plan':'Plan your visit to Valechester','/guides':'Valechester visitor guides','/itineraries':'Valechester itineraries','/trails':'Valechester trails','/saved':'Saved places','/contact':'Contact Visit Valechester','/accessibility':'Accessible Valechester','/privacy':'Privacy','/cookies':'Cookies'}
     const title=listing?.name??content?.metaTitle??content?.title??titles[path]??'Visit Valechester'
     const description=listing?.shortDescription??content?.metaDescription??content?.summary??data.workspace.strapline
@@ -617,7 +633,7 @@ export function PublicSite() {
     let meta=document.querySelector<HTMLMetaElement>('meta[name="description"]');if(!meta){meta=document.createElement('meta');meta.name='description';document.head.append(meta)}meta.content=description
     let canonical=document.querySelector<HTMLLinkElement>('link[rel="canonical"]');if(!canonical){canonical=document.createElement('link');canonical.rel='canonical';document.head.append(canonical)}canonical.href=`${window.location.origin}${path}`
     let og=document.querySelector<HTMLMetaElement>('meta[property="og:title"]');if(!og){og=document.createElement('meta');og.setAttribute('property','og:title');document.head.append(og)}og.content=title
-  },[data.contentPages,data.listings,data.workspace.destinationName,data.workspace.strapline,location])
+  },[data.contentPages,data.listings,data.workspace.destinationName,data.workspace.strapline,liveContent,location])
   useEffect(() => {
     const listener = () => { setLocation(`${window.location.pathname}${window.location.search}${window.location.hash}`); if (!window.location.hash) window.scrollTo({ top: 0 }) }
     window.addEventListener('popstate', listener)
@@ -634,6 +650,7 @@ export function PublicSite() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [location])
+  useEffect(()=>{if(new URLSearchParams(window.location.search).get('preview')!=='true')recordAnalytics('page_view')},[location])
   if (!features.publicWebsite) return <main className="site-disabled"><BrandLogo /><h1>Website module is not enabled</h1><p>This destination currently uses the CRM workspace without a public website.</p><a href="/crm">Open destination workspace</a></main>
   const published = data.listings.filter((listing) => listing.status === 'Published')
   const toggleSaved = (listing: Listing) => {
@@ -659,7 +676,7 @@ export function PublicSite() {
   else if (path === '/listing-templates') page = <ListingTemplatesPage listings={published} actions={actions} />
   else if (path === '/contact') page = <ContactPage savedCount={savedIds.length} />
   else if (features.itineraries&&contentTypeByPath[parts[0]]&&parts.length===1) page=<ContentDirectoryPage kind={contentTypeByPath[parts[0]]} savedCount={savedIds.length}/>
-  else if (features.itineraries&&contentTypeByPath[parts[0]]&&parts[1]) {const preview=new URLSearchParams(window.location.search).get('preview')==='true';const content=data.contentPages.find((item)=>item.type===contentTypeByPath[parts[0]]&&item.slug===parts[1]&&(item.status==='Published'||preview));page=content?<ContentDetailPage page={content} savedCount={savedIds.length}/>:<NotFoundPage savedCount={savedIds.length}/>}
+  else if (features.itineraries&&contentTypeByPath[parts[0]]&&parts[1]) {const preview=new URLSearchParams(window.location.search).get('preview')==='true';const content=(preview?data.contentPages:liveContent).find((item)=>item.type===contentTypeByPath[parts[0]]&&item.slug===parts[1]);page=content?<ContentDetailPage page={content} savedCount={savedIds.length}/>:<NotFoundPage savedCount={savedIds.length}/>}
   else if (['/privacy', '/cookies', '/accessibility'].includes(path)) page = <InfoPage page={parts[0]} savedCount={savedIds.length} />
   else if (parts[0] === 'guide' && features.itineraries) page = <GuidePage slug={parts[1]} listings={published} actions={actions} />
   else if (parts[0] === 'neighbourhood') page = <NeighbourhoodPage slug={parts[1]} listings={published} actions={actions} />

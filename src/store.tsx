@@ -22,7 +22,9 @@ import type {
   WebsiteSubmission,
   PipelineStage,
   TaskDraft,
+  WebsiteAnalyticsEvent,
 } from './types'
+import { contentSnapshot } from './contentPublishing'
 
 const STORAGE_KEY = 'visit-valechester-crm-v4'
 
@@ -71,6 +73,8 @@ interface CRMContextValue {
   updateWorkspace: (changes: Partial<CRMData['workspace']>) => void
   createContentPage: (page: Omit<ContentPage, 'id' | 'updatedAt'>) => ContentPage
   updateContentPage: (id: string, changes: Partial<ContentPage>) => void
+  publishContentPage: (id: string) => void
+  discardContentDraft: (id: string) => void
   deleteContentPage: (id: string) => void
   updateSubmission: (id: string, changes: Partial<WebsiteSubmission>) => void
   updateSocialMetric: (id: SocialMetric['id'], changes: Partial<SocialMetric>) => void
@@ -191,7 +195,8 @@ function normalizeCRMData(parsed: CRMData): CRMData {
     workspace: normalized.workspace ?? initialData.workspace,
     events: (normalized.events ?? initialData.events).map((event) => ({ ...event, format: event.format ?? 'One-off and short run', recurrence:event.recurrence??'None' })),
     socialMetrics: normalized.socialMetrics ?? initialData.socialMetrics,
-    contentPages: normalized.contentPages ?? initialData.contentPages,
+    contentPages: (normalized.contentPages ?? initialData.contentPages).map((page) => page.status === 'Published' && !page.published ? { ...page, published: contentSnapshot(page), publishedAt: page.updatedAt, version: 1 } : page),
+    analyticsEvents: normalized.analyticsEvents ?? initialData.analyticsEvents,
     submissions: normalized.submissions ?? initialData.submissions,
     levels: normalized.levels.map((level) => {
       const baseline = initialData.levels.find((item) => item.id === level.id)
@@ -257,6 +262,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         if(active&&submissions)setData((current)=>({...current,submissions:submissions.map((item)=>({id:item.id,kind:item.kind,payload:item.payload as Record<string,unknown>,createdAt:item.created_at,status:(item.status??'New') as WebsiteSubmission['status']}))}))
         const {data:auditRows}=await client.from('audit_log').select('id,action,entity_type,entity_id,detail,created_at,actor_id').eq('tenant_id',tenant.id).order('created_at',{ascending:false}).limit(250)
         if(active&&auditRows?.length)setData((current)=>({...current,activities:auditRows.map((row)=>({id:`audit-${row.id}`,organisationId:row.entity_type==='organisation'?row.entity_id:undefined,type:'note' as const,title:`${row.action.replaceAll('_',' ')} · ${row.entity_type.replaceAll('_',' ')}`,detail:JSON.stringify(row.detail??{}),timestamp:row.created_at,user:row.actor_id??'System'}))}))
+        const {data:analytics}=await client.from('website_analytics_events').select('id,event_type,path,title,visitor_id,source,campaign,occurred_at').eq('tenant_id',tenant.id).order('occurred_at',{ascending:false}).limit(5000)
+        if(active&&analytics)setData((current)=>({...current,analyticsEvents:analytics.map((row)=>({id:row.id,type:row.event_type,path:row.path,title:row.title,visitorId:row.visitor_id,source:row.source,campaign:row.campaign??undefined,occurredAt:row.occurred_at} as WebsiteAnalyticsEvent))}))
       } else {
         const [{ data: listings },{data:events},{data:content}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published')])
         if (active && listings) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
@@ -287,6 +294,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   }, [data])
 
   useEffect(()=>{const receive=(event:Event)=>{const submission=(event as CustomEvent<WebsiteSubmission>).detail;setData((current)=>({...current,submissions:[submission,...current.submissions]}))};window.addEventListener('website-submission',receive);return()=>window.removeEventListener('website-submission',receive)},[])
+  useEffect(()=>{const receive=(event:Event)=>{const analyticsEvent=(event as CustomEvent<WebsiteAnalyticsEvent>).detail;setData((current)=>current.analyticsEvents.some((item)=>item.id===analyticsEvent.id)?current:{...current,analyticsEvents:[analyticsEvent,...current.analyticsEvents].slice(0,5000)})};window.addEventListener('website-analytics',receive);return()=>window.removeEventListener('website-analytics',receive)},[])
 
   useEffect(() => {
     const client = supabase
@@ -299,9 +307,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         updated_at: new Date().toISOString(),
       }, { onConflict: 'tenant_id' })
       void client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' })
-      void client.from('public_content').upsert(data.contentPages.map((page)=>({id:page.id,tenant_id:tenant.id,type:page.type,title:page.title,slug:page.slug,summary:page.summary,body:page.body,image:page.image,status:page.status,meta_title:page.metaTitle??'',meta_description:page.metaDescription??'',updated_at:new Date().toISOString()})),{onConflict:'tenant_id,id'})
+      const publishedContent=data.contentPages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,type:page.published!.type,title:page.published!.title,slug:page.published!.slug,summary:page.published!.summary,body:page.published!.body,image:page.published!.image,status:'Published',meta_title:page.published!.metaTitle??'',meta_description:page.published!.metaDescription??'',updated_at:page.publishedAt??new Date().toISOString()}))
+      if(publishedContent.length)void client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})
       const listingIds=data.listings.map((item)=>item.id)
-      const contentIds=data.contentPages.map((item)=>item.id)
+      const contentIds=publishedContent.map((item)=>item.id)
       if(listingIds.length)void client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)
       else void client.from('public_listings').delete().eq('tenant_id',tenant.id)
       if(contentIds.length)void client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)
@@ -537,8 +546,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     },
     addBenefit: (benefit) => setData((current) => ({ ...current, benefits: [...current.benefits, { ...benefit, id: id('benefit') }] })),
     updateWorkspace: (changes) => setData((current) => ({ ...current, workspace: { ...current.workspace, ...changes } })),
-    createContentPage: (page) => {const created:ContentPage={...page,id:id('content'),updatedAt:todayISO()};setData((current)=>({...current,contentPages:[created,...current.contentPages]}));audit('create','content_page',created.id,{type:created.type,title:created.title});return created},
-    updateContentPage: (pageId, changes) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,...changes,updatedAt:todayISO()}:item)}));audit('update','content_page',pageId,changes)},
+    createContentPage: (page) => {const created:ContentPage={...page,status:'Draft',id:id('content'),updatedAt:todayISO(),version:0};setData((current)=>({...current,contentPages:[created,...current.contentPages]}));audit('create_draft','content_page',created.id,{type:created.type,title:created.title});return created},
+    updateContentPage: (pageId, changes) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,...changes,status:item.published?'Draft changes':'Draft',updatedAt:todayISO()}:item)}));audit('save_draft','content_page',pageId,{title:changes.title})},
+    publishContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,status:'Published',published:contentSnapshot(item),publishedAt:new Date().toISOString(),updatedAt:todayISO(),version:(item.version??0)+1}:item)}));audit('publish','content_page',pageId)},
+    discardContentDraft: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId&&item.published?{...item,...item.published,status:'Published',updatedAt:todayISO()}:item)}));audit('discard_draft','content_page',pageId)},
     deleteContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.filter((item)=>item.id!==pageId)}));audit('delete','content_page',pageId)},
     updateSubmission: (submissionId, changes) => {setData((current)=>({...current,submissions:current.submissions.map((item)=>item.id===submissionId?{...item,...changes}:item)}));if(supabase)void supabase.from('public_submissions').update(changes.status?{status:changes.status}:{}).eq('id',submissionId)},
     updateSocialMetric: (metricId, changes) => setData((current)=>({...current,socialMetrics:current.socialMetrics.map((item)=>item.id===metricId?{...item,...changes}:item)})),

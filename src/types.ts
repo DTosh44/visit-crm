@@ -231,10 +231,26 @@ export interface ContentPage {
   summary: string
   body: string
   image: string
-  status: 'Draft' | 'Published'
+  status: 'Draft' | 'Published' | 'Draft changes'
   updatedAt: string
   metaTitle?: string
   metaDescription?: string
+  published?: PublishedContentPage
+  publishedAt?: string
+  version?: number
+}
+
+export type PublishedContentPage = Pick<ContentPage, 'type' | 'title' | 'slug' | 'summary' | 'body' | 'image' | 'metaTitle' | 'metaDescription'>
+
+export interface WebsiteAnalyticsEvent {
+  id: string
+  type: 'page_view' | 'form_submit' | 'cta_click' | 'booking_completed'
+  path: string
+  title: string
+  visitorId: string
+  source: string
+  campaign?: string
+  occurredAt: string
 }
 
 export interface WebsiteSubmission {
@@ -281,6 +297,7 @@ export interface CRMData {
   activities: Activity[]
   socialMetrics: SocialMetric[]
   contentPages: ContentPage[]
+  analyticsEvents: WebsiteAnalyticsEvent[]
   submissions: WebsiteSubmission[]
   workspace: WorkspaceSettings
 }
