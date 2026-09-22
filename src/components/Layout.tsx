@@ -86,7 +86,7 @@ export function Layout({
   children: ReactNode
 }) {
   const { data } = useCRM()
-  const {data:platform}=usePlatform()
+  const {data:platform,updateRecord:upsertPlatformRecord}=usePlatform()
   const { user, signOut } = useAuth()
   const { features } = useFeatures()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -162,13 +162,14 @@ export function Layout({
   const openSearchResult=(result:typeof searchResults[number])=>{setSearchOpen(false);setQuery('');if(result.kind==='organisation'){const item=data.organisations.find((org)=>org.id===result.entityId);if(item)onOpenOrganisation(item);return}if(result.kind==='listing'){const item=data.listings.find((listing)=>listing.id===result.entityId);if(item)onOpenListing(item);return}navigate(result.view)}
   useEffect(()=>{if(!searchOpen)return;const handle=(event:KeyboardEvent)=>{if(event.key==='ArrowDown'){event.preventDefault();setActiveResult((current)=>Math.min(searchResults.length-1,current+1))}if(event.key==='ArrowUp'){event.preventDefault();setActiveResult((current)=>Math.max(0,current-1))}if(event.key==='Enter'&&searchResults[activeResult]){event.preventDefault();openSearchResult(searchResults[activeResult])}};window.addEventListener('keydown',handle);return()=>window.removeEventListener('keydown',handle)})
   const generatedNotifications=useMemo(()=>{const today=new Date().toISOString().slice(0,10);return[
+    ...platform.automationNotifications.filter((item)=>!item.read&&item.user===user?.name).map((item)=>({id:`automation-${item.id}`,title:item.title,detail:item.detail,view:(canAccessView(user?.role,'automations')?'automations':'dashboard') as ViewKey})),
     ...data.tasks.filter((task)=>!task.completed&&task.dueDate<=today).map((task)=>({id:`task-${task.id}`,title:task.title,detail:task.dueDate<today?'Task is overdue':'Task is due today',view:'tasks' as ViewKey})),
     ...data.invoices.filter((invoice)=>invoice.status==='Overdue').map((invoice)=>({id:`invoice-${invoice.id}`,title:`${invoice.number} is overdue`,detail:'Payment follow-up required',view:'billing' as ViewKey})),
     ...data.events.filter((event)=>event.status==='In review').map((event)=>({id:`event-${event.id}`,title:event.title,detail:'Event is awaiting review',view:'events' as ViewKey})),
     ...data.agreements.filter((agreement)=>agreement.status==='Sent').map((agreement)=>({id:`agreement-${agreement.id}`,title:agreement.number,detail:'Agreement is waiting for signature',view:'agreements' as ViewKey})),
-  ].slice(0,12)},[data.agreements,data.events,data.invoices,data.tasks])
+  ].slice(0,12)},[data.agreements,data.events,data.invoices,data.tasks,platform.automationNotifications,user?.name,user?.role])
   const notifications=generatedNotifications.filter((item)=>!dismissedNotifications.includes(item.id))
-  const dismissNotifications=()=>{const next=Array.from(new Set([...dismissedNotifications,...generatedNotifications.map((item)=>item.id)]));setDismissedNotifications(next);localStorage.setItem('vv-dismissed-notifications',JSON.stringify(next))}
+  const dismissNotifications=()=>{const next=Array.from(new Set([...dismissedNotifications,...generatedNotifications.map((item)=>item.id)]));setDismissedNotifications(next);localStorage.setItem('vv-dismissed-notifications',JSON.stringify(next));platform.automationNotifications.filter((item)=>item.user===user?.name&&!item.read).forEach((item)=>upsertPlatformRecord('automationNotifications',item.id,{read:true}))}
 
   return (
     <div className="app-shell">

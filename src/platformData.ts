@@ -21,11 +21,9 @@ export const initialPlatformData:PlatformData={
   ],
   communications:[{id:'comm-001',name:'September member opportunities',templateId:'template-002',segmentId:'segment-001',subject:'September opportunities for members',body:'A concise round-up of campaign, trade and training opportunities.',status:'Draft',recipientCount:18,createdAt:'2026-09-18'}],
   communicationPreferences:[],
-  automations:[
-    {id:'auto-001',name:'New member onboarding',description:'Create the first onboarding action when a membership opportunity is won.',trigger:'opportunity_won',conditions:[],actions:[{type:'create_task',value:'Arrange new-member welcome call'},{type:'queue_email',value:'Welcome to VisitMade'}],active:true,lastRun:'2026-09-16T10:00:00Z',runs:4},
-    {id:'auto-002',name:'Renewal workflow',description:'Prompt the account owner 90 days before renewal.',trigger:'renewal_approaching',conditions:[{field:'days_until_renewal',operator:'equals',value:'90'}],actions:[{type:'create_task',value:'Start membership renewal conversation'},{type:'notify',value:'Renewal is 90 days away'}],active:true,lastRun:'2026-09-21T07:00:00Z',runs:12},
-    {id:'auto-003',name:'Overdue payment follow-up',description:'Queue a reminder and create a finance task after 14 days.',trigger:'invoice_overdue',conditions:[{field:'days_overdue',operator:'greater than',value:'14'}],actions:[{type:'queue_email',value:'Overdue invoice reminder'},{type:'create_task',value:'Review overdue member invoice'}],active:true,runs:7},
-  ],
+  automations:[],
+  automationRuns:[],
+  automationNotifications:[],
   campaigns:[
     {id:'campaign-001',name:'Write Your Own Christmas Story',owner:'Sam Taylor',status:'Active',startDate:'2026-11-09',endDate:'2027-01-01',objective:'Drive winter breaks and member referrals',audience:'UK families and couples',markets:['UK'],themes:['Christmas','Short breaks'],channels:['Meta','Google','PR','Email'],budget:12500,actualSpend:4820,organisationIds:['org-001','org-003','org-004'],listingIds:['list-001','list-004'],pageIds:[],impressions:284000,reach:176000,clicks:6420,conversions:318,referrals:1240},
     {id:'campaign-002',name:'Autumn in the Vale',owner:'Sam Taylor',status:'Complete',startDate:'2026-08-15',endDate:'2026-09-15',objective:'Extend the shoulder season',audience:'Culture-led couples',markets:['UK','Ireland'],themes:['Heritage','Food'],channels:['Email','PR','Organic social'],budget:6500,actualSpend:6120,organisationIds:['org-001','org-002'],listingIds:['list-001','list-003'],pageIds:[],impressions:198000,reach:121000,clicks:5210,conversions:246,referrals:892},

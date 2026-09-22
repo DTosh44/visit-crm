@@ -31,7 +31,8 @@ import { ProductLogo } from './components/BrandLogo'
 import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 import { PortalApp, PublicSurvey } from './PortalApp'
-import { Automations, BusinessEvents, Campaigns, Communications, Engagement, MemberOpportunities, MemberValue, PRMedia, Surveys, TravelTrade, WebsiteHealth } from './views/PlatformModules'
+import { BusinessEvents, Campaigns, Communications, Engagement, MemberOpportunities, MemberValue, PRMedia, Surveys, TravelTrade, WebsiteHealth } from './views/PlatformModules'
+import { Automations } from './views/Automations'
 import { GlobalPlatformCreate, type PlatformCreateTarget } from './components/GlobalPlatformCreate'
 
 const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','surveys','websiteHealth','automations','settings']

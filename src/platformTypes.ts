@@ -3,12 +3,17 @@ export type PlatformCollection = keyof PlatformData
 export interface MemberValueEntry { id:string; organisationId:string; date:string; category:'Website'|'Marketing'|'PR'|'Travel trade'|'MICE'|'Engagement'; activity:string; quantity:number; estimatedValue:number; evidence:string }
 export interface MemberResource { id:string; title:string; category:string; description:string; url:string; membershipLevels:string[]; published:boolean; updatedAt:string }
 export interface CommunicationTemplate { id:string; name:string; category:string; subject:string; previewText:string; body:string; senderName:string; updatedAt:string }
-export interface ContactSegment { id:string; name:string; description:string; filters:Array<{field:string;operator:string;value:string}>; dynamic:boolean; updatedAt:string }
-export interface CommunicationRecord { id:string; name:string; templateId?:string; segmentId?:string; subject:string; body:string; status:'Draft'|'Queued'|'Sent'; recipientCount:number; createdAt:string; sentAt?:string }
+export interface ContactSegment { id:string; name:string; description:string; filters:Array<{field:string;operator:string;value:string}>; dynamic:boolean; contactIds?:string[]; updatedAt:string }
+export interface CommunicationRecord { id:string; name:string; templateId?:string; segmentId?:string; contactId?:string; subject:string; body:string; status:'Draft'|'Queued'|'Sent'; recipientCount:number; createdAt:string; sentAt?:string }
 export interface CommunicationPreference { id:string; contactId:string; service:boolean; marketing:boolean; trade:boolean; events:boolean; research:boolean; lawfulBasis:string; note:string }
-export interface AutomationCondition { field:string; operator:string; value:string }
-export interface AutomationAction { type:'create_task'|'queue_email'|'add_activity'|'add_tag'|'notify'; value:string }
-export interface AutomationRule { id:string; name:string; description:string; trigger:string; conditions:AutomationCondition[]; actions:AutomationAction[]; active:boolean; lastRun?:string; runs:number; error?:string }
+export type AutomationTrigger = 'organisation_created'|'contact_created'|'lead_created'|'pipeline_stage_changed'|'membership_created'|'renewal_approaching'|'membership_expired'|'invoice_due'|'invoice_overdue'|'agreement_expiring'|'task_completed'|'event_created'|'opportunity_created'|'risk_changed'|'date_based'|'scheduled_recurring'
+export type AutomationField = 'membership_tier'|'organisation_type'|'area'|'pipeline_stage'|'member_status'|'membership_status'|'satisfaction_status'|'tags'|'owner'|'invoice_status'|'renewal_date'|'last_engagement_date'|'contact_preference'
+export interface AutomationCondition { field:AutomationField; operator:'equals'|'not_equals'|'contains'|'before'|'after'|'within_days'; value:string }
+export type AutomationActionType = 'create_task'|'assign_task'|'queue_email'|'add_tag'|'remove_tag'|'update_field'|'change_pipeline_stage'|'update_member_status'|'create_reminder'|'add_to_campaign'|'add_to_audience'|'notify'|'add_activity'
+export interface AutomationAction { type:AutomationActionType; value:string; field?:string }
+export interface AutomationRule { id:string; name:string; description:string; trigger:AutomationTrigger; conditions:AutomationCondition[]; actions:AutomationAction[]; active:boolean; createdAt:string; owner:string; scheduleAt?:string; interval?:'daily'|'weekly'|'monthly'; lastRun?:string; nextRun?:string; runs:number; error?:string }
+export interface AutomationRun { id:string; ruleId:string; ruleName:string; eventKey:string; trigger:AutomationTrigger; recordId:string; recordLabel:string; organisationId?:string; startedAt:string; status:'success'|'failed'|'skipped'; actions:string[]; error?:string }
+export interface AutomationNotification { id:string; user:string; title:string; detail:string; createdAt:string; read:boolean }
 export interface Campaign { id:string; name:string; owner:string; status:'Planning'|'Active'|'Complete'|'Paused'; startDate:string; endDate:string; objective:string; audience:string; markets:string[]; themes:string[]; channels:string[]; budget:number; actualSpend:number; organisationIds:string[]; listingIds:string[]; pageIds:string[]; impressions:number; reach:number; clicks:number; conversions:number; referrals:number }
 export interface MemberOpportunity { id:string; title:string; description:string; category:string; eligibleLevels:string[]; capacity:number; price:number; closingDate:string; campaignId?:string; requirements:string; status:'Draft'|'Open'|'Closed'; applications:Array<{id:string;organisationId:string;contactId:string;response:string;listingId?:string;notes:string;status:'Applied'|'Approved'|'Declined'|'Waitlisted'|'Information requested';amount:number}> }
 export interface TravelBuyer { id:string; organisationId?:string; contactId?:string; company:string; contact:string; country:string; market:string; type:string; sourceMarkets:string[]; segments:string[]; fitGroup:'FIT'|'Group'|'Both'; interests:string[]; relationshipStatus:string; priority:'High'|'Medium'|'Low'; lastContacted:string; nextAction:string; owner:string; notes:string; tags:string[] }
@@ -34,6 +39,8 @@ export interface PlatformData {
   communications:CommunicationRecord[]
   communicationPreferences:CommunicationPreference[]
   automations:AutomationRule[]
+  automationRuns:AutomationRun[]
+  automationNotifications:AutomationNotification[]
   campaigns:Campaign[]
   memberOpportunities:MemberOpportunity[]
   travelBuyers:TravelBuyer[]

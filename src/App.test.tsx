@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import App from './App'
 import { CRMProvider } from './store'
@@ -6,6 +6,8 @@ import { AuthProvider } from './auth'
 import { FeatureProvider } from './features'
 import { initialData } from './data'
 import { PlatformProvider } from './platform'
+import { initialPlatformData } from './platformData'
+import { tenant } from './tenant'
 
 function renderApp() {
   return render(<AuthProvider><FeatureProvider><CRMProvider><PlatformProvider><App /></PlatformProvider></CRMProvider></FeatureProvider></AuthProvider>)
@@ -29,6 +31,42 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Members by level')).toBeInTheDocument()
     expect(screen.getByText('Visitor review trends')).toBeInTheDocument()
     expect(screen.getByText('5.8m')).toBeInTheDocument()
+  })
+
+  it('creates an automation and runs it once for a new organisation', async () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
+    expect(screen.getByText('No automations yet')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'New automation'}))
+    fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Welcome a new partner'}})
+    fireEvent.change(screen.getByLabelText('Description'),{target:{value:'Create a welcome task for each new organisation.'}})
+    fireEvent.change(screen.getByLabelText('Action 1 value'),{target:{value:'Call new partner'}})
+    fireEvent.click(screen.getByLabelText('Active after saving'))
+    fireEvent.click(screen.getByRole('button',{name:'Create automation'}))
+    expect(screen.getByText('Welcome a new partner')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
+    fireEvent.click(screen.getByRole('button',{name:'Add organisation'}))
+    fireEvent.change(screen.getByLabelText('Organisation name'),{target:{value:'Automation Test Partner'}})
+    fireEvent.click(screen.getByRole('button',{name:'Create organisation'}))
+    fireEvent.click(screen.getByRole('button',{name:/^Tasks,/}))
+    await waitFor(()=>expect(screen.getByText('Call new partner')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
+    fireEvent.click(screen.getByRole('tab',{name:'History'}))
+    expect(screen.getAllByText('Automation Test Partner').length).toBeGreaterThan(0)
+    expect(screen.getByText('Create task: Call new partner')).toBeInTheDocument()
+    fireEvent.focus(window)
+    expect(screen.getAllByText('Create task: Call new partner')).toHaveLength(1)
+  })
+
+  it('runs a due scheduled automation once despite repeated focus checks', async () => {
+    localStorage.setItem(`visitmade-platform-v2-${tenant.id}`,JSON.stringify({...initialPlatformData,automations:[{id:'auto-scheduled-test',name:'Scheduled partner check',description:'Review major attractions.',trigger:'date_based',conditions:[{field:'tags',operator:'contains',value:'Major attraction'}],actions:[{type:'create_task',value:'Review castle partnership'}],active:true,createdAt:new Date().toISOString(),owner:'Alex Morgan',scheduleAt:new Date(Date.now()-3600000).toISOString(),runs:0}]}))
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
+    fireEvent.click(screen.getByRole('tab',{name:'History'}))
+    await waitFor(()=>expect(screen.getByText('Create task: Review castle partnership')).toBeInTheDocument())
+    fireEvent.focus(window)
+    fireEvent.focus(window)
+    expect(screen.getAllByText('Create task: Review castle partnership')).toHaveLength(1)
   })
 
   it('navigates to the organisations workspace', () => {

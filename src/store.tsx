@@ -34,6 +34,9 @@ const STORAGE_KEY = 'visit-valechester-crm-v4'
 
 interface CRMContextValue {
   data: CRMData
+  ready: boolean
+  remoteAutomationRevision: number
+  applyAutomationUpdate: (update: (current: CRMData) => CRMData) => void
   addOrganisation: (draft: OrganisationDraft) => Organisation
   updateOrganisation: (id: string, changes: Partial<Organisation>) => void
   deleteOrganisation: (id: string) => void
@@ -271,6 +274,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [data, setData] = useState<CRMData>(readInitialData)
   const [remoteReady, setRemoteReady] = useState(!supabase)
+  const [remoteAutomationRevision,setRemoteAutomationRevision]=useState(0)
   const audit=useCallback((action:string,entityType:string,entityId?:string,detail:Record<string,unknown>={})=>{const client=supabase;if(client&&user)void client.from('audit_log').insert({tenant_id:tenant.id,actor_id:user.id,action,entity_type:entityType,entity_id:entityId,detail})},[user])
 
   useEffect(() => {
@@ -316,7 +320,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     if(!client||!user)return
     const channel=client.channel(`workspace-${tenant.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'workspace_states',filter:`tenant_id=eq.${tenant.id}`},(payload)=>{
       const record=payload.new as {data?:CRMData;updated_by?:string}
-      if(record.updated_by!==user.id&&record.data)setData(normalizeCRMData(record.data))
+      if(record.updated_by!==user.id&&record.data){setData(normalizeCRMData(record.data));if(!record.updated_by)setRemoteAutomationRevision((current)=>current+1)}
     }).subscribe()
     return()=>{void client.removeChannel(channel)}
   },[user])
@@ -369,6 +373,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CRMContextValue>(() => ({
     data,
+    ready: remoteReady,
+    remoteAutomationRevision,
+    applyAutomationUpdate: (update) => setData(update),
     addOrganisation: (draft) => {
       const organisationId = id('org')
       const contactId = id('con')
@@ -618,7 +625,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [audit,data,user?.name])
+  }), [audit,data,remoteReady,remoteAutomationRevision,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }

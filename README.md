@@ -32,10 +32,12 @@ The interface works without credentials by using browser storage. A shared produ
 
 1. Run `supabase/schema.sql`, followed by the migrations in `supabase/migrations`.
 2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the deployment environment.
-3. Deploy the `invite-workspace-user`, `manage-workspace-user`, `generate-listing-copy` and `process-invoice-reminders` Edge Functions.
+3. Deploy the `invite-workspace-user`, `manage-workspace-user`, `generate-listing-copy`, `process-invoice-reminders` and `process-automations` Edge Functions.
 4. Create the first administrator in Supabase Auth and add the matching row to `public.profiles`.
 
 Set `OPENAI_API_KEY` for AI listing copy. Set `RESEND_API_KEY`, `REMINDER_FROM_EMAIL` and `REMINDER_CRON_SECRET` for invoice reminder email. Schedule `process-invoice-reminders` daily from Supabase Cron or another scheduler and send the configured secret in the `x-cron-secret` header.
+
+For background CRM automations, apply `20260923_automation_runs.sql`, set `AUTOMATION_CRON_SECRET`, and deploy `process-automations` with `supabase functions deploy process-automations --use-api --no-verify-jwt` (the function validates its own secret). Invoke it every minute from Supabase Cron or another scheduler with that secret in the `x-cron-secret` header. The function also needs Supabase's standard `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` environment variables. Open CRM sessions check due rules themselves; the scheduler is needed for reliable unattended runs. Automation emails are queued as communications, not sent, until an email-delivery provider and approved sending workflow are configured.
 
 This enables shared records, live multi-user updates, secure staff and event-organiser accounts, dashboard preferences, public submissions, published guides, itineraries and trails, image storage and tenant permissions. Configure an SMTP provider in Supabase before inviting real users or sending password resets.
 
