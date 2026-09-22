@@ -2,8 +2,9 @@ import {
   Accessibility, ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, Clock3,
   Download, Heart, LogIn, LogOut, Mail, MapPin, Menu, PlayCircle, Save, Search, Share2, Sparkles, Star, TrainFront, UserPlus, X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState, type AnchorHTMLAttributes, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type AnchorHTMLAttributes, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { BrandLogo } from './components/BrandLogo'
+import { useDialogFocus } from './components/UI'
 import { useFeatures } from './features'
 import { guides, imageLibrary, neighbourhoods } from './siteData'
 import { useCRM } from './store'
@@ -113,7 +114,7 @@ function ListingCard({ listing, savedIds, toggleSaved }: { listing: Listing } & 
       <div className="site-card-image">
         <button className="site-card-open" onClick={() => siteNavigate(`/place/${listing.id}`)} aria-label={`View ${listing.name}`}>{tier === 'Free Listing' ? <span className="site-card-brand-image"><BrandLogo inverse /></span> : <img src={image} alt="" loading="lazy" decoding="async" />}</button>
         <span className="site-card-category">{categoryGroup(listing)}</span>
-        <button className={`site-card-save${saved ? ' saved' : ''}`} onClick={() => toggleSaved(listing)} aria-label={`${saved ? 'Remove' : 'Save'} ${listing.name}`}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button>
+        <button className={`site-card-save${saved ? ' saved' : ''}`} onClick={() => toggleSaved(listing)} aria-label={`${saved ? 'Remove' : 'Save'} ${listing.name}`} aria-pressed={saved}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button>
       </div>
       <div className="site-card-copy">
         <span><MapPin size={13} />{listing.town}</span>
@@ -130,13 +131,26 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { features } = useFeatures()
   const { data } = useCRM()
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
   const closeMenu = () => setMenuOpen(false)
+  useEffect(() => {
+    if (!menuOpen) return
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setMenuOpen(false)
+        menuButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [menuOpen])
   return (
     <>
       <div className="site-utility"><div><span>{data.workspace.address.split(',').slice(-2).join(',').trim()}</span><nav><SiteLink to="/plan">Plan your visit</SiteLink><SiteLink to="/accessibility">Accessibility</SiteLink><SiteLink to="/saved">Saved places{savedCount ? ` (${savedCount})` : ''}</SiteLink><SiteLink to="/account">Event organiser login</SiteLink><a href="/crm">Partner login</a></nav></div></div>
       <header className="site-header">
         <SiteLink to="/" className="site-logo" aria-label={`${data.workspace.destinationName} home`}><BrandLogo /></SiteLink>
-        <nav className={menuOpen ? 'site-nav open' : 'site-nav'} aria-label="Main navigation">
+        <nav id="site-primary-navigation" className={menuOpen ? 'site-nav open' : 'site-nav'} aria-label="Main navigation">
           <SiteLink to="/?category=Things%20to%20do#discover" onClick={closeMenu}>Things to do</SiteLink>
           {features.events && <SiteLink to="/events" onClick={closeMenu}>What’s on</SiteLink>}
           <SiteLink to="/?category=Places%20to%20stay#discover" onClick={closeMenu}>Stay</SiteLink>
@@ -144,7 +158,7 @@ function SiteHeader({ savedCount }: { savedCount: number }) {
           {features.itineraries && <SiteLink to="/guides" onClick={closeMenu}>Ideas & inspiration</SiteLink>}
           <SiteLink to="/plan" onClick={closeMenu}>Plan your visit</SiteLink>
         </nav>
-        <div className="site-header-actions"><button onClick={() => siteNavigate('/?search=1')} aria-label="Search"><Search size={20} /></button><SiteLink to="/plan" className="site-plan-button">Plan my trip</SiteLink><button className="site-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle menu">{menuOpen ? <X size={22} /> : <Menu size={22} />}</button></div>
+        <div className="site-header-actions"><button onClick={() => siteNavigate('/?search=1')} aria-label="Search"><Search size={20} /></button><SiteLink to="/plan" className="site-plan-button">Plan my trip</SiteLink><button ref={menuButtonRef} className="site-menu-button" onClick={() => setMenuOpen((value) => !value)} aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="site-primary-navigation">{menuOpen ? <X size={22} /> : <Menu size={22} />}</button></div>
       </header>
     </>
   )
@@ -157,7 +171,7 @@ function SiteFooter() {
 }
 
 function PublicShell({ savedCount, children }: { savedCount: number; children: ReactNode }) {
-  return <div className="public-site"><SiteHeader savedCount={savedCount} />{children}<SiteFooter /></div>
+  return <div className="public-site"><a className="skip-link" href="#site-content">Skip to main content</a><SiteHeader savedCount={savedCount} /><div id="site-content" tabIndex={-1}>{children}</div><SiteFooter /></div>
 }
 
 function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; title: string; description: string; image?: string }) {
@@ -232,7 +246,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
 
       <section className="site-discover site-container" id="discover">
         <header className="site-section-heading"><div><span className="site-eyebrow plum">Start exploring</span><h2>{searchTerm ? `Results for “${searchTerm}”` : 'Find your Valechester'}</h2></div><p>Search by place, practical needs, who you are travelling with or the kind of experience you want.</p></header>
-        <div className="site-category-tabs">{categories.map((item) => <button key={item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
+        <div className="site-category-tabs">{categories.map((item) => <button key={item} aria-pressed={category === item} className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}</div>
         <div className="visitor-discovery-layout">
           <aside className="visitor-filter-panel" aria-label="Refine your visit">
             <header><div><span>Refine your visit</span><strong>What works for you?</strong></div>{(activeOptions.length>0||town!=='All areas'||category!=='All')&&<button onClick={clearFilters}>Clear all</button>}</header>
@@ -240,7 +254,7 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
             {visitorFilterGroups.map((group)=><fieldset key={group.id}><legend>{group.label}</legend><small>{group.prompt}</small>{group.options.map((option)=>{const checked=(activeFilters[group.id]??[]).includes(option.id);const count=published.filter((listing)=>matchesVisitorOption(listing,option,searchableTagsFor(listing))).length;if(!count)return null;return <label key={option.id} className={checked?'selected':''}><input type="checkbox" checked={checked} onChange={()=>toggleFilter(group.id,option.id)}/><span>{option.label}</span><em>{count}</em></label>})}</fieldset>)}
           </aside>
           <div className="visitor-results">
-            <div className="visitor-results-meta"><p className="results-count">{results.length} {results.length===1?'place':'places'} match your choices</p>{activeOptions.length>0&&<div className="active-visitor-filters" aria-label="Selected filters">{activeOptions.map((option)=><button key={`${option.groupId}-${option.id}`} onClick={()=>toggleFilter(option.groupId,option.id)}>{option.label}<X size={12}/></button>)}</div>}</div>
+            <div className="visitor-results-meta"><p className="results-count" role="status" aria-live="polite" aria-atomic="true">{results.length} {results.length===1?'place':'places'} match your choices</p>{activeOptions.length>0&&<div className="active-visitor-filters" aria-label="Selected filters">{activeOptions.map((option)=><button key={`${option.groupId}-${option.id}`} aria-label={`Remove ${option.label} filter`} onClick={()=>toggleFilter(option.groupId,option.id)}>{option.label}<X size={12}/></button>)}</div>}</div>
             <div className="site-card-grid">{results.slice(0, visibleCount).map((listing) => <ListingCard key={listing.id} listing={listing} {...actions} />)}</div>
             {results.length>visibleCount&&<div className="site-show-more"><button onClick={()=>setVisibleCount((count)=>count+12)}>Show more places <span>{Math.min(12,results.length-visibleCount)} more</span></button></div>}
             {!results.length && <div className="site-no-results"><Search size={25} /><h3>No exact matches yet</h3><p>Remove a choice or try a broader phrase.</p><button onClick={() => { setQuery(''); setSearchTerm(''); clearFilters() }}>Show everything</button></div>}
@@ -313,7 +327,7 @@ function EventsPage({ savedCount }: { savedCount: number }) {
             <details open>
               <summary>Event date <ChevronDown size={16}/></summary>
               <div className="event-filter-panel event-date-panel">
-                <div className="event-quick-dates">{([['all','All dates'],['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['next7','Next 7 days']] as [EventDateFilter,string][]).map(([value,label])=><button key={value} className={dateFilter===value?'active':''} onClick={()=>chooseQuickDate(value)}>{label}</button>)}</div>
+                <div className="event-quick-dates">{([['all','All dates'],['today','Today'],['tomorrow','Tomorrow'],['weekend','This weekend'],['next7','Next 7 days']] as [EventDateFilter,string][]).map(([value,label])=><button key={value} className={dateFilter===value?'active':''} aria-pressed={dateFilter===value} onClick={()=>chooseQuickDate(value)}>{label}</button>)}</div>
                 <div className="event-custom-dates"><label>From<input type="date" value={dateFrom} onChange={(e)=>{setDateFrom(e.target.value);setDateFilter('custom')}} aria-label="Events from date"/></label><label>To<input type="date" min={dateFrom||undefined} value={dateTo} onChange={(e)=>{setDateTo(e.target.value);setDateFilter('custom')}} aria-label="Events to date"/></label></div>
               </div>
             </details>
@@ -368,9 +382,9 @@ function SubmitEventPage({ savedCount }: { savedCount: number }) {
 }
 
 function OrganiserEventEditor({event,onClose,onSave}:{event:DestinationEvent;onClose:()=>void;onSave:(changes:Partial<DestinationEvent>)=>void}){
-  const [draft,setDraft]=useState(event);const [error,setError]=useState('')
+  const [draft,setDraft]=useState(event);const [error,setError]=useState('');const dialogRef=useDialogFocus<HTMLFormElement>(true,onClose)
   const submit=(formEvent:FormEvent)=>{formEvent.preventDefault();if(draft.endDate<draft.startDate||draft.endDate===draft.startDate&&draft.endTime<=draft.startTime){setError('Check that the event finishes after it starts.');return}onSave(draft)}
-  return <div className="modal-backdrop"><form className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-label={`Edit ${event.title}`}><header><div><span className="site-eyebrow plum">Event organiser</span><h2>Edit event</h2></div><button type="button" onClick={onClose} aria-label="Close"><X size={19}/></button></header><div className="event-form-grid"><label className="event-field-wide">Event title<input value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} required/></label><label className="event-field-wide">Description<textarea rows={5} value={draft.description} onChange={(e)=>setDraft({...draft,description:e.target.value})} required/></label><label>Start date<input type="date" value={draft.startDate} onChange={(e)=>setDraft({...draft,startDate:e.target.value})} required/></label><label>End date<input type="date" min={draft.startDate} value={draft.endDate} onChange={(e)=>setDraft({...draft,endDate:e.target.value})} required/></label><label>Start time<input type="time" value={draft.startTime} onChange={(e)=>setDraft({...draft,startTime:e.target.value})} required/></label><label>End time<input type="time" value={draft.endTime} onChange={(e)=>setDraft({...draft,endTime:e.target.value})} required/></label><label className="event-field-wide">Venue<input value={draft.venueName} onChange={(e)=>setDraft({...draft,venueName:e.target.value})} required/></label><label className="event-field-wide">Address<input value={draft.address} onChange={(e)=>setDraft({...draft,address:e.target.value})} required/></label><label>Town or area<input value={draft.town} onChange={(e)=>setDraft({...draft,town:e.target.value})} required/></label><label>Postcode<input value={draft.postcode} onChange={(e)=>setDraft({...draft,postcode:e.target.value})} required/></label><label className="event-field-wide">Accessibility information<textarea rows={3} value={draft.accessibility} onChange={(e)=>setDraft({...draft,accessibility:e.target.value})}/></label></div>{error&&<p className="form-error" role="alert">{error}</p>}<footer><button type="button" onClick={onClose}>Cancel</button><button>Save and resubmit</button></footer></form></div>
+  return <div className="modal-backdrop"><form ref={dialogRef} tabIndex={-1} className="event-editor-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-label={`Edit ${event.title}`}><header><div><span className="site-eyebrow plum">Event organiser</span><h2>Edit event</h2></div><button type="button" onClick={onClose} aria-label="Close"><X size={19}/></button></header><div className="event-form-grid"><label className="event-field-wide">Event title<input data-dialog-initial-focus value={draft.title} onChange={(e)=>setDraft({...draft,title:e.target.value})} required/></label><label className="event-field-wide">Description<textarea rows={5} value={draft.description} onChange={(e)=>setDraft({...draft,description:e.target.value})} required/></label><label>Start date<input type="date" value={draft.startDate} onChange={(e)=>setDraft({...draft,startDate:e.target.value})} required/></label><label>End date<input type="date" min={draft.startDate} value={draft.endDate} onChange={(e)=>setDraft({...draft,endDate:e.target.value})} required/></label><label>Start time<input type="time" value={draft.startTime} onChange={(e)=>setDraft({...draft,startTime:e.target.value})} required/></label><label>End time<input type="time" value={draft.endTime} onChange={(e)=>setDraft({...draft,endTime:e.target.value})} required/></label><label className="event-field-wide">Venue<input value={draft.venueName} onChange={(e)=>setDraft({...draft,venueName:e.target.value})} required/></label><label className="event-field-wide">Address<input value={draft.address} onChange={(e)=>setDraft({...draft,address:e.target.value})} required/></label><label>Town or area<input value={draft.town} onChange={(e)=>setDraft({...draft,town:e.target.value})} required/></label><label>Postcode<input value={draft.postcode} onChange={(e)=>setDraft({...draft,postcode:e.target.value})} required/></label><label className="event-field-wide">Accessibility information<textarea rows={3} value={draft.accessibility} onChange={(e)=>setDraft({...draft,accessibility:e.target.value})}/></label></div>{error&&<p className="form-error" role="alert">{error}</p>}<footer><button type="button" onClick={onClose}>Cancel</button><button>Save and resubmit</button></footer></form></div>
 }
 
 function GuidePage({ slug, listings, actions }: { slug: string; listings: Listing[]; actions: VisitorActions }) {
@@ -582,7 +596,7 @@ function CookiePreferences(){
   const [custom,setCustom]=useState(false)
   if(choice)return null
   const save=(value:'essential'|'analytics')=>{localStorage.setItem('visit-cookie-consent',value);setChoice(value)}
-  return <aside className="cookie-preferences" role="dialog" aria-label="Cookie preferences"><div><strong>Choose your cookie settings</strong><p>Essential storage keeps saved places and account sessions working. Optional analytics can help the destination team improve the site.</p>{custom&&<label><input type="checkbox" disabled checked/> Essential storage</label>}</div><div>{custom?<><button onClick={()=>save('essential')}>Save essential only</button><button onClick={()=>save('analytics')}>Allow analytics</button></>:<><button onClick={()=>save('essential')}>Essential only</button><button onClick={()=>setCustom(true)}>Choose settings</button><button onClick={()=>save('analytics')}>Accept optional cookies</button></>}</div></aside>
+  return <aside className="cookie-preferences" role="region" aria-label="Cookie preferences"><div><strong>Choose your cookie settings</strong><p>Essential storage keeps saved places and account sessions working. Optional analytics can help the destination team improve the site.</p>{custom&&<label><input type="checkbox" disabled checked/> Essential storage</label>}</div><div>{custom?<><button onClick={()=>save('essential')}>Save essential only</button><button onClick={()=>save('analytics')}>Allow analytics</button></>:<><button onClick={()=>save('essential')}>Essential only</button><button onClick={()=>setCustom(true)}>Choose settings</button><button onClick={()=>save('analytics')}>Accept optional cookies</button></>}</div></aside>
 }
 
 export function PublicSite() {
@@ -609,6 +623,17 @@ export function PublicSite() {
     window.addEventListener('popstate', listener)
     return () => window.removeEventListener('popstate', listener)
   }, [])
+  useEffect(() => {
+    if (window.location.hash) return
+    const frame = window.requestAnimationFrame(() => {
+      const heading = document.querySelector<HTMLElement>('#site-content h1')
+      if (heading) {
+        heading.tabIndex = -1
+        heading.focus({ preventScroll: true })
+      }
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [location])
   if (!features.publicWebsite) return <main className="site-disabled"><BrandLogo /><h1>Website module is not enabled</h1><p>This destination currently uses the CRM workspace without a public website.</p><a href="/crm">Open destination workspace</a></main>
   const published = data.listings.filter((listing) => listing.status === 'Published')
   const toggleSaved = (listing: Listing) => {
