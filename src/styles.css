@@ -1550,3 +1550,11 @@ a:focus-visible,
 .order-actions { display: inline-flex; gap: 5px; margin-left: auto; }
 .order-actions button { min-height: 28px; padding: 0 8px; color: #344257; border: 1px solid #7f8a99; border-radius: 6px; background: #fff; font-size: 9px; }
 .order-actions button:disabled { color: #737f8f; border-color: #b7bec8; background: #f4f5f7; }
+
+/* WCAG 2.2 minimum target-size overrides */
+.task-check,
+.matrix-check,
+.matrix-empty { min-width: 24px; width: 24px; min-height: 24px; height: 24px; }
+.switch { width: 40px; min-width: 40px; height: 24px; min-height: 24px; padding: 3px; border: 1px solid #7f8a99; }
+.switch span { width: 16px; height: 16px; }
+.switch.on span { transform: translateX(16px); }
