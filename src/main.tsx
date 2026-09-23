@@ -8,7 +8,8 @@ document.title = window.location.pathname.startsWith('/crm') ? `${tenant.name} C
 
 const root=createRoot(document.getElementById('root')!)
 if(window.location.pathname.startsWith('/portal')){
-  void import('./SecurePortalApp').then(({SecurePortalApp})=>root.render(<StrictMode><SecurePortalApp/></StrictMode>))
+  if(import.meta.env.PROD&&import.meta.env.VITE_MEMBER_PORTAL_READY!=='true')root.render(<StrictMode><main className="portal-login"><section className="portal-login-card"><h1>Member portal</h1><p>Portal access is not available yet. Please contact your destination team for assistance.</p><a href="/crm">CRM staff sign in</a></section></main></StrictMode>)
+  else void import('./SecurePortalApp').then(({SecurePortalApp})=>root.render(<StrictMode><SecurePortalApp/></StrictMode>))
 }else{
   void import('./WorkspaceRoot').then(({WorkspaceRoot})=>root.render(<StrictMode><WorkspaceRoot/></StrictMode>))
 }

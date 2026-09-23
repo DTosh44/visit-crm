@@ -14,6 +14,7 @@ import { TagPicker } from './TagPicker'
 import { engagementScore, usePlatform } from '../platform'
 import { useCommunicationHistory } from '../communicationHistory'
 import { PortalAdministration } from './PortalAdministration'
+import { useFeatures } from '../features'
 import { inPeriod, memberValueRows, membershipPeriod } from '../memberValueModel'
 
 type OrgTab = 'Overview' | 'Contacts' | 'Membership' | 'Value & engagement' | 'Listings' | 'Billing' | 'Agreements' | 'Activity'
@@ -25,6 +26,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
 }) {
   const { data, updateOrganisation, incrementBenefit, markInvoicePaid, addContact, updateContact, deleteContact, addActivity, createListing, createInvoice, createAgreement } = useCRM()
   const {data:platform}=usePlatform()
+  const {features}=useFeatures()
   const [tab, setTab] = useState<OrgTab>('Overview')
   const [editing, setEditing] = useState(false)
   const [draftNotes, setDraftNotes] = useState(organisation.notes)
@@ -110,7 +112,7 @@ export function OrganisationDrawer({ organisation, onClose, onEditListing }: {
           <dl><div><Mail size={14} /><a href={`mailto:${contact.email}`}>{contact.email}</a></div><div><Phone size={14} /><span>{contact.phone || 'Not set'}</span></div></dl>
           <footer><span className={contact.portalAccess ? 'portal-on' : ''}><i />{contact.portalAccess ? 'Portal access' : 'No portal access'}</span><span><Button variant="ghost" size="sm" onClick={()=>setContactDraft({...contact})}>Edit</Button><button className="icon-button danger" onClick={()=>{if(window.confirm(`Delete ${contact.name}?`))deleteContact(contact.id)}} aria-label={`Delete ${contact.name}`}><Trash2 size={15}/></button></span></footer>
         </article>)}</div>
-        <PortalAdministration organisation={organisation} contacts={contacts} />
+        {features.memberPortal&&<PortalAdministration organisation={organisation} contacts={contacts} />}
       </div>}
 
       {tab === 'Membership' && !isMember && <div className="org-tab-content"><div className="inline-empty"><strong>No membership attached</strong><br/>This organisation is stored as a non-member relationship, so it has no renewal, annual membership value or tracked benefits.</div></div>}

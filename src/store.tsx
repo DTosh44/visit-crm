@@ -345,7 +345,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const client = supabase
-    if (!client || !user || !remoteReady) return
+    if (!client || !user || !remoteReady || user.role==='Viewer / Reporting') return
     const timer = window.setTimeout(() => { void (async()=>{
       setSaveError(undefined)
       const failures:string[]=[]
