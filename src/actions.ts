@@ -29,6 +29,10 @@ export function openEmail(to: string | string[], subject: string, body = '') {
   window.location.href = `mailto:${recipients}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
+export function escapeHtml(value: unknown) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!)
+}
+
 export function printHtml(title: string, html: string) {
   const popup = window.open('', '_blank', 'noopener,noreferrer')
   if (!popup) return false

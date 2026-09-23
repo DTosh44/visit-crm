@@ -63,11 +63,9 @@ interface CRMContextValue {
   deleteOpportunity: (id: string) => void
   markInvoicePaid: (id: string) => void
   toggleInvoiceReminders: (id: string) => void
-  sendInvoice: (id: string) => void
   updateInvoice: (id: string, changes: Partial<CRMData['invoices'][number]>) => void
   deleteInvoice: (id: string) => void
   createInvoice: (draft: InvoiceDraft) => void
-  runInvoiceReminders: () => number
   createAgreement: (agreement: Omit<Agreement, 'id' | 'number' | 'createdAt'>) => void
   renewMembership: (input: { organisationId: string; membershipLevel: string; annualValue: number; startDate: string; endDate: string; raiseInvoice: boolean; createAgreement: boolean }) => void
   updateAgreement: (id: string, changes: Partial<Agreement>) => void
@@ -533,12 +531,6 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         invoices: current.invoices.map((item) => item.id === invoiceId ? { ...item, remindersPaused: !item.remindersPaused } : item),
       }))
     },
-    sendInvoice: (invoiceId) => {
-      setData((current) => ({
-        ...current,
-        invoices: current.invoices.map((item) => item.id === invoiceId && item.status === 'Draft' ? { ...item, status: 'Sent' } : item),
-      }))
-    },
     updateInvoice: (invoiceId, changes) => {setData((current)=>({...current,invoices:current.invoices.map((item)=>item.id===invoiceId?{...item,...changes}:item)}));audit('update','invoice',invoiceId,changes)},
     deleteInvoice: (invoiceId) => {setData((current)=>({...current,invoices:current.invoices.filter((item)=>item.id!==invoiceId)}));audit('delete','invoice',invoiceId)},
     createInvoice: (draft) => {
@@ -566,7 +558,6 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         }, ...current.invoices],
       }))
     },
-    runInvoiceReminders: () => {let sent=0;const today=todayISO();setData((current)=>({...current,invoices:current.invoices.map((invoice)=>{if(invoice.status==='Paid'||invoice.status==='Draft'||invoice.remindersPaused||invoice.dueDate>=today)return invoice;sent++;return{...invoice,status:'Overdue',reminderStep:Math.min(3,invoice.reminderStep+1)}}),activities:sent?[{id:id('act'),type:'invoice',title:'Invoice reminders processed',detail:`${sent} overdue invoice reminder${sent===1?'':'s'} queued.`,timestamp:new Date().toISOString(),user:user?.name??'Workspace user'},...current.activities]:current.activities}));audit('process_reminders','invoice',undefined,{sent});return sent},
     createAgreement: (agreement) => setData((current) => ({ ...current, agreements: [{ ...agreement, id: id('agr'), number: `AGR-${new Date().getFullYear()}-${String(current.agreements.length + 113).padStart(3, '0')}`, createdAt: todayISO() }, ...current.agreements] })),
     renewMembership: (input) => {
       setData((current) => {
