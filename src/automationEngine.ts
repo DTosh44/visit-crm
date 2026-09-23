@@ -98,7 +98,7 @@ export function matchesAutomationConditions(rule:AutomationRule,e:AutomationEven
 }
 
 const memberStatuses:MembershipStatus[]=['Active','Renewing','Prospect','Free listing','Lapsed','Non-member']
-const pipelineStages:PipelineStage[]=['New lead','Qualified','Proposal','Decision','Won']
+const pipelineStages:PipelineStage[]=['New lead','Qualified','Proposal','Decision','Won','Lost']
 export function validateAutomation(rule:AutomationRule):string|undefined{
   if(!rule.name.trim())return'Give the automation a name.'
   if(!rule.description.trim())return'Add a description explaining what this automation does.'

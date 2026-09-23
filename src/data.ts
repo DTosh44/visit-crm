@@ -187,6 +187,7 @@ export const initialData: CRMData = {
     { id: 'agr-004', number: 'AGR-2026-108', organisationId: 'org-007', membershipLevel: 'Tier 4', signatory: 'Daniel King', signatoryEmail: 'daniel.king@example.com', status: 'Sent', createdAt: '2026-09-14', sentAt: '2026-09-15', validUntil: '2026-10-15' },
     { id: 'agr-005', number: 'AGR-2026-112', organisationId: 'org-009', membershipLevel: 'Tier 4', signatory: 'Martin Green', signatoryEmail: 'martin.green@example.com', status: 'Draft', createdAt: '2026-09-18', validUntil: '2026-10-20' },
   ],
+  membershipPeriods: [],
   tasks: [
     { id: 'task-001', title: 'Call The Lantern House Hotel about renewal', organisationId: 'org-003', dueDate: '2026-09-21', dueTime: '10:00', priority: 'High', assignee: 'Morgan Lee', category: 'Renewal', completed: false },
     { id: 'task-002', title: 'Send supplier proposal to Vale Executive Travel', organisationId: 'org-012', dueDate: '2026-09-21', dueTime: '12:00', priority: 'High', assignee: 'Morgan Lee', category: 'Follow-up', completed: false },

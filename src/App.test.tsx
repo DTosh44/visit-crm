@@ -27,11 +27,11 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('img',{name:'VisitMade'})).toBeInTheDocument()
     expect(screen.getByRole('img',{name:'Visit Valechester'})).toBeInTheDocument()
     expect(screen.getByText(/Good (morning|afternoon|evening), Alex/)).toBeInTheDocument()
-    expect(screen.getByText('Membership income')).toBeInTheDocument()
-    expect(screen.getByText('Recent activity')).toBeInTheDocument()
-    expect(screen.getByText('Members by level')).toBeInTheDocument()
-    expect(screen.getByText('Visitor review trends')).toBeInTheDocument()
-    expect(screen.getByText('5.8m')).toBeInTheDocument()
+    expect(screen.getByText('Membership revenue')).toBeInTheDocument()
+    expect(screen.getByText('Outstanding and overdue invoices')).toBeInTheDocument()
+    expect(screen.getAllByText('Sales pipeline').length).toBeGreaterThan(0)
+    expect(screen.getByText('Items awaiting approval')).toBeInTheDocument()
+    expect(screen.queryByText('Visitor review trends')).not.toBeInTheDocument()
   })
 
   it('saves a communication draft without claiming it was sent', () => {
@@ -47,35 +47,19 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Draft')).toBeInTheDocument()
   })
 
-  it('creates an automation and runs it once for a new organisation', async () => {
+  it('configures focused reminder routines without exposing the rule builder', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
-    expect(screen.getByText('No automations yet')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button',{name:'New automation'}))
-    fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Welcome a new partner'}})
-    fireEvent.change(screen.getByLabelText('Description'),{target:{value:'Create a welcome task for each new organisation.'}})
-    fireEvent.change(screen.getByLabelText('Action 1 value'),{target:{value:'Call new partner'}})
-    fireEvent.click(screen.getByLabelText('Active after saving'))
-    fireEvent.click(screen.getByRole('button',{name:'Create automation'}))
-    expect(screen.getByText('Welcome a new partner')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button',{name:'Organisations'}))
-    fireEvent.click(screen.getByRole('button',{name:'Add organisation'}))
-    fireEvent.change(screen.getByLabelText('Organisation name'),{target:{value:'Automation Test Partner'}})
-    fireEvent.click(screen.getByRole('button',{name:'Create organisation'}))
-    fireEvent.click(screen.getByRole('button',{name:/^Tasks,/}))
-    await waitFor(()=>expect(screen.getByText('Call new partner')).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
-    fireEvent.click(screen.getByRole('tab',{name:'History'}))
-    expect(screen.getAllByText('Automation Test Partner').length).toBeGreaterThan(0)
-    expect(screen.getByText('Create task: Call new partner')).toBeInTheDocument()
-    fireEvent.focus(window)
-    expect(screen.getAllByText('Create task: Call new partner')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button',{name:'Automated routines'}))
+    expect(screen.getByRole('heading',{name:'Reminder routines'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Enable Renewal reminders'}))
+    expect(screen.getByRole('button',{name:'Disable Renewal reminders'})).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'New automation'})).not.toBeInTheDocument()
   })
 
   it('runs a due scheduled automation once despite repeated focus checks', async () => {
     localStorage.setItem(`visitmade-platform-v2-${tenant.id}`,JSON.stringify({...initialPlatformData,automations:[{id:'auto-scheduled-test',name:'Scheduled partner check',description:'Review major attractions.',trigger:'date_based',conditions:[{field:'tags',operator:'contains',value:'Major attraction'}],actions:[{type:'create_task',value:'Review castle partnership'}],active:true,createdAt:new Date().toISOString(),owner:'Alex Morgan',scheduleAt:new Date(Date.now()-3600000).toISOString(),runs:0}]}))
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Automations'}))
+    fireEvent.click(screen.getByRole('button',{name:'Automated routines'}))
     fireEvent.click(screen.getByRole('tab',{name:'History'}))
     await waitFor(()=>expect(screen.getByText('Create task: Review castle partnership')).toBeInTheDocument())
     fireEvent.focus(window)
@@ -132,11 +116,12 @@ describe('Visit CRM', () => {
     expect(screen.getAllByText('Non-member').length).toBeGreaterThan(0)
   })
 
-  it('offers CRM-wide record types from Add new', () => {
+  it('keeps global Add new focused on common records', () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Add new'}))
     const menu=within(screen.getByRole('region',{name:'Quick create'}))
-    for(const name of ['Organisation','Person','Opportunity','Task','Membership level','Invoice','Agreement','Listing','Event','Guide, itinerary or trail','Website page','Image','A/B test'])expect(menu.getByRole('button',{name:new RegExp(`^${name}`)})).toBeInTheDocument()
+    for(const name of ['Organisation','Person','Task'])expect(menu.getByRole('button',{name:new RegExp(`^${name}`)})).toBeInTheDocument()
+    expect(menu.queryByRole('button',{name:/A\/B test/})).not.toBeInTheDocument()
     fireEvent.click(menu.getByRole('button',{name:/^Person/}))
     expect(screen.getByRole('heading',{name:'People'})).toBeInTheDocument()
     expect(screen.getByRole('heading',{name:'Add person'})).toBeInTheDocument()
@@ -162,14 +147,12 @@ describe('Visit CRM', () => {
     expect(screen.queryByText('Independent dining')).not.toBeInTheDocument()
   })
 
-  it('starts a draft website experiment', () => {
+  it('removes A/B testing from the launch surface', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'A/B testing'}))
-    expect(screen.getByRole('heading',{name:'A/B testing'})).toBeInTheDocument()
-    expect(screen.getByText('Homepage hero message')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button',{name:'Start'}))
-    expect(screen.getByText('Running')).toBeInTheDocument()
-    expect(screen.getByRole('button',{name:'Pause'})).toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'A/B testing'})).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:/Search the CRM/}))
+    fireEvent.change(screen.getByLabelText('Search the whole CRM'),{target:{value:'Homepage hero message'}})
+    expect(screen.queryByText('Homepage hero message')).not.toBeInTheDocument()
   })
 
   it('filters organisations by location, health and type while keeping every match scrollable', () => {
@@ -203,7 +186,7 @@ describe('Visit CRM', () => {
 
   it('opens and completes a task', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: /Tasks/ }))
+    fireEvent.click(screen.getByRole('button', { name: /My tasks \/ team tasks/ }))
     const task = screen.getByText('Call The Lantern House Hotel about renewal')
     expect(task).toBeInTheDocument()
     const row = task.closest('.task-row')
@@ -232,7 +215,7 @@ describe('Visit CRM', () => {
 
   it('manages map visibility and featured pins in the CRM', () => {
     const app=renderApp()
-    fireEvent.click(screen.getByRole('button', { name: 'Interactive map' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Website settings & map' }))
     expect(screen.getByRole('heading', { name: 'Interactive map' })).toBeInTheDocument()
     const featureButton = screen.getByRole('button', { name: 'Feature Valechester Castle' })
     fireEvent.click(featureButton)
@@ -242,7 +225,7 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Featured')).toBeInTheDocument()
     app.unmount()
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: 'Interactive map' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Website settings & map' }))
     expect(screen.getByRole('button', { name: 'Unfeature Valechester Castle' })).toBeInTheDocument()
     fireEvent.change(screen.getByPlaceholderText('Search map locations...'), { target: { value: 'Valechester Castle' } })
     expect(screen.getByText(/52\./)).toBeInTheDocument()
@@ -290,7 +273,7 @@ describe('Visit CRM', () => {
 
   it('lets CRM users configure taxonomy allowances and review sites', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: 'Memberships' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Members, renewals & benefits' }))
     expect(screen.getByText('Up to 12 searchable categories')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Listings' }))
     fireEvent.change(screen.getByPlaceholderText('Search listings...'), { target: { value: 'Wren & Quill Books' } })
@@ -343,9 +326,24 @@ describe('Visit CRM', () => {
     expect(screen.getByRole('heading',{name:'Valechester Bakery'})).toBeInTheDocument()
   })
 
+  it('records a lost sales outcome without counting it as active pipeline', () => {
+    renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Sales pipeline'}))
+    fireEvent.click(screen.getAllByRole('button',{name:'Add opportunity'})[0])
+    fireEvent.change(screen.getByLabelText('Organisation'),{target:{value:'Declined Prospect'}})
+    fireEvent.change(screen.getByLabelText('Contact'),{target:{value:'Taylor Green'}})
+    fireEvent.change(screen.getByLabelText('Stage'),{target:{value:'Lost'}})
+    fireEvent.change(screen.getByLabelText('Outcome date'),{target:{value:'2026-09-23'}})
+    fireEvent.change(screen.getByLabelText('Lost reason'),{target:{value:'Budget unavailable'}})
+    const addButtons=screen.getAllByRole('button',{name:'Add opportunity'})
+    fireEvent.click(addButtons[addButtons.length-1])
+    const stored=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}') as typeof initialData
+    expect(stored.opportunities.find((item)=>item.organisationName==='Declined Prospect')).toMatchObject({stage:'Lost',outcomeDate:'2026-09-23',lostReason:'Budget unavailable',probability:0})
+  })
+
   it('persists configurable workspace details', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Settings'}))
+    fireEvent.click(screen.getByRole('button',{name:'Workspace, team & modules'}))
     fireEvent.change(screen.getByLabelText('Destination name'),{target:{value:'Visit New Vale'}})
     fireEvent.click(screen.getByRole('button',{name:'Save changes'}))
     const stored=JSON.parse(localStorage.getItem('visit-valechester-crm-v4')??'{}')
@@ -417,7 +415,7 @@ describe('Visit CRM', () => {
 
   it('lets a CRM user rename a membership level', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: 'Memberships' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Members, renewals & benefits' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Edit level' })[0])
     fireEvent.change(screen.getByLabelText('Level name'), { target: { value: 'Premier Partner' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save level' }))
@@ -437,7 +435,7 @@ describe('Visit CRM', () => {
 
   it('shows fifty editable events in the CMS', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button', { name: 'Events' }))
+    fireEvent.click(screen.getByRole('button', { name: 'What’s on' }))
     expect(screen.getByRole('heading', { name: 'Events' })).toBeInTheDocument()
     expect(screen.getByText('Showing 50 of 50 events')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit Valechester After Dark' })).toBeInTheDocument()
@@ -445,8 +443,8 @@ describe('Visit CRM', () => {
 
   it('opens the website inbox and content publishing workspace', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Website inbox'}))
-    expect(screen.getByRole('heading',{name:'Inbox'})).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button',{name:'Website enquiries'}))
+    expect(screen.getByRole('heading',{name:'Approvals & website enquiries'})).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button',{name:'Guides, itineraries & trails'}))
     expect(screen.getByRole('heading',{name:'Guides, itineraries and trails'})).toBeInTheDocument()
     expect(screen.getByText('A rainy day in Valechester')).toBeInTheDocument()
@@ -555,8 +553,9 @@ describe('Visit CRM', () => {
     expect(screen.getByText('/autumn · Changes stay private until published.')).toBeInTheDocument()
   })
 
-  it('creates campaigns from the CRM-wide Add new menu', () => {
+  it('creates campaigns from the contextual Add new menu', () => {
     renderApp()
+    fireEvent.click(screen.getByRole('button',{name:'Campaigns'}))
     fireEvent.click(screen.getByRole('button',{name:'Add new'}))
     fireEvent.click(within(screen.getByRole('region',{name:'Quick create'})).getByRole('button',{name:/^Campaign/}))
     fireEvent.change(screen.getByLabelText('Name'),{target:{value:'Spring by the river'}})
@@ -597,7 +596,7 @@ describe('Visit CRM', () => {
 
   it('creates an opportunity and persists an organisation invitation', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Opportunities'}))
+    fireEvent.click(screen.getByRole('button',{name:'Member opportunities'}))
     fireEvent.click(screen.getByRole('button',{name:'New opportunity'}))
     fireEvent.change(screen.getByLabelText('Title'),{target:{value:'Autumn member showcase'}})
     fireEvent.change(screen.getByLabelText('Description'),{target:{value:'A featured place in the destination campaign.'}})
@@ -613,7 +612,7 @@ describe('Visit CRM', () => {
 
   it('records opportunity participation once in member value', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Opportunities'}))
+    fireEvent.click(screen.getByRole('button',{name:'Member opportunities'}))
     const card=screen.getByText('Christmas campaign partner feature').closest('article')!
     fireEvent.click(within(card).getByRole('button',{name:'Open opportunity'}))
     fireEvent.click(screen.getByRole('tab',{name:'Applicants'}))
@@ -715,7 +714,7 @@ describe('Visit CRM', () => {
 
   it('records transparent estimated member value', () => {
     renderApp()
-    fireEvent.click(screen.getByRole('button',{name:'Member Value'}))
+    fireEvent.click(screen.getByRole('button',{name:'Membership value'}))
     fireEvent.click(screen.getByRole('button',{name:'Record value'}))
     fireEvent.change(screen.getByLabelText('Description'),{target:{value:'Photography support'}})
     fireEvent.change(screen.getByRole('spinbutton',{name:/Estimated value/}),{target:{value:'175'}})

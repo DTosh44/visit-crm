@@ -1,21 +1,21 @@
-# Visit Valechester Platform
+# VisitMade destination website and CRM
 
-A configurable destination website and CRM for destination management organisations and local-authority tourism teams.
+VisitMade helps destination teams manage business relationships, recruit and retain members, maintain a public destination website and evidence the value they deliver. The demo destination is Visit Valechester.
 
-## Product areas
+## Launch product
 
-- Visitor website with taxonomy-led search, saved places, enquiries, events and itinerary planning
-- Event organiser registration, sign-in, submission tracking and moderation
-- Public events directory with 50 seeded events, search and category filters
-- CRM event editing and publication for member and non-member venues
-- Tier-differentiated member listings and review-supported visitor highlights
-- At least 15 listed businesses in each of the six membership types
-- CRM dashboard with per-user widget selection, drag-and-drop ordering and persistent layouts
-- Membership pipeline, configurable levels, benefits and benefit usage
-- Organisations, contacts, listings, billing, agreements and tasks
-- User administration with roles, suspension, password reset and access controls
-- Optional visitor economy, social, accounting and Open Banking data sources
-- Supabase-ready tenant authentication and persistence
+- Home dashboard, team tasks, notifications and a shared approval queue
+- Organisations, people and a sales pipeline with won/lost outcomes
+- Membership levels, benefits, renewals, agreements, membership value and member opportunities
+- Invoices, payment recording, reminders and exports
+- Targeted communications, reusable templates, preferences and provider-confirmed delivery states
+- Campaigns with objectives, owners, dates, participating members, management budgets, linked work and recorded results
+- Public listings, events, pages, guides, itineraries, trails, imagery, enquiries, map configuration and actionable website checks
+- Membership, website and supplied destination reports with stated periods and data sources
+- Secure member portal for organisation-scoped profile, listing and event submissions
+- Optional PR & Media, Travel Trade and Business Events workflows using shared CRM records
+
+A/B testing, Open Banking, unsupported accounting connections, the survey builder, press releases and automated review intelligence are not part of the launch interface. Historical experiment and survey records remain stored. Existing published survey links remain readable so customer commitments are not silently broken, but surveys cannot be created or promoted in the CRM. Public content never applies experiment variants.
 
 ## Run locally
 
@@ -24,39 +24,42 @@ npm install
 npm run dev
 ```
 
-The visitor website is at `/` and the destination workspace is at `/crm`.
+The visitor website is at `/`, the destination workspace at `/crm`, and the member portal at `/portal`.
 
-## Production services
+Without Supabase configuration the app is an explicitly local demo using browser storage and sample records. Do not use that mode for customer data.
 
-The interface works without credentials by using browser storage. A shared production workspace requires a Supabase project:
+## Production configuration
 
-1. Run `supabase/schema.sql`, followed by the migrations in `supabase/migrations`.
+1. Create a Supabase project and apply `supabase/schema.sql`, then every file in `supabase/migrations` in filename order.
 2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the deployment environment.
-3. Deploy the `invite-workspace-user`, `manage-workspace-user`, `generate-listing-copy`, `process-invoice-reminders` and `process-automations` Edge Functions.
-4. Create the first administrator in Supabase Auth and add the matching row to `public.profiles`.
+3. Create the first administrator in Supabase Auth and add its tenant-scoped row to `public.profiles`.
+4. Deploy the repository’s Edge Functions. Use JWT verification for `portal-access`; the cron and webhook functions validate their own secrets as described below.
+5. Configure Supabase Auth SMTP, the exact production `/portal` redirect URL and the `listing-media` storage bucket before inviting customers.
 
-Set `OPENAI_API_KEY` for AI listing copy. Set `RESEND_API_KEY`, `REMINDER_FROM_EMAIL` and `REMINDER_CRON_SECRET` for invoice reminder email. Schedule `process-invoice-reminders` daily from Supabase Cron or another scheduler and send the configured secret in the `x-cron-secret` header.
+### Communications and reminders
 
-For background CRM automations, apply `20260923_automation_runs.sql`, set `AUTOMATION_CRON_SECRET`, and deploy `process-automations` with `supabase functions deploy process-automations --use-api --no-verify-jwt` (the function validates its own secret). Invoke it every minute from Supabase Cron or another scheduler with that secret in the `x-cron-secret` header. The function also needs Supabase's standard `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` environment variables. Open CRM sessions check due rules themselves; the scheduler is needed for reliable unattended runs. Automation emails are queued as communications, not sent, until an email-delivery provider and approved sending workflow are configured.
+Set `RESEND_API_KEY`, `COMMUNICATION_FROM_EMAIL`, `COMMUNICATION_CRON_SECRET`, `COMMUNICATION_UNSUBSCRIBE_SECRET`, `RESEND_WEBHOOK_SECRET`, `REMINDER_FROM_EMAIL`, `REMINDER_CRON_SECRET` and `AUTOMATION_CRON_SECRET` as Supabase Function secrets.
 
-For CRM Communications, apply `supabase/migrations/20260924_communications.sql` and deploy `dispatch-communications`, `communication-webhook` and `unsubscribe-communication` Edge Functions. Configure `RESEND_API_KEY`, a verified `COMMUNICATION_FROM_EMAIL`, `COMMUNICATION_CRON_SECRET`, `COMMUNICATION_UNSUBSCRIBE_SECRET` (a long random signing secret), and `RESEND_WEBHOOK_SECRET` in Supabase secrets. Deploy all three with `--no-verify-jwt`: dispatch authenticates user requests or a cron secret, the webhook verifies Resend's Svix signature, and unsubscribe verifies a signed, expiring recipient token. Schedule an HTTP POST to `dispatch-communications` every minute with `x-cron-secret: <COMMUNICATION_CRON_SECRET>` so scheduled messages run when nobody has the CRM open. Create a Resend webhook pointing to `communication-webhook` for `email.delivered`, `email.bounced`, `email.failed`, `email.opened` and `email.clicked`. The CRM records a provider acceptance as “Sent” but only counts “Delivered” after a verified delivery webhook. Marketing messages carry a signed unsubscribe link; scheduled sends recheck contact preferences immediately before delivery. Without these services, drafts and templates remain usable, but test/send/schedule return an explicit configuration error and no delivery is claimed.
+Deploy `dispatch-communications`, `communication-webhook`, `unsubscribe-communication`, `process-invoice-reminders` and `process-automations`. Schedule the dispatch and automation functions every minute and invoice reminders daily. Configure a Resend webhook for delivered, bounced, failed, opened and clicked events.
 
-For the secure member/partner portal, apply `supabase/migrations/20260925_partner_portal.sql` and deploy `portal-access` with JWT verification enabled. Set the Edge Function secret `PORTAL_BASE_URL` to the production `/portal` URL and add that exact URL to the Supabase Auth redirect allowlist. Configure SMTP in Supabase Auth so invitations and password resets are delivered. Staff with Administrator or Membership manager role can invite organisation contacts and review submitted profile, listing and event changes from the organisation's Contacts tab. Invitees must set a password after following the invitation link. Portal accounts are never created by matching an email address automatically, and `/portal` does not load the CRM workspace providers. The portal requires the existing `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; without them it shows a configuration state rather than sample CRM data. Portal images use the existing `listing-media` bucket with short-lived signed upload URLs. Documents appear only when the CRM has a published HTTPS resource URL eligible for that membership level. Portal event approvals enter the CRM event review queue; the destination team must publish them separately.
+A queued communication is not a sent email. Provider acceptance is recorded as sent-to-provider, and delivery is recorded only after a verified webhook. Marketing sends recheck preferences and include a signed unsubscribe link. Without the provider and scheduler, drafts/templates remain usable but email delivery and unattended reminders are not verified.
 
-Campaign Management extends the existing tenant-scoped `platform_states` record; no separate campaign service is required. Campaign plans, partner contributions, budget lines, KPIs, channel results, asset links and activity are saved with the platform state. CRM tasks carry a `campaignId`, communications can be linked from their composer or the campaign, and member-value entries can be recorded against a campaign. For first-party website attribution, use the campaign ID (or exact campaign name) as the website link's `utm_campaign` value. Website visit, lead, referral and booking KPI actuals come from those tagged events; other outcomes and ROI require evidenced manual figures. The overall budget is the campaign spending ceiling; partner contributions and external funding are sources within it, not extra budget. Campaign budgets are management figures, not accounting transactions.
+### Portal and media
 
-Member Value uses tenant-scoped manual entries in `platform_states` and read-only calculated lines from existing benefit usage, campaign participation, opportunity participation, FAM itineraries, PR coverage/opportunities and dated trade/business leads. Calculated lines are rebuilt from their source records, avoiding duplicate stored snapshots and assigning no monetary value automatically. Staff may enter an estimated or evidenced actual amount with a source and evidence. Reports use each organisation's membership start and renewal dates; previous-year comparisons appear only where dated source records exist. Cumulative listing views and enquiries, plus communications and event activity, are context only because their counters cannot reliably be assigned to a membership period. CSV export and browser print provide renewal-ready summaries. The estimated-value-to-fee comparison is **not** revenue or financial ROI.
-The four unchanged, hard-coded demo value entries from earlier builds are excluded on load; edited or newly created records remain untouched.
+Deploy `portal-access`, set `PORTAL_BASE_URL`, configure Auth SMTP and add the exact redirect URL to the Supabase allowlist. Portal access is invitation-based and organisation-scoped. Images use Supabase Storage; listing videos use hosted URLs.
 
-Member/co-op Opportunities also persist in the tenant-scoped platform state. The destination team can set membership, geography, category and invitation-only eligibility, invite organisations, manage applications and capacity, and record participation. Recorded participation creates a linked Member Value entry once per organisation and opportunity; follow-ups are ordinary CRM tasks and email drafts use the Communications centre, where recipient eligibility and opt-in are rechecked. Portal interest, application, confirmation and withdrawal run through the authenticated `portal-access` function with organisation scoping, eligibility and a concurrency check on the platform state. Redeploy `portal-access` after updating this module. Drafts do not send email automatically; an email provider is required for sending through Communications.
+## Data and reporting rules
 
-Travel Trade uses the same tenant-scoped platform state for specialist profiles, activities, leads, trade events and FAM trips. New buyer profiles link to shared CRM organisations and contacts; existing unlinked demo profiles remain visible for manual linking. Trade contacts are the main People records, while represented members and relevant products link to existing organisations and published listings. Leads can be distributed to members with a recorded share date and response, but merely selecting a member or drafting a communication does not count as a send. A conversion requires an explicit outcome and date; estimated pipeline is not reported as actual value. Trade events, FAMs and leads can reference Member Opportunities, follow-up tasks are ordinary CRM tasks, and communication drafts open in Communications. Completed FAMs and recorded member lead shares feed traceable Member Value lines without automatically assigning monetary value. Email delivery still requires the configured Communications provider.
+- Campaign budgets are management figures, not accounting transactions.
+- Membership revenue means contracted membership fees; cash received comes from paid invoices.
+- Membership value can include optional estimated amounts, but estimates are labelled and are not financial ROI.
+- Website analytics is first-party and consent-dependent. Reports show their period and source.
+- Unknown figures are shown as unknown rather than zero.
+- Optional modules reuse organisations, people, listings, tasks and communications and respect existing permissions.
 
-Business Events/MICE also extends the tenant-scoped platform state and reuses CRM organisations, People contacts, listings, tasks and Communications. Buyer profiles classify linked organisations and contacts; venue capabilities designate published listings for capacity-based matching. Enquiries record requirements, dates, known budgets, partner selection, dated distribution and staff-only responses. Selecting a partner or creating a Communications draft does not claim delivery. A confirmed win requires a winning venue and date; event value and delegate nights are recorded amounts, while economic impact remains a clearly labelled estimate. Completed planner showcases and recorded lead shares/wins produce source-linked Member Value activity with no automatic monetary allocation. The partner portal has no access to private MICE response records. Existing legacy free-text enquiries remain available for staff to link to shared CRM records. No new external service is needed beyond the existing Communications provider for actual email delivery.
+## Historical data
 
-This enables shared records, live multi-user updates, secure staff and event-organiser accounts, dashboard preferences, public submissions, published guides, itineraries and trails, image storage and tenant permissions. Configure an SMTP provider in Supabase before inviting real users or sending password resets.
-
-Images are stored in Supabase Storage. Listing videos use hosted YouTube, Vimeo or Mux URLs. Open Banking, accounting, review and video-processing providers require the destination's own provider account and API credentials; the CRM exposes their configuration and connection state without embedding provider secrets in the browser.
+Retired feature tables and fields are intentionally not dropped. Do not delete experiment or survey history during deployment. The launch UI and search do not expose those builders, and the public site ignores experiment assignments.
 
 ## Quality checks
 
@@ -65,3 +68,5 @@ npm run lint
 npm test
 npm run build
 ```
+
+Production authentication, tenant isolation, email delivery, scheduled execution, image storage, invitations and password resets require the configured services above and cannot be verified by the local demo alone.

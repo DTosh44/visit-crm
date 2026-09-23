@@ -9,12 +9,14 @@ import { downloadCsv } from '../actions'
 type MembershipTab = 'Overview' | 'Benefits' | 'Renewals'
 
 export function Memberships({ openOrganisation,createRequest=0 }: { openOrganisation: (organisation: Organisation) => void;createRequest?:number }) {
-  const { data, addLevel, updateLevel, addBenefit } = useCRM()
+  const { data, addLevel, updateLevel, addBenefit, renewMembership } = useCRM()
   const [tab, setTab] = useState<MembershipTab>('Overview')
   const [addOpen, setAddOpen] = useState(Boolean(createRequest))
   const [editingLevel, setEditingLevel] = useState<MembershipLevel|null>(null)
   const [addingBenefit,setAddingBenefit]=useState(false)
   const [showArchived,setShowArchived]=useState(false)
+  const [renewing,setRenewing]=useState<Organisation|null>(null)
+  const [renewal,setRenewal]=useState({membershipLevel:'',annualValue:0,startDate:'',endDate:'',raiseInvoice:true,createAgreement:true})
   const [benefit,setBenefit]=useState<Omit<Benefit,'id'>>({name:'',kind:'Single use',allowance:1,category:'Marketing'})
   const [newLevel, setNewLevel] = useState({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0, taxonomyAllowance: 6 })
   const memberCount=(levelName:string)=>data.organisations.filter((organisation)=>organisation.tier===levelName&&(organisation.status==='Active'||organisation.status==='Renewing'||organisation.status==='Free listing')).length
@@ -29,6 +31,13 @@ export function Memberships({ openOrganisation,createRequest=0 }: { openOrganisa
     addLevel({ ...newLevel, benefits: [], active: true })
     setAddOpen(false)
     setNewLevel({ name: '', price: 0, description: '', colour: '#4b69c6', listingAllowance: 1, imageAllowance: 6, videoAllowance: 0, taxonomyAllowance: 6 })
+  }
+
+  const openRenewal=(organisation:Organisation)=>{
+    const startDate=organisation.renewalDate
+    const endDate=startDate?`${Number(startDate.slice(0,4))+1}${startDate.slice(4)}`:''
+    setRenewing(organisation)
+    setRenewal({membershipLevel:organisation.tier,annualValue:organisation.annualValue,startDate,endDate,raiseInvoice:true,createAgreement:true})
   }
 
   return (
@@ -70,12 +79,16 @@ export function Memberships({ openOrganisation,createRequest=0 }: { openOrganisa
 
       {tab === 'Renewals' && <section className="panel data-panel renewals-table-panel">
         <div className="table-toolbar"><div><h2>Renewal queue</h2><p>Memberships requiring action in the current period.</p></div><Button variant="secondary" size="sm" onClick={()=>downloadCsv('membership-renewals.csv',[['Organisation','Level','Renewal date','Owner','Next action'],...renewals.map((org)=>[org.name,org.tier,org.renewalDate,org.owner,org.nextAction])])}>Export queue</Button></div>
-        <div className="table-scroll"><table className="data-table"><thead><tr><th>Organisation</th><th>Current level</th><th>Renewal date</th><th>Agreement</th><th>Invoice</th><th>Owner</th><th>Next action</th></tr></thead><tbody>{renewals.map((org) => {
+        <div className="table-scroll"><table className="data-table"><thead><tr><th>Organisation</th><th>Current level</th><th>Renewal date</th><th>Agreement</th><th>Invoice</th><th>Owner</th><th>Next action</th><th></th></tr></thead><tbody>{renewals.map((org) => {
           const agreement = data.agreements.find((item) => item.organisationId === org.id)
           const invoice = data.invoices.find((item) => item.organisationId === org.id && item.status !== 'Paid')
-          return <tr key={org.id}><td><div className="org-cell"><Avatar name={org.name} colour={org.colour} size="sm" /><button className="table-primary-action" onClick={() => openOrganisation(org)}>{org.name}</button></div></td><td>{org.tier}</td><td><strong>{formatDate(org.renewalDate)}</strong></td><td><Badge>{agreement?.status ?? 'Draft'}</Badge></td><td>{invoice ? <Badge>{invoice.status}</Badge> : <span>Not raised</span>}</td><td>{org.owner}</td><td>{org.nextAction}</td></tr>
+          return <tr key={org.id}><td><div className="org-cell"><Avatar name={org.name} colour={org.colour} size="sm" /><button className="table-primary-action" onClick={() => openOrganisation(org)}>{org.name}</button></div></td><td>{org.tier}</td><td><strong>{formatDate(org.renewalDate)}</strong></td><td><Badge>{agreement?.status ?? 'Draft'}</Badge></td><td>{invoice ? <Badge>{invoice.status}</Badge> : <span>Not raised</span>}</td><td>{org.owner}</td><td>{org.nextAction}</td><td><Button size="sm" onClick={()=>openRenewal(org)}>Renew</Button></td></tr>
         })}</tbody></table></div>
+        <div className="table-toolbar"><div><h3>Recorded membership history</h3><p>Legacy records remain unknown until a renewal is completed; no dates or outcomes are inferred.</p></div></div>
+        <div className="table-scroll"><table className="data-table"><thead><tr><th>Organisation</th><th>Level</th><th>Period</th><th>Outcome</th><th>Invoice</th><th>Agreement</th></tr></thead><tbody>{data.membershipPeriods.length?data.membershipPeriods.map((period)=><tr key={period.id}><td>{data.organisations.find((item)=>item.id===period.organisationId)?.name??'Deleted organisation'}</td><td>{period.membershipLevel}</td><td>{formatDate(period.startDate)} – {formatDate(period.endDate)}</td><td><Badge>{period.outcome}</Badge></td><td>{period.invoiceId?data.invoices.find((item)=>item.id===period.invoiceId)?.number??'Linked':'—'}</td><td>{period.agreementId?data.agreements.find((item)=>item.id===period.agreementId)?.number??'Linked':'—'}</td></tr>):<tr><td colSpan={6}>No membership periods have been recorded yet.</td></tr>}</tbody></table></div>
       </section>}
+
+      {renewing&&<Modal title={`Renew ${renewing.name}`} subtitle="Record the new period and optionally prepare linked finance documents." onClose={()=>setRenewing(null)}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();renewMembership({organisationId:renewing.id,...renewal});setRenewing(null)}}><div className="form-grid two"><Field label="Membership level"><select value={renewal.membershipLevel} onChange={(event)=>{const membershipLevel=event.target.value;const level=data.levels.find((item)=>item.name===membershipLevel);setRenewal({...renewal,membershipLevel,annualValue:level?.price??renewal.annualValue})}}>{data.levels.filter((item)=>item.active).map((item)=><option key={item.id}>{item.name}</option>)}</select></Field><Field label="Agreed annual fee"><input required type="number" min="0" value={renewal.annualValue} onChange={(event)=>setRenewal({...renewal,annualValue:Number(event.target.value)})}/></Field><Field label="Period starts"><input required type="date" value={renewal.startDate} onChange={(event)=>setRenewal({...renewal,startDate:event.target.value})}/></Field><Field label="Period ends"><input required type="date" min={renewal.startDate} value={renewal.endDate} onChange={(event)=>setRenewal({...renewal,endDate:event.target.value})}/></Field></div><label className="check-row"><input type="checkbox" checked={renewal.raiseInvoice} onChange={(event)=>setRenewal({...renewal,raiseInvoice:event.target.checked})}/>Prepare a draft membership invoice</label><label className="check-row"><input type="checkbox" checked={renewal.createAgreement} onChange={(event)=>setRenewal({...renewal,createAgreement:event.target.checked})}/>Prepare a draft agreement</label><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setRenewing(null)}>Cancel</Button><Button type="submit" disabled={!renewal.startDate||!renewal.endDate||renewal.endDate<renewal.startDate}>Complete renewal</Button></div></form></Modal>}
 
       {addOpen && <Modal title="Create membership level" subtitle="Set a package that belongs only to this destination workspace." onClose={() => setAddOpen(false)}>
         <div className="form-stack">

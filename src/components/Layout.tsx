@@ -1,7 +1,7 @@
 import {
   Bell, BarChart3, BookOpen, Building2, CircleDollarSign, ClipboardCheck, ExternalLink, FilePenLine, PanelsTopLeft,
   FileSignature, Gauge, Handshake, HelpCircle, ListTodo, LogOut, Menu, Plus, Search, Settings, CalendarDays,
-  Inbox as InboxIcon, UsersRound, X, MapPinned, Images, FlaskConical, ContactRound, Bot, Megaphone, Newspaper, Plane, BriefcaseBusiness, HeartPulse, ClipboardList, Workflow, Mail,
+  Inbox as InboxIcon, UsersRound, X, MapPinned, Images, ContactRound, Bot, Megaphone, Newspaper, Plane, BriefcaseBusiness, HeartPulse, ClipboardList, Workflow, Mail, ChevronDown,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useCRM } from '../store'
@@ -16,25 +16,43 @@ import { AskVisitMade } from './AskVisitMade'
 import { usePlatform } from '../platform'
 
 const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: string; icon: typeof Gauge; feature?: FeatureKey }> }> = [
-  { label: 'Workspace', items: [
+  { label: 'Home', items: [
     { key: 'dashboard', label: 'Dashboard', icon: Gauge },
+    { key: 'tasks', label: 'My tasks / team tasks', icon: ListTodo, feature: 'tasks' },
+    { key: 'inbox', label: 'Approvals', icon: ClipboardCheck },
+  ] },
+  { label: 'Contacts', items: [
     { key: 'organisations', label: 'Organisations', icon: Building2, feature: 'organisations' },
     { key: 'people', label: 'People', icon: ContactRound, feature: 'organisations' },
-    { key: 'tasks', label: 'Tasks', icon: ListTodo, feature: 'tasks' },
-    { key: 'communications', label: 'Communications', icon: Mail, feature: 'communications' },
   ] },
   { label: 'Membership', items: [
-    { key: 'memberships', label: 'Memberships', icon: UsersRound, feature: 'memberships' },
+    { key: 'memberships', label: 'Members, renewals & benefits', icon: UsersRound, feature: 'memberships' },
     { key: 'pipeline', label: 'Sales pipeline', icon: Handshake, feature: 'salesPipeline' },
-    { key: 'memberValue', label: 'Member Value', icon: HeartPulse, feature: 'memberValue' },
+    { key: 'memberValue', label: 'Membership value', icon: HeartPulse, feature: 'memberValue' },
     { key: 'agreements', label: 'Agreements', icon: FileSignature, feature: 'agreements' },
-    { key: 'billing', label: 'Billing', icon: CircleDollarSign, feature: 'billing' },
-    { key: 'memberOpportunities', label: 'Opportunities', icon: ClipboardList, feature: 'coopOpportunities' },
-    { key: 'engagement', label: 'Members at risk', icon: Gauge, feature: 'memberValue' },
+    { key: 'memberOpportunities', label: 'Member opportunities', icon: ClipboardList, feature: 'coopOpportunities' },
+    { key: 'engagement', label: 'Members needing attention', icon: Gauge, feature: 'memberValue' },
+  ] },
+  { label: 'Website', items: [
+    { key: 'listings', label: 'Listings', icon: FilePenLine, feature: 'listings' },
+    { key: 'events', label: 'What’s on', icon: CalendarDays, feature: 'events' },
+    { key: 'pages', label: 'Pages', icon: PanelsTopLeft, feature: 'publicWebsite' },
+    { key: 'content', label: 'Guides, itineraries & trails', icon: BookOpen, feature: 'itineraries' },
+    { key: 'images', label: 'Image bank', icon: Images, feature: 'imageBank' },
+    { key: 'websiteHealth', label: 'Website checks', icon: HeartPulse, feature: 'websiteHealth' },
+    { key: 'inbox', label: 'Website enquiries', icon: InboxIcon },
+    { key: 'map', label: 'Website settings & map', icon: MapPinned, feature: 'interactiveMap' },
   ] },
   { label: 'Marketing', items: [
+    { key: 'communications', label: 'Communications', icon: Mail, feature: 'communications' },
     { key: 'campaigns', label: 'Campaigns', icon: Megaphone, feature: 'campaigns' },
     { key: 'prMedia', label: 'PR & Media', icon: Newspaper, feature: 'prMedia' },
+  ] },
+  { label: 'Finance', items: [
+    { key: 'billing', label: 'Invoices, payments & reminders', icon: CircleDollarSign, feature: 'billing' },
+  ] },
+  { label: 'Reports', items: [
+    { key: 'insights', label: 'Performance reports', icon: BarChart3 },
   ] },
   { label: 'Travel Trade', items: [
     { key: 'travelTrade', label: 'Buyers, leads & FAMs', icon: Plane, feature: 'travelTrade' },
@@ -42,32 +60,15 @@ const navGroups: Array<{ label: string; items: Array<{ key: ViewKey; label: stri
   { label: 'Business Events', items: [
     { key: 'businessEvents', label: 'Enquiries & venues', icon: BriefcaseBusiness, feature: 'businessEvents' },
   ] },
-  { label: 'Website', items: [
-    { key: 'pages', label: 'Pages', icon: PanelsTopLeft, feature: 'publicWebsite' },
-    { key: 'images', label: 'Image bank', icon: Images, feature: 'imageBank' },
-    { key: 'experiments', label: 'A/B testing', icon: FlaskConical, feature: 'websiteExperiments' },
-    { key: 'map', label: 'Interactive map', icon: MapPinned, feature: 'interactiveMap' },
-    { key: 'listings', label: 'Listings', icon: FilePenLine, feature: 'listings' },
-    { key: 'events', label: 'Events', icon: CalendarDays, feature: 'events' },
-    { key: 'content', label: 'Guides, itineraries & trails', icon: BookOpen, feature: 'itineraries' },
-    { key: 'websiteHealth', label: 'Website Health', icon: HeartPulse, feature: 'websiteHealth' },
-    { key: 'inbox', label: 'Website inbox', icon: InboxIcon },
-  ] },
-  { label: 'Research', items: [
-    { key: 'surveys', label: 'Surveys', icon: ClipboardList, feature: 'surveys' },
-  ] },
-  { label: 'Reporting', items: [
-    { key: 'insights', label: 'Reviews & social insights', icon: BarChart3, feature: 'reviewIntelligence' },
-  ] },
-  { label: 'Manage', items: [
-    { key: 'automations', label: 'Automations', icon: Workflow, feature: 'automations' },
-    { key: 'settings', label: 'Settings', icon: Settings },
+  { label: 'Settings', items: [
+    { key: 'automations', label: 'Automated routines', icon: Workflow, feature: 'automations' },
+    { key: 'settings', label: 'Workspace, team & modules', icon: Settings },
   ] },
 ]
 
 const pageNames: Record<ViewKey, string> = {
   dashboard: 'Dashboard', organisations: 'Organisations', people: 'People', pipeline: 'Sales pipeline', memberships: 'Memberships',
-  pages: 'Pages', images: 'Image bank', experiments: 'A/B testing', map: 'Interactive map', listings: 'Listings', events: 'Events', content: 'Guides, itineraries & trails', inbox: 'Website inbox', insights: 'Website, visitor & social insights', billing: 'Billing', agreements: 'Agreements', tasks: 'Tasks', communications:'Communications', memberValue:'Member Value', memberOpportunities:'Opportunities', campaigns:'Campaigns', engagement:'Members at risk', travelTrade:'Travel Trade', businessEvents:'Business Events', prMedia:'PR & Media', surveys:'Surveys', websiteHealth:'Website Health', automations:'Automations', settings: 'Settings',
+  pages: 'Pages', images: 'Image bank', experiments: 'Unavailable', map: 'Website settings', listings: 'Listings', events: 'What’s on', content: 'Guides, itineraries & trails', inbox: 'Approvals & website enquiries', insights: 'Reports', billing: 'Invoices & payments', agreements: 'Agreements', tasks: 'Tasks', communications:'Communications', memberValue:'Membership value', memberOpportunities:'Member opportunities', campaigns:'Campaigns', engagement:'Members needing attention', travelTrade:'Travel Trade', businessEvents:'Business Events', prMedia:'PR & Media', surveys:'Unavailable', websiteHealth:'Website checks', automations:'Automated routines', settings: 'Settings',
 }
 
 export function Layout({
@@ -90,6 +91,7 @@ export function Layout({
   const { user, signOut } = useAuth()
   const { features } = useFeatures()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set(navGroups.map((group) => group.label)))
   const [searchOpen, setSearchOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   const [notificationsOpen,setNotificationsOpen]=useState(false)
@@ -144,7 +146,6 @@ export function Layout({
     data.contentPages.filter((item)=>match(item.title,item.summary,item.type,item.slug,item.status)).forEach((item)=>results.push({id:`content-${item.id}`,title:item.title,detail:`${item.type} · /${item.slug}`,meta:'Content',view:'content',kind:'module'}))
     data.websitePages.filter((item)=>match(item.name,item.path,item.template,item.status,item.draft.title)).forEach((item)=>results.push({id:`page-${item.id}`,title:item.name,detail:`${item.path} · ${item.status}`,meta:'Website page',view:'pages',kind:'module'}))
     data.imageAssets.filter((item)=>match(item.name,item.alt,item.credit,item.collection,item.tags)).forEach((item)=>results.push({id:`image-${item.id}`,title:item.name,detail:`${item.collection} · ${item.credit}`,meta:'Image',view:'images',kind:'module'}))
-    data.websiteExperiments.filter((item)=>match(item.name,item.hypothesis,item.pagePath,item.status,item.goal)).forEach((item)=>results.push({id:`experiment-${item.id}`,title:item.name,detail:`${item.pagePath} · ${item.status}`,meta:'A/B test',view:'experiments',kind:'module'}))
     data.submissions.filter((item)=>match(item.kind,item.status,item.createdAt,JSON.stringify(item.payload))).forEach((item)=>results.push({id:`submission-${item.id}`,title:String(item.payload.name??item.payload.email??item.kind),detail:`${item.kind} · ${item.status}`,meta:'Website inbox',view:'inbox',kind:'module'}))
     data.invoices.filter((item)=>match(item.number,item.description,item.status,item.sentTo,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`invoice-${item.id}`,title:item.number,detail:`${item.description} · ${item.status}`,meta:'Invoice',view:'billing',kind:'module'}))
     data.agreements.filter((item)=>match(item.number,item.membershipLevel,item.signatory,item.signatoryEmail,item.status,data.organisations.find((org)=>org.id===item.organisationId)?.name)).forEach((item)=>results.push({id:`agreement-${item.id}`,title:item.number,detail:`${item.signatory} · ${item.status}`,meta:'Agreement',view:'agreements',kind:'module'}))
@@ -156,7 +157,6 @@ export function Layout({
     platform.famTrips.filter((item)=>match(item.title,item.targetMarket,item.itinerary,item.feedback,item.followUp)).forEach((item)=>results.push({id:`fam-trip-${item.id}`,title:item.title,detail:`${item.targetMarket} · ${item.startDate}`,meta:'FAM trip',view:'travelTrade',kind:'module'}))
     platform.businessEnquiries.filter((item)=>match(item.client,item.organisation,item.eventType,item.requirements,item.stage,item.owner)).forEach((item)=>results.push({id:`business-${item.id}`,title:item.client,detail:`${item.eventType} · ${item.stage}`,meta:'Business event',view:'businessEvents',kind:'module'}))
     platform.mediaProfiles.filter((item)=>match(item.name,item.outlet,item.type,item.topics,item.tags)).forEach((item)=>results.push({id:`media-${item.id}`,title:item.name,detail:`${item.outlet} · ${item.type}`,meta:'Media contact',view:'prMedia',kind:'module'}))
-    platform.surveys.filter((item)=>match(item.title,item.introduction,item.audience,item.status)).forEach((item)=>results.push({id:`survey-${item.id}`,title:item.title,detail:`${item.audience} · ${item.status}`,meta:'Survey',view:'surveys',kind:'module'}))
     return results.filter((item)=>canAccessView(user?.role,item.view)).slice(0,15)
   }, [data,platform,user?.role,query])
   const openSearchResult=(result:typeof searchResults[number])=>{setSearchOpen(false);setQuery('');if(result.kind==='organisation'){const item=data.organisations.find((org)=>org.id===result.entityId);if(item)onOpenOrganisation(item);return}if(result.kind==='listing'){const item=data.listings.find((listing)=>listing.id===result.entityId);if(item)onOpenListing(item);return}navigate(result.view)}
@@ -187,11 +187,11 @@ export function Layout({
 
         <nav className="nav" aria-label="CRM sections">
           {navGroups.map((group) => {
-            const visibleItems=group.items.filter((item) => (item.key==='insights' ? features.reviewIntelligence||features.socialInsights : !item.feature || features[item.feature]) && canAccessView(user?.role, item.key))
+            const visibleItems=group.items.filter((item) => (!item.feature || features[item.feature]) && canAccessView(user?.role, item.key))
             if(!visibleItems.length)return null
             return <div className="nav-group" key={group.label}>
-              <span className="nav-label">{group.label}</span>
-              {visibleItems.map(({ key, label, icon: Icon }) => (
+              <button className="nav-label nav-group-toggle" aria-expanded={openGroups.has(group.label)} onClick={()=>setOpenGroups((current)=>{const next=new Set(current);if(next.has(group.label))next.delete(group.label);else next.add(group.label);return next})}>{group.label}<ChevronDown size={13}/></button>
+              {openGroups.has(group.label)&&visibleItems.map(({ key, label, icon: Icon }) => (
                 <button key={key} className={classNames('nav-item', view === key && 'active')} aria-current={view === key ? 'page' : undefined} aria-label={key === 'tasks' ? `${label}, ${data.tasks.filter((task) => !task.completed).length} open tasks` : label} onClick={() => navigate(key)}>
                   <Icon size={18} strokeWidth={1.9} />
                   <span>{label}</span>
@@ -234,9 +234,9 @@ export function Layout({
                 <div id="quick-create-menu" className="quick-menu" role="region" aria-label="Quick create">
                   <span>Quick create</span>
                   {([
-                    ['organisation','organisations',Building2,'Organisation','Member, prospect or partner'],['person','people',ContactRound,'Person','Contact, PR or travel trade'],['opportunity','pipeline',Handshake,'Opportunity','Add to the sales pipeline'],['task','tasks',ClipboardCheck,'Task','Create a follow-up'],['membership','memberships',UsersRound,'Membership level','Create a package'],['invoice','billing',CircleDollarSign,'Invoice','Raise a new invoice'],['agreement','agreements',FileSignature,'Agreement','Create a signing record'],['listing','listings',FilePenLine,'Listing','Create a website listing'],['event','events',CalendarDays,'Event','Add to what’s on'],['content','content',BookOpen,'Guide, itinerary or trail','Create inspiration content'],['page','pages',PanelsTopLeft,'Website page','Create a landing page'],['image','images',Images,'Image','Add to the image bank'],['experiment','experiments',FlaskConical,'A/B test','Create a website experiment'],
-                    ['communication','communications',Mail,'Communication','Create a targeted draft'],['memberValue','memberValue',HeartPulse,'Member value record','Record delivered value'],['campaign','campaigns',Megaphone,'Campaign','Plan a marketing campaign'],['memberOpportunity','memberOpportunities',ClipboardList,'Member opportunity','Invite eligible members'],['survey','surveys',ClipboardList,'Survey','Create a research form'],['buyer','travelTrade',Plane,'Travel trade buyer','Add a buyer relationship'],['tradeLead','travelTrade',Plane,'Trade lead','Record an enquiry'],['famTrip','travelTrade',Plane,'FAM trip','Plan a familiarisation visit'],['businessEnquiry','businessEvents',BriefcaseBusiness,'Business events enquiry','Capture an RFP'],['prOpportunity','prMedia',Newspaper,'PR opportunity','Record a media request'],
-                  ] as Array<[CreateTarget,ViewKey,typeof Building2,string,string]>).filter(([,target])=>{const item=navGroups.flatMap((group)=>group.items).find((entry)=>entry.key===target);return canAccessView(user?.role,target)&&(!item?.feature||features[item.feature])}).map(([target,,Icon,label,detail])=><button key={target} onClick={()=>{setQuickOpen(false);onCreate(target)}}><Icon size={17}/><div><strong>{label}</strong><small>{detail}</small></div></button>)}
+                    ['organisation','organisations',Building2,'Organisation','Member, prospect or partner'],['person','people',ContactRound,'Person','Contact, PR or travel trade'],['task','tasks',ClipboardCheck,'Task','Create a follow-up'],['opportunity','pipeline',Handshake,'Sales opportunity','Add to the sales pipeline'],['membership','memberships',UsersRound,'Membership level','Create a package'],['invoice','billing',CircleDollarSign,'Invoice','Raise a new invoice'],['agreement','agreements',FileSignature,'Agreement','Create a signing record'],['listing','listings',FilePenLine,'Listing','Create a website listing'],['event','events',CalendarDays,'Event','Add to what’s on'],['content','content',BookOpen,'Guide, itinerary or trail','Create inspiration content'],['page','pages',PanelsTopLeft,'Website page','Create a landing page'],['image','images',Images,'Image','Add to the image bank'],
+                    ['communication','communications',Mail,'Communication','Create a targeted draft'],['memberValue','memberValue',HeartPulse,'Membership value record','Record delivered value'],['campaign','campaigns',Megaphone,'Campaign','Plan a marketing campaign'],['memberOpportunity','memberOpportunities',ClipboardList,'Member opportunity','Invite eligible members'],['buyer','travelTrade',Plane,'Travel trade buyer','Add a buyer relationship'],['tradeLead','travelTrade',Plane,'Trade lead','Record an enquiry'],['famTrip','travelTrade',Plane,'FAM trip','Plan a familiarisation visit'],['businessEnquiry','businessEvents',BriefcaseBusiness,'Business events enquiry','Capture an RFP'],['prOpportunity','prMedia',Newspaper,'PR request','Record a media request'],
+                  ] as Array<[CreateTarget,ViewKey,typeof Building2,string,string]>).filter(([target,targetView])=>{const item=navGroups.flatMap((group)=>group.items).find((entry)=>entry.key===targetView);const contextual=targetView===view||['organisation','person','task'].includes(target);return contextual&&canAccessView(user?.role,targetView)&&(!item?.feature||features[item.feature])}).map(([target,,Icon,label,detail])=><button key={target} onClick={()=>{setQuickOpen(false);onCreate(target)}}><Icon size={17}/><div><strong>{label}</strong><small>{detail}</small></div></button>)}
                 </div>
               )}
             </div>

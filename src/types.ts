@@ -33,12 +33,12 @@ export type CreateTarget = 'organisation' | 'person' | 'opportunity' | 'membersh
 
 export type Health = 'Happy' | 'OK' | 'Needs attention'
 export type MembershipStatus = 'Active' | 'Renewing' | 'Prospect' | 'Free listing' | 'Lapsed' | 'Non-member'
-export type ListingStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested'
+export type ListingStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested' | 'Rejected'
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Overdue' | 'Paid' | 'Void'
 export type AgreementStatus = 'Draft' | 'Sent' | 'Viewed' | 'Signed' | 'Declined' | 'Expired'
 export type TaskPriority = 'High' | 'Medium' | 'Low'
-export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won'
-export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested' | 'Withdrawn'
+export type PipelineStage = 'New lead' | 'Qualified' | 'Proposal' | 'Decision' | 'Won' | 'Lost'
+export type EventStatus = 'Published' | 'Draft' | 'In review' | 'Changes requested' | 'Rejected' | 'Withdrawn'
 export type EventFormat = 'One-off and short run' | 'Ongoing events' | 'Online events'
 export type EventRecurrence = 'None' | 'Daily' | 'Weekly' | 'Monthly'
 
@@ -231,6 +231,20 @@ export interface Agreement {
   validUntil: string
 }
 
+export interface MembershipPeriod {
+  id: string
+  organisationId: string
+  membershipLevel: string
+  annualValue: number
+  startDate: string
+  endDate: string
+  outcome: 'Current' | 'Renewed' | 'Cancelled' | 'Lapsed' | 'Unknown'
+  reason?: string
+  invoiceId?: string
+  agreementId?: string
+  createdAt: string
+}
+
 export interface CRMTask {
   id: string
   title: string
@@ -262,6 +276,8 @@ export interface Opportunity {
   owner: string
   daysInStage: number
   stageEnteredAt?: string
+  outcomeDate?: string
+  lostReason?: string
 }
 
 export interface ContentPage {
@@ -432,6 +448,7 @@ export interface CRMData {
   events: DestinationEvent[]
   invoices: Invoice[]
   agreements: Agreement[]
+  membershipPeriods: MembershipPeriod[]
   tasks: CRMTask[]
   opportunities: Opportunity[]
   activities: Activity[]

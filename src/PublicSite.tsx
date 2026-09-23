@@ -11,7 +11,7 @@ import { useCRM } from './store'
 import { tenant } from './tenant'
 import { supabase } from './auth'
 import { filtersForVisitorQuery, matchesVisitorOption, matchesVisitorQuery, visitorFilterGroups, visitorTaxonomyFor } from './listingTaxonomy'
-import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing, WebsitePageBlock, WebsitePageContent, WebsiteExperimentVariant } from './types'
+import type { ContentPage, DestinationEvent, EventDraft, EventFormat, Listing, WebsitePageBlock, WebsitePageContent } from './types'
 import { downloadCalendarEvent } from './actions'
 import { publishedPages } from './contentPublishing'
 import type { WebsiteAnalyticsEvent } from './types'
@@ -82,31 +82,14 @@ function recordSubmission(key: string, value: Record<string, unknown>) {
 }
 
 const ANALYTICS_VISITOR_KEY='visit-analytics-visitor-v1'
-const EXPERIMENT_ASSIGNMENT_PREFIX='visit-experiment-assignment-v1:'
-type ExperimentAssignment={experimentId:string;variantId:string}
 function analyticsVisitorId(){let value=localStorage.getItem(ANALYTICS_VISITOR_KEY);if(!value){value=`visitor-${crypto.randomUUID()}`;localStorage.setItem(ANALYTICS_VISITOR_KEY,value)}return value}
 function analyticsSource(){try{if(!document.referrer)return'Direct';const host=new URL(document.referrer).hostname;if(host.includes('google.'))return'Google';if(host.includes('facebook.'))return'Facebook';if(host.includes('instagram.'))return'Instagram';return host}catch{return'Direct'}}
 function recordAnalytics(type:WebsiteAnalyticsEvent['type'],title=document.title){
   if(localStorage.getItem('visit-cookie-consent')!=='analytics')return
   const params=new URLSearchParams(window.location.search)
-  if(params.has('experiment'))return
-  let assignment:ExperimentAssignment|undefined;try{assignment=JSON.parse(sessionStorage.getItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${window.location.pathname}`)??'null')??undefined}catch{assignment=undefined}
-  const event:WebsiteAnalyticsEvent={id:crypto.randomUUID(),type,path:window.location.pathname,title:title.replace(/ \| .*$/,''),visitorId:analyticsVisitorId(),source:params.get('utm_source')??analyticsSource(),campaign:params.get('utm_campaign')??undefined,experimentId:assignment?.experimentId,variantId:assignment?.variantId,occurredAt:new Date().toISOString()}
+  const event:WebsiteAnalyticsEvent={id:crypto.randomUUID(),type,path:window.location.pathname,title:title.replace(/ \| .*$/,''),visitorId:analyticsVisitorId(),source:params.get('utm_source')??analyticsSource(),campaign:params.get('utm_campaign')??undefined,occurredAt:new Date().toISOString()}
   window.dispatchEvent(new CustomEvent('website-analytics',{detail:event}))
   if(supabase)void supabase.from('website_analytics_events').insert({id:event.id,tenant_id:tenant.id,event_type:event.type,path:event.path,title:event.title,visitor_id:event.visitorId,source:event.source,campaign:event.campaign??null,experiment_id:event.experimentId??null,variant_id:event.variantId??null,occurred_at:event.occurredAt})
-}
-
-function experimentVariant(data:ReturnType<typeof useCRM>['data'],path=window.location.pathname):WebsiteExperimentVariant|undefined{
-  const params=new URLSearchParams(window.location.search)
-  const previewExperiment=params.get('experiment')
-  const experiment=data.websiteExperiments.find((item)=>item.pagePath===path&&(item.status==='Running'||item.id===previewExperiment))
-  if(!experiment){sessionStorage.removeItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`);return undefined}
-  const requested=params.get('variant')
-  let variant=experiment.variants.find((item)=>item.id===requested)
-  if(!variant){let saved:ExperimentAssignment|undefined;try{saved=JSON.parse(sessionStorage.getItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`)??'null')??undefined}catch{saved=undefined}variant=saved?.experimentId===experiment.id?experiment.variants.find((item)=>item.id===saved?.variantId):undefined}
-  if(!variant){const position=Math.random()*100;let total=0;variant=experiment.variants.find((item)=>{total+=item.weight;return position<total})??experiment.variants[0]}
-  sessionStorage.setItem(`${EXPERIMENT_ASSIGNMENT_PREFIX}${path}`,JSON.stringify({experimentId:experiment.id,variantId:variant.id}))
-  return variant
 }
 
 function categoryGroup(listing: Listing) {
@@ -233,9 +216,8 @@ function ManagedBlocks({ blocks }: { blocks: WebsitePageBlock[] }) {
 function PageIntro({ eyebrow, title, description, image }: { eyebrow: string; title: string; description: string; image?: string }) {
   const { data } = useCRM()
   const managed = managedContent(data)
-  const variant = experimentVariant(data)
   const heroImage = managed?.heroImage ? mediaUrl(managed.heroImage) : image
-  return <><section className={`visitor-page-intro${heroImage ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{managed?.eyebrow || eyebrow}</span><h1>{variant?.title||managed?.title||title}</h1><p>{variant?.description||managed?.description||description}</p></div>{heroImage && <img src={heroImage} alt="" />}</section>{managed && <ManagedBlocks blocks={managed.blocks}/>}</>
+  return <><section className={`visitor-page-intro${heroImage ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14} />Back to destination</SiteLink><span className="site-eyebrow">{managed?.eyebrow || eyebrow}</span><h1>{managed?.title||title}</h1><p>{managed?.description||description}</p></div>{heroImage && <img src={heroImage} alt="" />}</section>{managed && <ManagedBlocks blocks={managed.blocks}/>}</>
 }
 
 function NewsletterSignup() {
@@ -248,7 +230,6 @@ function NewsletterSignup() {
 function HomePage({ actions, location }: { actions: VisitorActions; location: string }) {
   const { data } = useCRM()
   const managed = managedContent(data, '/')
-  const experiment = experimentVariant(data, '/')
   const { features } = useFeatures()
   const [query, setQuery] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
@@ -297,8 +278,8 @@ function HomePage({ actions, location }: { actions: VisitorActions; location: st
       <section className="site-hero">
         <img src={managed?.heroImage ? mediaUrl(managed.heroImage) : imageLibrary.hero} alt="Visitors walking beside the river in historic Valechester" fetchPriority="high" />
         <div className="site-hero-shade" />
-        <div className="site-hero-content"><span className="site-eyebrow">{managed?.eyebrow || 'Find your kind of remarkable'}</span><h1>{experiment?.title||managed?.title||'A town with stories in every direction.'}</h1><p>{experiment?.description||managed?.description||data.workspace.strapline}</p>
-          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...visitorTaxonomyFor(item)]))).map((item)=><option key={item} value={item}/>)}</datalist><button>{experiment?.buttonLabel||'Search'}</button></form>
+        <div className="site-hero-content"><span className="site-eyebrow">{managed?.eyebrow || 'Find your kind of remarkable'}</span><h1>{managed?.title||'A town with stories in every direction.'}</h1><p>{managed?.description||data.workspace.strapline}</p>
+          <form className="site-search" onSubmit={submitSearch}><Search size={21} /><input list="visitor-search-suggestions" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Try ‘rainy day with children’ or ‘romantic evening’" aria-label="Search Valechester" /><datalist id="visitor-search-suggestions">{Array.from(new Set(published.flatMap((item)=>[item.category,item.town,...searchableTagsFor(item),...visitorTaxonomyFor(item)]))).map((item)=><option key={item} value={item}/>)}</datalist><button>Search</button></form>
           <div className="site-popular"><span>Popular:</span><button onClick={() => quickSearch('family')}>Family days</button><button onClick={() => quickSearch('free')}>Free things</button><button onClick={() => quickSearch('heritage')}>Heritage</button></div>
         </div>
         <span className="site-hero-credit">An afternoon beside the River Vale</span>
@@ -618,7 +599,7 @@ function TemplateListingPage({ listing, actions, tier, profile }: { listing: Lis
           {profile.levelId!=='level-004'&&<div className="place-good-for"><h2>{profile.action==='quote'?'Services and strengths':'Good for'}</h2><div>{listing.searchTags.slice(0,profile.goodForLimit).map((item)=><span key={item}><Check size={13}/>{item}</span>)}</div></div>}
           <section className="listing-feature-section"><span className="site-eyebrow plum">{profile.action==='quote'?'What we provide':'The story'}</span><h2>{sectionTitle}</h2><p>{listing.description}</p><p>Use the practical information below to decide whether it suits your plans, then check current availability and any date-specific details directly with the business.</p></section>
           {profile.levelId==='level-004'&&<section className="listing-feature-section listing-taxonomy"><span className="site-eyebrow plum">Plan the right visit</span><h2>Visitor information</h2><p>These details help visitors find experiences that suit their interests and practical needs.</p><div><section><h3>Visitor interests</h3><div>{visitorTaxonomyFor(listing).map((item)=><span key={item}><Check size={13}/>{item}</span>)}</div><h3 className="taxonomy-subheading">Search filters</h3><div>{listing.searchTags.slice(0,profile.taxonomyAllowance).map((item)=><span key={item}><Search size={13}/>{item}</span>)}</div></section><section><h3>Good to know</h3><ul>{listing.goodToKnow.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section></div></section>}
-          {profile.showReviews&&<section className="listing-feature-section listing-reviews"><span className="site-eyebrow plum">Visitor feedback</span><h2>{profile.action==='quote'?'What clients value':'What visitors say'}</h2><p>Recent feedback themes help people understand what stands out before they visit.</p><div>{listing.reviewHighlights.map((item)=><blockquote key={item}><Star size={16}/><strong>{item}</strong><small>Recurring feedback theme</small></blockquote>)}</div>{listing.reviewSites?.length?<nav aria-label="Review sites">{listing.reviewSites.filter((site)=>site.url).map((site)=><a key={site.id} href={site.url} target="_blank" rel="noreferrer">Reviews on {site.name} <ArrowRight size={13}/></a>)}</nav>:<small className="review-source">A live rating or review widget appears here when an authorised source is connected.</small>}</section>}
+          {profile.showReviews&&<section className="listing-feature-section listing-reviews"><span className="site-eyebrow plum">Visitor feedback</span><h2>{profile.action==='quote'?'What clients value':'What visitors say'}</h2><p>Feedback themes manually recorded by the destination team help people understand what stands out before they visit.</p><div>{listing.reviewHighlights.map((item)=><blockquote key={item}><Star size={16}/><strong>{item}</strong><small>Manually recorded feedback theme</small></blockquote>)}</div>{listing.reviewSites?.length&&<nav aria-label="Review sites">{listing.reviewSites.filter((site)=>site.url).map((site)=><a key={site.id} href={site.url} target="_blank" rel="noreferrer">Reviews on {site.name} <ArrowRight size={13}/></a>)}</nav>}</section>}
           <section className="listing-feature-section listing-access"><span className="site-eyebrow plum">Plan with confidence</span><h2>Accessibility information</h2><p>Accessibility information is available on every paid member listing. Contact the business if you need details for a specific visit.</p><div><span><Accessibility size={20}/><strong>{accessFacilities.length?accessFacilities.join(' · '):'Ask the venue about step-free routes and individual access requirements'}</strong></span>{listing.email&&<a href={`mailto:${listing.email}`}>Contact about accessibility <ArrowRight size={14}/></a>}</div></section>
           <section className="listing-feature-section listing-facilities"><span className="site-eyebrow plum">Useful details</span><h2>Facilities</h2><div><section><h3>On site</h3><ul>{generalFacilities.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section><section><h3>Access and support</h3><ul>{(accessFacilities.length?accessFacilities:['Contact the venue for access details']).map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section><section><h3>Before you travel</h3><ul>{listing.goodToKnow.map((item)=><li key={item}><Check size={14}/>{item}</li>)}</ul></section></div></section>
           <section className="listing-feature-section listing-opening"><span className="site-eyebrow plum">When to visit</span><h2>Opening information</h2><div><Clock3 size={22}/><span><strong>{listing.openingHours}</strong>{listing.website&&<small>Check the official website for seasonal changes and exceptions.</small>}</span></div></section>
@@ -637,10 +618,8 @@ function ContentDirectoryPage({kind,savedCount}:{kind:ContentPage['type'];savedC
 function ContentDetailPage({page,savedCount}:{page:ContentPage;savedCount:number}){return <PublicShell savedCount={savedCount}><main><PageIntro eyebrow={page.type} title={page.title} description={page.summary} image={mediaUrl(page.image)}/><article className="content-detail site-container">{page.body.split(/\n+/).filter(Boolean).map((paragraph,index)=>paragraph.startsWith('## ')?<h2 key={index}>{paragraph.slice(3)}</h2>:paragraph.startsWith('- ')?<ul key={index}><li>{paragraph.slice(2)}</li></ul>:index===0?<p className="place-lede" key={index}>{paragraph}</p>:<p key={index}>{paragraph}</p>)}</article></main></PublicShell>}
 
 function ManagedLandingPage({ content, savedCount }: { content: WebsitePageContent; savedCount: number }) {
-  const {data}=useCRM()
-  const variant=experimentVariant(data)
   const image = content.heroImage ? mediaUrl(content.heroImage) : undefined
-  return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{variant?.title||content.title}</h1><p>{variant?.description||content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
+  return <PublicShell savedCount={savedCount}><main><section className={`visitor-page-intro${image ? ' has-image' : ''}`}><div className="site-container"><SiteLink to="/" className="visitor-back"><ArrowLeft size={14}/>Back to destination</SiteLink><span className="site-eyebrow">{content.eyebrow}</span><h1>{content.title}</h1><p>{content.description}</p></div>{image && <img src={image} alt=""/>}</section><ManagedBlocks blocks={content.blocks}/></main></PublicShell>
 }
 
 function InteractiveMapPage({ savedCount }: { savedCount: number }) {
@@ -722,7 +701,7 @@ export function PublicSite() {
     })
     return () => window.cancelAnimationFrame(frame)
   }, [location])
-  useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.get('preview')!=='true'&&!params.has('experiment'))recordAnalytics('page_view')},[location])
+  useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.get('preview')!=='true')recordAnalytics('page_view')},[location])
   if (!features.publicWebsite) return <main className="site-disabled"><BrandLogo /><h1>Website module is not enabled</h1><p>This destination currently uses the CRM workspace without a public website.</p><a href="/crm">Open destination workspace</a></main>
   const published = data.listings.filter((listing) => listing.status === 'Published')
   const toggleSaved = (listing: Listing) => {

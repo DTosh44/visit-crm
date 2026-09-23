@@ -20,10 +20,9 @@ import { Content } from './views/Content'
 import { WebsitePages } from './views/WebsitePages'
 import { MapProduct } from './views/MapProduct'
 import { ImageBank } from './views/ImageBank'
-import { WebsiteExperiments } from './views/WebsiteExperiments'
 import { Inbox } from './views/Inbox'
 import { Insights } from './views/Insights'
-import { useAuth } from './auth'
+import { supabase, useAuth } from './auth'
 import { canAccessView } from './auth'
 import { LoginPage } from './LoginPage'
 import { PublicSite } from './PublicSite'
@@ -32,14 +31,14 @@ import { useFeatures } from './features'
 import type { FeatureKey } from './tenant'
 import { PublicSurvey } from './PortalApp'
 import { SecurePortalApp } from './SecurePortalApp'
-import { BusinessEvents, Campaigns, Engagement, MemberOpportunities, PRMedia, Surveys, TravelTrade, WebsiteHealth } from './views/PlatformModules'
+import { BusinessEvents, Campaigns, Engagement, MemberOpportunities, PRMedia, TravelTrade, WebsiteHealth } from './views/PlatformModules'
 import { MemberValue } from './views/MemberValueManagement'
 import { Communications } from './views/Communications'
 import { Automations } from './views/Automations'
 import { GlobalPlatformCreate, type PlatformCreateTarget } from './components/GlobalPlatformCreate'
 
-const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','experiments','map','listings','events','content','inbox','insights','billing','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','surveys','websiteHealth','automations','settings']
-const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',people:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',experiments:'websiteExperiments',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',insights:'reviewIntelligence',billing:'billing',agreements:'agreements',tasks:'tasks',communications:'communications',memberValue:'memberValue',memberOpportunities:'coopOpportunities',campaigns:'campaigns',engagement:'memberValue',travelTrade:'travelTrade',businessEvents:'businessEvents',prMedia:'prMedia',surveys:'surveys',websiteHealth:'websiteHealth',automations:'automations'}
+const views: ViewKey[] = ['dashboard','organisations','people','pipeline','memberships','pages','images','map','listings','events','content','inbox','insights','billing','agreements','tasks','communications','memberValue','memberOpportunities','campaigns','engagement','travelTrade','businessEvents','prMedia','websiteHealth','automations','settings']
+const viewFeatures:Partial<Record<ViewKey,FeatureKey>>={organisations:'organisations',people:'organisations',pipeline:'salesPipeline',memberships:'memberships',pages:'publicWebsite',images:'imageBank',map:'interactiveMap',listings:'listings',events:'events',content:'itineraries',billing:'billing',agreements:'agreements',tasks:'tasks',communications:'communications',memberValue:'memberValue',memberOpportunities:'coopOpportunities',campaigns:'campaigns',engagement:'memberValue',travelTrade:'travelTrade',businessEvents:'businessEvents',prMedia:'prMedia',websiteHealth:'websiteHealth',automations:'automations'}
 
 function initialView(): ViewKey {
   const hash = window.location.hash.replace('#/', '') as ViewKey
@@ -70,7 +69,7 @@ function CRMApp() {
   }
 
   const requiredFeature=viewFeatures[view]
-  const featureEnabled=view==='insights'?(features.reviewIntelligence||features.socialInsights):(!requiredFeature||features[requiredFeature])
+  const featureEnabled=!requiredFeature||features[requiredFeature]
   const activeView=user&&canAccessView(user.role,view)&&featureEnabled?view:'dashboard'
 
   const openOrganisation = (organisation: Organisation) => {
@@ -84,10 +83,10 @@ function CRMApp() {
   const selectedOrganisation = data.organisations.find((item) => item.id === selectedOrganisationId)
   const selectedListing = data.listings.find((item) => item.id === selectedListingId)
   const requestCreate=(target:CreateTarget)=>{
-    const platformTargets:PlatformCreateTarget[]=['communication','memberValue','campaign','memberOpportunity','survey','buyer','tradeLead','famTrip','businessEnquiry','prOpportunity']
+    const platformTargets:PlatformCreateTarget[]=['communication','memberValue','campaign','memberOpportunity','buyer','tradeLead','famTrip','businessEnquiry','prOpportunity']
     if(platformTargets.includes(target as PlatformCreateTarget)){setPlatformCreate(target as PlatformCreateTarget);return}
     if(target==='organisation'||target==='invoice'||target==='task'){setCreateRequest(null);setModal(target);return}
-    const destinations:Partial<Record<CreateTarget,ViewKey>>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',experiment:'experiments',agreement:'agreements'}
+    const destinations:Partial<Record<CreateTarget,ViewKey>>={person:'people',opportunity:'pipeline',membership:'memberships',listing:'listings',event:'events',content:'content',page:'pages',image:'images',agreement:'agreements'}
     setView(destinations[target]??'dashboard')
     setCreateRequest({target,token:Date.now()})
   }
@@ -109,7 +108,6 @@ function CRMApp() {
       {activeView === 'events' && <Events key={createRequest?.target==='event'?createRequest.token:0} createRequest={createRequest?.target==='event'?createRequest.token:0} />}
       {activeView === 'pages' && <WebsitePages key={createRequest?.target==='page'?createRequest.token:0} createRequest={createRequest?.target==='page'?createRequest.token:0} />}
       {activeView === 'images' && <ImageBank key={createRequest?.target==='image'?createRequest.token:0} createRequest={createRequest?.target==='image'?createRequest.token:0} />}
-      {activeView === 'experiments' && <WebsiteExperiments key={createRequest?.target==='experiment'?createRequest.token:0} createRequest={createRequest?.target==='experiment'?createRequest.token:0} />}
       {activeView === 'map' && <MapProduct />}
       {activeView === 'content' && <Content key={createRequest?.target==='content'?createRequest.token:0} createRequest={createRequest?.target==='content'?createRequest.token:0} />}
       {activeView === 'inbox' && <Inbox />}
@@ -125,7 +123,6 @@ function CRMApp() {
       {activeView === 'travelTrade' && <TravelTrade onNavigateCommunications={()=>setView('communications')} onNavigateMemberOpportunities={()=>setView('memberOpportunities')} />}
       {activeView === 'businessEvents' && <BusinessEvents onNavigateCommunications={()=>setView('communications')} />}
       {activeView === 'prMedia' && <PRMedia />}
-      {activeView === 'surveys' && <Surveys />}
       {activeView === 'websiteHealth' && <WebsiteHealth navigate={setView} />}
       {activeView === 'automations' && <Automations />}
       {activeView === 'settings' && <Settings />}
@@ -145,6 +142,8 @@ export default function App() {
   const isCRM = window.location.pathname.startsWith('/crm')
   const isPortal = window.location.pathname.startsWith('/portal')
   const surveySlug = window.location.pathname.match(/^\/survey\/([^/]+)/)?.[1]
+
+  if (import.meta.env.PROD && !supabase && import.meta.env.VITE_DEMO_MODE !== 'true') return <main className="portal-login"><section className="portal-login-card"><ProductLogo/><h1>Configuration required</h1><p>This deployment has no shared database or production authentication. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before customer use.</p><small>Browser-only sample data is disabled in production. Set VITE_DEMO_MODE=true only for an explicitly labelled demonstration deployment.</small></section></main>
 
   if (surveySlug) return <PublicSurvey slug={decodeURIComponent(surveySlug)} />
   if (isPortal) return <SecurePortalApp />

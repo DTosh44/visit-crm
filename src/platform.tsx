@@ -24,6 +24,7 @@ interface PlatformContextValue{
   updateRecord:<K extends PlatformCollection>(collection:K,id:string,changes:Partial<RecordFor<K>>)=>void
   removeRecord:<K extends PlatformCollection>(collection:K,id:string)=>void
   updateSettings:(changes:Partial<PlatformData['engagementSettings']>)=>void
+  replaceOrganisationReferences:(fromId:string,toId:string)=>void
   resetPlatform:()=>void
 }
 
@@ -106,6 +107,7 @@ export function PlatformProvider({children}:{children:ReactNode}){
     updateRecord:(collection,id,changes)=>setData((current)=>({...current,[collection]:(current[collection] as Array<{id:string}>).map((record)=>record.id===id?{...record,...changes}:record)} as PlatformData)),
     removeRecord:(collection,id)=>setData((current)=>({...current,[collection]:(current[collection] as Array<{id:string}>).filter((record)=>record.id!==id)} as PlatformData)),
     updateSettings:(changes)=>setData((current)=>({...current,engagementSettings:{...current.engagementSettings,...changes}})),
+    replaceOrganisationReferences:(fromId,toId)=>setData((current)=>{const replace=(value:unknown):unknown=>value===fromId?toId:Array.isArray(value)?value.map(replace):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,replace(item)])):value;return replace(current) as PlatformData}),
     resetPlatform:()=>setData(initialPlatformData),
   }),[data,ready,loadError])
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>
