@@ -86,8 +86,8 @@ export function Layout({
   onOpenListing: (listing: Listing) => void
   children: ReactNode
 }) {
-  const { data } = useCRM()
-  const {data:platform,updateRecord:upsertPlatformRecord}=usePlatform()
+  const { data,saveError } = useCRM()
+  const {data:platform,updateRecord:upsertPlatformRecord,loadError:platformLoadError,saveError:platformSaveError}=usePlatform()
   const { user, signOut } = useAuth()
   const { features } = useFeatures()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -243,6 +243,7 @@ export function Layout({
           </div>
         </header>
 
+        {(saveError||platformLoadError||platformSaveError)&&<div className="persistence-alert" role="alert"><strong>Some changes are not safely stored.</strong><span>{saveError??platformSaveError??platformLoadError}</span></div>}
         <main id="main-content" className="main-content" tabIndex={-1}>{children}</main>
       </div>
 

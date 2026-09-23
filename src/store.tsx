@@ -35,6 +35,7 @@ const STORAGE_KEY = 'visit-valechester-crm-v4'
 interface CRMContextValue {
   data: CRMData
   ready: boolean
+  saveError?: string
   remoteAutomationRevision: number
   applyAutomationUpdate: (update: (current: CRMData) => CRMData) => void
   addOrganisation: (draft: OrganisationDraft) => Organisation
@@ -280,6 +281,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [data, setData] = useState<CRMData>(readInitialData)
   const [remoteReady, setRemoteReady] = useState(!supabase)
+  const [saveError,setSaveError]=useState<string>()
   const [remoteAutomationRevision,setRemoteAutomationRevision]=useState(0)
   const audit=useCallback((action:string,entityType:string,entityId?:string,detail:Record<string,unknown>={})=>{const client=supabase;if(client&&user)void client.from('audit_log').insert({tenant_id:tenant.id,actor_id:user.id,action,entity_type:entityType,entity_id:entityId,detail})},[user])
 
@@ -344,42 +346,47 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const client = supabase
     if (!client || !user || !remoteReady) return
-    const timer = window.setTimeout(() => {
-      void client.from('workspace_states').upsert({
+    const timer = window.setTimeout(() => { void (async()=>{
+      setSaveError(undefined)
+      const failures:string[]=[]
+      const write=async(query:PromiseLike<{error:{message:string}|null}>)=>{const {error}=await query;if(error)failures.push(error.message)}
+      const writes:Array<Promise<void>>=[write(client.from('workspace_states').upsert({
         tenant_id: tenant.id,
         data,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'tenant_id' })
-      void client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' })
+      }, { onConflict: 'tenant_id' })),write(client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' }))]
       const publishedContent=data.contentPages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,type:page.published!.type,title:page.published!.title,slug:page.published!.slug,summary:page.published!.summary,body:page.published!.body,image:page.published!.image,status:'Published',meta_title:page.published!.metaTitle??'',meta_description:page.published!.metaDescription??'',updated_at:page.publishedAt??new Date().toISOString()}))
       const publishedWebsitePages=data.websitePages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,name:page.name,path:page.path,template:page.template,content:page.published,version:page.version,published_at:page.publishedAt??new Date().toISOString(),updated_at:new Date().toISOString()}))
-      if(publishedContent.length)void client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})
-      if(publishedWebsitePages.length)void client.from('public_website_pages').upsert(publishedWebsitePages,{onConflict:'tenant_id,id'})
+      if(publishedContent.length)writes.push(write(client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})))
+      if(publishedWebsitePages.length)writes.push(write(client.from('public_website_pages').upsert(publishedWebsitePages,{onConflict:'tenant_id,id'})))
       const imageAssets=data.imageAssets.map((asset)=>({id:asset.id,tenant_id:tenant.id,name:asset.name,storage_path:null,public_url:asset.url,alt_text:asset.alt,caption:asset.caption,credit:asset.credit,rights_holder:asset.rightsHolder,licence:asset.licence,usage_expiry:asset.usageExpiry??null,tags:asset.tags,collection_name:asset.collection,width:asset.width,height:asset.height,file_size:asset.fileSize,mime_type:asset.mimeType,status:asset.status,updated_at:new Date().toISOString()}))
       const experiments=data.websiteExperiments.map((experiment)=>({id:experiment.id,tenant_id:tenant.id,name:experiment.name,hypothesis:experiment.hypothesis,page_path:experiment.pagePath,goal:experiment.goal,status:experiment.status,variants:experiment.variants,started_at:experiment.startedAt??null,ended_at:experiment.endedAt??null,created_at:experiment.createdAt,updated_at:new Date().toISOString()}))
-      if(imageAssets.length)void client.from('image_assets').upsert(imageAssets,{onConflict:'tenant_id,id'})
-      if(experiments.length)void client.from('website_experiments').upsert(experiments,{onConflict:'tenant_id,id'})
+      if(imageAssets.length)writes.push(write(client.from('image_assets').upsert(imageAssets,{onConflict:'tenant_id,id'})))
+      if(experiments.length)writes.push(write(client.from('website_experiments').upsert(experiments,{onConflict:'tenant_id,id'})))
       const listingIds=data.listings.map((item)=>item.id)
       const contentIds=publishedContent.map((item)=>item.id)
-      if(listingIds.length)void client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)
-      else void client.from('public_listings').delete().eq('tenant_id',tenant.id)
-      if(contentIds.length)void client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)
-      else void client.from('public_content').delete().eq('tenant_id',tenant.id)
+      if(listingIds.length)writes.push(write(client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)))
+      else writes.push(write(client.from('public_listings').delete().eq('tenant_id',tenant.id)))
+      if(contentIds.length)writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)))
+      else writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id)))
       const websitePageIds=publishedWebsitePages.map((item)=>item.id)
-      if(websitePageIds.length)void client.from('public_website_pages').delete().eq('tenant_id',tenant.id).not('id','in',`(${websitePageIds.join(',')})`)
-      else void client.from('public_website_pages').delete().eq('tenant_id',tenant.id)
+      if(websitePageIds.length)writes.push(write(client.from('public_website_pages').delete().eq('tenant_id',tenant.id).not('id','in',`(${websitePageIds.join(',')})`)))
+      else writes.push(write(client.from('public_website_pages').delete().eq('tenant_id',tenant.id)))
       const imageAssetIds=imageAssets.map((item)=>item.id)
       const experimentIds=experiments.map((item)=>item.id)
-      if(imageAssetIds.length)void client.from('image_assets').delete().eq('tenant_id',tenant.id).not('id','in',`(${imageAssetIds.join(',')})`)
-      if(experimentIds.length)void client.from('website_experiments').delete().eq('tenant_id',tenant.id).not('id','in',`(${experimentIds.join(',')})`)
-    }, 650)
+      if(imageAssetIds.length)writes.push(write(client.from('image_assets').delete().eq('tenant_id',tenant.id).not('id','in',`(${imageAssetIds.join(',')})`)))
+      if(experimentIds.length)writes.push(write(client.from('website_experiments').delete().eq('tenant_id',tenant.id).not('id','in',`(${experimentIds.join(',')})`)))
+      await Promise.all(writes)
+      if(failures.length)setSaveError(`Changes could not be saved: ${failures[0]}`)
+    })() }, 650)
     return () => window.clearTimeout(timer)
   }, [data, remoteReady, user])
 
   const value = useMemo<CRMContextValue>(() => ({
     data,
     ready: remoteReady,
+    saveError,
     remoteAutomationRevision,
     applyAutomationUpdate: (update) => setData(update),
     addOrganisation: (draft) => {
@@ -654,7 +661,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [audit,data,remoteReady,remoteAutomationRevision,user?.name])
+  }), [audit,data,remoteReady,remoteAutomationRevision,saveError,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }

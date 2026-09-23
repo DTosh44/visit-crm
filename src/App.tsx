@@ -138,7 +138,7 @@ function CRMApp() {
 }
 
 export default function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, passwordRecovery } = useAuth()
   const isCRM = window.location.pathname.startsWith('/crm')
   const isPortal = window.location.pathname.startsWith('/portal')
   const surveySlug = window.location.pathname.match(/^\/survey\/([^/]+)/)?.[1]
@@ -149,6 +149,7 @@ export default function App() {
   if (isPortal) return <SecurePortalApp />
   if (!isCRM) return <PublicSite />
   if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
+  if (passwordRecovery) return <LoginPage />
   if (!user) return <LoginPage />
   return <CRMApp />
 }

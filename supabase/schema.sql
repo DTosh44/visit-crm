@@ -26,6 +26,7 @@ create table public.profiles (
   user_id uuid not null references auth.users(id) on delete cascade,
   tenant_id uuid not null references public.tenants(id) on delete cascade,
   full_name text not null,
+  email text,
   role public.workspace_role not null default 'Content editor',
   active boolean not null default true,
   created_at timestamptz not null default now(),

@@ -20,6 +20,7 @@ interface PlatformContextValue{
   data:PlatformData
   ready:boolean
   loadError?:string
+  saveError?:string
   addRecord:<K extends PlatformCollection>(collection:K,record:RecordFor<K>)=>void
   updateRecord:<K extends PlatformCollection>(collection:K,id:string,changes:Partial<RecordFor<K>>)=>void
   removeRecord:<K extends PlatformCollection>(collection:K,id:string)=>void
@@ -37,6 +38,7 @@ export function PlatformProvider({children}:{children:ReactNode}){
   const [data,setData]=useState<PlatformData>(readData)
   const [loadedFor,setLoadedFor]=useState<string|null>(null)
   const [loadError,setLoadError]=useState<string>()
+  const [saveError,setSaveError]=useState<string>()
   const {user}=useAuth()
   const ready=!supabase||Boolean(user&&loadedFor===user.id)
   const crm=useCRM()
@@ -54,7 +56,7 @@ export function PlatformProvider({children}:{children:ReactNode}){
   },[user])
   useEffect(()=>{
     localStorage.setItem(STORAGE_KEY,JSON.stringify(data))
-    if(supabase&&user&&ready){void supabase.from('platform_states').upsert({tenant_id:tenant.id,data,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:'tenant_id'});void supabase.from('public_surveys').upsert(data.surveys.map((survey)=>({id:survey.id,tenant_id:tenant.id,slug:survey.slug,definition:survey,status:survey.status,opening_date:survey.openingDate||null,closing_date:survey.closingDate||null,updated_at:new Date().toISOString()})),{onConflict:'tenant_id,id'})}
+    if(supabase&&user&&ready){void (async()=>{setSaveError(undefined);const [stateResult,surveyResult]=await Promise.all([supabase.from('platform_states').upsert({tenant_id:tenant.id,data,updated_by:user.id,updated_at:new Date().toISOString()},{onConflict:'tenant_id'}),data.surveys.length?supabase.from('public_surveys').upsert(data.surveys.map((survey)=>({id:survey.id,tenant_id:tenant.id,slug:survey.slug,definition:survey,status:survey.status,opening_date:survey.openingDate||null,closing_date:survey.closingDate||null,updated_at:new Date().toISOString()})),{onConflict:'tenant_id,id'}):Promise.resolve({error:null})]);const failure=stateResult.error??surveyResult.error;if(failure)setSaveError(`Module changes could not be saved: ${failure.message}`)})()}
   },[data,user,ready])
   useEffect(()=>{
     if(!supabase||!user||!ready)return
@@ -102,14 +104,14 @@ export function PlatformProvider({children}:{children:ReactNode}){
     tick();const timer=window.setInterval(tick,60_000);window.addEventListener('focus',tick);return()=>{window.clearInterval(timer);window.removeEventListener('focus',tick)}
   },[ready,crm.ready,user,execute])
   const value=useMemo<PlatformContextValue>(()=>({
-    data,ready,loadError,
+    data,ready,loadError,saveError,
     addRecord:(collection,record)=>{setData((current)=>{if(collection==='memberValue'){const value=record as PlatformData['memberValue'][number];if(current.memberValue.some((existing)=>existing.id===value.id||Boolean(value.opportunityId&&existing.opportunityId===value.opportunityId&&existing.organisationId===value.organisationId)))return current}return {...current,[collection]:[...(current[collection] as unknown[]),record]} as PlatformData});if(supabase&&collection==='surveyResponses'){const response=record as PlatformData['surveyResponses'][number];void supabase.from('survey_responses').insert({tenant_id:tenant.id,survey_id:response.surveyId,organisation_id:response.organisationId??null,contact_id:response.contactId??null,answers:response.answers,submitted_at:response.submittedAt})}},
     updateRecord:(collection,id,changes)=>setData((current)=>({...current,[collection]:(current[collection] as Array<{id:string}>).map((record)=>record.id===id?{...record,...changes}:record)} as PlatformData)),
     removeRecord:(collection,id)=>setData((current)=>({...current,[collection]:(current[collection] as Array<{id:string}>).filter((record)=>record.id!==id)} as PlatformData)),
     updateSettings:(changes)=>setData((current)=>({...current,engagementSettings:{...current.engagementSettings,...changes}})),
     replaceOrganisationReferences:(fromId,toId)=>setData((current)=>{const replace=(value:unknown):unknown=>value===fromId?toId:Array.isArray(value)?value.map(replace):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,item])=>[key,replace(item)])):value;return replace(current) as PlatformData}),
     resetPlatform:()=>setData(initialPlatformData),
-  }),[data,ready,loadError])
+  }),[data,ready,loadError,saveError])
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>
 }
 

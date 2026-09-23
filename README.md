@@ -36,6 +36,10 @@ Without Supabase configuration the app is an explicitly local demo using browser
 4. Deploy the repository’s Edge Functions. Use JWT verification for `portal-access`; the cron and webhook functions validate their own secrets as described below.
 5. Configure Supabase Auth SMTP, the exact production `/portal` redirect URL and the `listing-media` storage bucket before inviting customers.
 
+Deploy `invite-workspace-user` and `manage-workspace-user` before using the team screen. Set `WORKSPACE_BASE_URL` to the production `/crm` URL so invitations and password recovery return to the live workspace.
+
+Service-backed modules are hidden in production until their deployment is verified. Set `VITE_MEMBER_PORTAL_READY`, `VITE_COMMUNICATIONS_READY`, `VITE_AUTOMATIONS_READY` or `VITE_AI_READY` to `true` only after the matching functions, secrets and scheduled jobs work end to end. Leaving a flag unset or `false` prevents staff from seeing controls that cannot complete successfully.
+
 ### Communications and reminders
 
 Set `RESEND_API_KEY`, `COMMUNICATION_FROM_EMAIL`, `COMMUNICATION_CRON_SECRET`, `COMMUNICATION_UNSUBSCRIBE_SECRET`, `RESEND_WEBHOOK_SECRET`, `REMINDER_FROM_EMAIL`, `REMINDER_CRON_SECRET` and `AUTOMATION_CRON_SECRET` as Supabase Function secrets.
