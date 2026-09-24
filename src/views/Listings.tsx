@@ -4,7 +4,7 @@ import { useCRM } from '../store'
 import type { Listing } from '../types'
 import { formatDate } from '../utils'
 import { imageLibrary } from '../siteData'
-import { Badge, Button, Field, Modal, PageHeader, Progress } from '../components/UI'
+import { Badge, Button, EmptyState, Field, Modal, PageHeader, Progress } from '../components/UI'
 
 export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing) => void;createRequest?:number }) {
   const { data, publishListing, unpublishListing, duplicateListing, deleteListing, createListing } = useCRM()
@@ -19,7 +19,7 @@ export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing
   }), [data.listings, data.organisations, query, status])
 
   const reviewCount = data.listings.filter((listing) => listing.status === 'In review' || listing.status === 'Changes requested').length
-  const averageCompleteness = Math.round(data.listings.reduce((sum, listing) => sum + listing.completeness, 0) / data.listings.length)
+  const averageCompleteness = data.listings.length ? Math.round(data.listings.reduce((sum, listing) => sum + listing.completeness, 0) / data.listings.length) : 0
 
   return (
     <div>
@@ -54,6 +54,7 @@ export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing
             </article>
           })}
         </div>
+        {!listings.length&&<EmptyState icon={Search} title={data.listings.length?'No listings match':'No listings yet'} description={data.listings.length?'Try another search or status filter.':'Add a listing to create the first database-backed record.'}/>}
       </section>
       {adding&&<Modal title="Add website listing" subtitle="Create a draft linked to an organisation, then complete its content and media." onClose={()=>setAdding(false)}><form className="form-stack" onSubmit={(event)=>{event.preventDefault();const listing=createListing(newListing.organisationId,newListing.name);setAdding(false);setNewListing({organisationId:data.organisations[0]?.id??'',name:''});onEdit(listing)}}><Field label="Organisation"><select value={newListing.organisationId} onChange={(event)=>setNewListing({...newListing,organisationId:event.target.value})}>{data.organisations.map((organisation)=><option value={organisation.id} key={organisation.id}>{organisation.name}</option>)}</select></Field><Field label="Listing name"><input autoFocus required value={newListing.name} onChange={(event)=>setNewListing({...newListing,name:event.target.value})}/></Field><div className="modal-actions"><Button type="button" variant="secondary" onClick={()=>setAdding(false)}>Cancel</Button><Button type="submit">Create draft</Button></div></form></Modal>}
     </div>

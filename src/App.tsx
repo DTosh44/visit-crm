@@ -139,6 +139,7 @@ function CRMApp() {
 
 export default function App() {
   const { user, loading, passwordRecovery } = useAuth()
+  const { ready, saveError } = useCRM()
   const isCRM = window.location.pathname.startsWith('/crm')
   const isPortal = window.location.pathname.startsWith('/portal')
   const surveySlug = window.location.pathname.match(/^\/survey\/([^/]+)/)?.[1]
@@ -151,5 +152,6 @@ export default function App() {
   if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
   if (passwordRecovery) return <LoginPage />
   if (!user) return <LoginPage />
+  if (!ready) return <div className="auth-loading"><ProductLogo /><span>{saveError ?? 'Loading your workspace records…'}</span>{saveError&&<button onClick={()=>window.location.reload()}>Try again</button>}</div>
   return <CRMApp />
 }

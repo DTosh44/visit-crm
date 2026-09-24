@@ -61,7 +61,7 @@ create table public.public_listings (
   name text not null,
   category text not null,
   town text not null,
-  status text not null default 'Draft' check (status in ('Published','Draft','In review','Changes requested')),
+  status text not null default 'Draft' check (status in ('Published','Draft','In review','Changes requested','Rejected')),
   completeness integer not null default 0 check (completeness between 0 and 100),
   views integer not null default 0,
   enquiries integer not null default 0,
@@ -123,7 +123,7 @@ create table public.events (
   recurrence text not null default 'None' check (recurrence in ('None','Daily','Weekly','Monthly')),
   recurrence_until date,
   moderation_note text not null default '',
-  status text not null default 'In review' check (status in ('Published','Draft','In review','Changes requested')),
+  status text not null default 'In review' check (status in ('Published','Draft','In review','Changes requested','Rejected','Withdrawn')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -257,6 +257,8 @@ create policy "users update own preferences" on public.user_preferences
 
 create policy "public reads published listings" on public.public_listings
   for select using (status = 'Published');
+create policy "members read all listings" on public.public_listings
+  for select using (public.is_tenant_member(tenant_id));
 create policy "members create listings" on public.public_listings
   for insert with check (public.is_tenant_member(tenant_id));
 create policy "members update listings" on public.public_listings

@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { initialData } from './data'
 import { supabase, useAuth } from './auth'
 import { tenant } from './tenant'
@@ -252,13 +252,22 @@ function normalizeCRMData(parsed: CRMData): CRMData {
   }
 }
 
-function readInitialData(): CRMData {
+export function catalogueFromDatabase(workspace: CRMData, listingRows: PublicListingRow[], eventRows: EventRow[]): CRMData {
+  return {
+    ...normalizeCRMData(workspace),
+    listings: listingRows.map(fromPublicListing),
+    events: eventRows.map(fromEventRow),
+  }
+}
+
+export function readInitialData(databaseConfigured=Boolean(supabase)): CRMData {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed = stored ? JSON.parse(stored) as CRMData : initialData
-    return normalizeCRMData(parsed)
+    const result = normalizeCRMData(parsed)
+    return databaseConfigured ? { ...result, listings: [], events: [] } : result
   } catch {
-    return initialData
+    return databaseConfigured ? { ...initialData, listings: [], events: [] } : initialData
   }
 }
 
@@ -281,6 +290,13 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const [remoteReady, setRemoteReady] = useState(!supabase)
   const [saveError,setSaveError]=useState<string>()
   const [remoteAutomationRevision,setRemoteAutomationRevision]=useState(0)
+  const catalogWriteQueue=useRef<Promise<void>>(Promise.resolve())
+  const queueCatalogWrite=useCallback((operation:()=>Promise<void>)=>{
+    const next=catalogWriteQueue.current.then(operation)
+    catalogWriteQueue.current=next.catch((error:unknown)=>{setSaveError(`Catalogue change could not be saved: ${error instanceof Error?error.message:String(error)}`)})
+  },[])
+  const persistListing=useCallback((listing:Listing)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {error}=await client.from('public_listings').upsert(toPublicListing(listing),{onConflict:'tenant_id,id'});if(error)throw error})},[queueCatalogWrite])
+  const persistEvent=useCallback((event:DestinationEvent)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {id:_id,tenant_id:_tenantId,submitted_by:_submittedBy,...changes}=toEventRow(event);void _id;void _tenantId;void _submittedBy;const {error}=await client.from('events').update(changes).eq('tenant_id',tenant.id).eq('id',event.id);if(error)throw error})},[queueCatalogWrite])
   const audit=useCallback((action:string,entityType:string,entityId?:string,detail:Record<string,unknown>={})=>{const client=supabase;if(client&&user)void client.from('audit_log').insert({tenant_id:tenant.id,actor_id:user.id,action,entity_type:entityType,entity_id:entityId,detail})},[user])
 
   useEffect(() => {
@@ -290,13 +306,18 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     const hydrate = async () => {
       setRemoteReady(false)
       if (user) {
-        const { data: state } = await client.from('workspace_states').select('data').eq('tenant_id', tenant.id).maybeSingle()
-        if (active && state?.data) {
-          const remoteData = state.data as CRMData
-          setData(normalizeCRMData(remoteData))
+        const [stateResult,listingsResult,eventsResult]=await Promise.all([
+          client.from('workspace_states').select('data').eq('tenant_id',tenant.id).maybeSingle(),
+          client.from('public_listings').select('*').eq('tenant_id',tenant.id),
+          client.from('events').select('*').eq('tenant_id',tenant.id),
+        ])
+        const catalogError=stateResult.error??listingsResult.error??eventsResult.error
+        if(catalogError){if(active)setSaveError(`Catalogue could not be loaded: ${catalogError.message}`);return}
+        if(active){
+          const workspace=stateResult.data?.data?stateResult.data.data as CRMData:initialData
+          setData(catalogueFromDatabase(workspace,listingsResult.data as PublicListingRow[],eventsResult.data as EventRow[]))
+          setSaveError(undefined)
         }
-        const {data:events}=await client.from('events').select('*').eq('tenant_id',tenant.id)
-        if(active&&events?.length)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
         const {data:submissions}=await client.from('public_submissions').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
         if(active&&submissions)setData((current)=>({...current,submissions:submissions.map((item)=>({id:item.id,kind:item.kind,payload:item.payload as Record<string,unknown>,createdAt:item.created_at,status:(item.status??'New') as WebsiteSubmission['status']}))}))
         const {data:auditRows}=await client.from('audit_log').select('id,action,entity_type,entity_id,detail,created_at,actor_id').eq('tenant_id',tenant.id).order('created_at',{ascending:false}).limit(250)
@@ -317,7 +338,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       }
       if (active) setRemoteReady(true)
     }
-    void hydrate()
+    void hydrate().catch((error:unknown)=>{if(active)setSaveError(`Workspace could not be loaded: ${error instanceof Error?error.message:String(error)}`)})
     return () => { active = false }
   }, [user])
 
@@ -326,10 +347,34 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     if(!client||!user)return
     const channel=client.channel(`workspace-${tenant.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'workspace_states',filter:`tenant_id=eq.${tenant.id}`},(payload)=>{
       const record=payload.new as {data?:CRMData;updated_by?:string}
-      if(record.updated_by!==user.id&&record.data){setData(normalizeCRMData(record.data));if(!record.updated_by)setRemoteAutomationRevision((current)=>current+1)}
+      if(record.updated_by!==user.id&&record.data){setData((current)=>({...normalizeCRMData(record.data!),listings:current.listings,events:current.events}));if(!record.updated_by)setRemoteAutomationRevision((current)=>current+1)}
     }).subscribe()
     return()=>{void client.removeChannel(channel)}
   },[user])
+
+  useEffect(()=>{
+    const client=supabase
+    if(!client||!remoteReady)return
+    let active=true
+    const refresh=async()=>{
+      await catalogWriteQueue.current
+      const [listingsResult,eventsResult]=await Promise.all([
+        client.from('public_listings').select('*').eq('tenant_id',tenant.id),
+        client.from('events').select('*').eq('tenant_id',tenant.id),
+      ])
+      if(!active)return
+      const error=listingsResult.error??eventsResult.error
+      if(error){setSaveError(`Catalogue could not be refreshed: ${error.message}`);return}
+      const listings=(listingsResult.data as PublicListingRow[]).map(fromPublicListing)
+      const events=(eventsResult.data as EventRow[]).map(fromEventRow)
+      setData((current)=>JSON.stringify(current.listings)===JSON.stringify(listings)&&JSON.stringify(current.events)===JSON.stringify(events)?current:{...current,listings,events})
+    }
+    const onFocus=()=>{if(document.visibilityState==='visible')void refresh()}
+    window.addEventListener('focus',onFocus)
+    document.addEventListener('visibilitychange',onFocus)
+    const channel=client.channel(`catalogue-${tenant.id}`).on('postgres_changes',{event:'*',schema:'public',table:'public_listings',filter:`tenant_id=eq.${tenant.id}`},()=>{void refresh()}).on('postgres_changes',{event:'*',schema:'public',table:'events',filter:`tenant_id=eq.${tenant.id}`},()=>{void refresh()}).subscribe()
+    return()=>{active=false;window.removeEventListener('focus',onFocus);document.removeEventListener('visibilitychange',onFocus);void client.removeChannel(channel)}
+  },[remoteReady,user])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
@@ -345,15 +390,14 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     const client = supabase
     if (!client || !user || !remoteReady || user.role==='Viewer / Reporting') return
     const timer = window.setTimeout(() => { void (async()=>{
-      setSaveError(undefined)
       const failures:string[]=[]
       const write=async(query:PromiseLike<{error:{message:string}|null}>)=>{const {error}=await query;if(error)failures.push(error.message)}
       const writes:Array<Promise<void>>=[write(client.from('workspace_states').upsert({
         tenant_id: tenant.id,
-        data,
+        data:{...data,listings:[],events:[]},
         updated_by: user.id,
         updated_at: new Date().toISOString(),
-      }, { onConflict: 'tenant_id' })),write(client.from('public_listings').upsert(data.listings.map(toPublicListing), { onConflict: 'tenant_id,id' }))]
+      }, { onConflict: 'tenant_id' }))]
       const publishedContent=data.contentPages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,type:page.published!.type,title:page.published!.title,slug:page.published!.slug,summary:page.published!.summary,body:page.published!.body,image:page.published!.image,status:'Published',meta_title:page.published!.metaTitle??'',meta_description:page.published!.metaDescription??'',updated_at:page.publishedAt??new Date().toISOString()}))
       const publishedWebsitePages=data.websitePages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,name:page.name,path:page.path,template:page.template,content:page.published,version:page.version,published_at:page.publishedAt??new Date().toISOString(),updated_at:new Date().toISOString()}))
       if(publishedContent.length)writes.push(write(client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})))
@@ -362,10 +406,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       const experiments=data.websiteExperiments.map((experiment)=>({id:experiment.id,tenant_id:tenant.id,name:experiment.name,hypothesis:experiment.hypothesis,page_path:experiment.pagePath,goal:experiment.goal,status:experiment.status,variants:experiment.variants,started_at:experiment.startedAt??null,ended_at:experiment.endedAt??null,created_at:experiment.createdAt,updated_at:new Date().toISOString()}))
       if(imageAssets.length)writes.push(write(client.from('image_assets').upsert(imageAssets,{onConflict:'tenant_id,id'})))
       if(experiments.length)writes.push(write(client.from('website_experiments').upsert(experiments,{onConflict:'tenant_id,id'})))
-      const listingIds=data.listings.map((item)=>item.id)
       const contentIds=publishedContent.map((item)=>item.id)
-      if(listingIds.length)writes.push(write(client.from('public_listings').delete().eq('tenant_id',tenant.id).not('id','in',`(${listingIds.join(',')})`)))
-      else writes.push(write(client.from('public_listings').delete().eq('tenant_id',tenant.id)))
       if(contentIds.length)writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)))
       else writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id)))
       const websitePageIds=publishedWebsitePages.map((item)=>item.id)
@@ -455,6 +496,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       const organisation = data.organisations.find((item) => item.id === organisationId)
       const listing: Listing = { id: id('list'), organisationId, name, category: organisation?.type ?? 'Attractions', town: organisation?.town ?? '', status: 'Draft', completeness: 9, views: 0, enquiries: 0, shortDescription: '', description: '', website: organisation?.website ?? '', bookingUrl: '', phone: '', email: '', openingHours: '', facilities: [], searchTags: [], visitorTaxonomy: [], reviewHighlights: [], reviewSites: [], goodToKnow: [], awards:[], imageRightsConfirmed:false, lastUpdated: todayISO(), image: 'hero', media: [] }
       setData((current) => ({ ...current, listings: [listing, ...current.listings], organisations: current.organisations.map((item) => item.id === organisationId ? { ...item, listings: item.listings + 1 } : item) }))
+      persistListing(listing)
       audit('create','listing',listing.id,{organisationId,name})
       return listing
     },
@@ -468,6 +510,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
+      const listing=data.listings.find((item)=>item.id===listingId)
+      if(listing){const updated={...listing,...changes,lastUpdated:todayISO()};persistListing({...updated,completeness:listingCompleteness(updated)})}
       audit('update','listing',listingId,changes)
     },
     publishListing: (listingId) => {
@@ -480,11 +524,13 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
+      const listing=data.listings.find((item)=>item.id===listingId)
+      if(listing)persistListing({...listing,status:'Published',lastUpdated:todayISO()})
       audit('publish','listing',listingId)
     },
-    unpublishListing: (listingId) => {setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',lastUpdated:todayISO()}:item)}));audit('unpublish','listing',listingId)},
-    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
-    deleteListing: (listingId) => {setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});audit('delete','listing',listingId);if(supabase)void supabase.from('public_listings').delete().eq('tenant_id',tenant.id).eq('id',listingId)},
+    unpublishListing: (listingId) => {setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',lastUpdated:todayISO()}:item)}));const listing=data.listings.find((item)=>item.id===listingId);if(listing)persistListing({...listing,status:'Draft',lastUpdated:todayISO()});audit('unpublish','listing',listingId)},
+    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));persistListing(copy);audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
+    deleteListing: (listingId) => {setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});audit('delete','listing',listingId);if(supabase)queueCatalogWrite(async()=>{const {error}=await supabase!.from('public_listings').delete().eq('tenant_id',tenant.id).eq('id',listingId);if(error)throw error})},
     createEvent: (draft) => {
       const event: DestinationEvent = { ...draft, id: id('event'), lastUpdated: todayISO() }
       setData((current) => ({
@@ -492,7 +538,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         events: [event, ...current.events],
         activities: [{ id: id('act'), type: 'event', title: 'Event submitted', detail: `${event.title} was submitted for review.`, timestamp: new Date().toISOString(), user: draft.submittedBy || user?.name || 'Event organiser' }, ...current.activities],
       }))
-      const client=supabase;if(client)void client.auth.getUser().then(({data:auth})=>client.from('events').insert(toEventRow(event,auth.user?.id)))
+      const client=supabase;if(client)queueCatalogWrite(async()=>{const {data:auth,error:authError}=await client.auth.getUser();if(authError)throw authError;const {error}=await client.from('events').insert(toEventRow(event,auth.user?.id));if(error)throw error})
       audit('create','event',event.id,{title:event.title})
       return event
     },
@@ -500,12 +546,12 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       ...current,
       events: current.events.map((item) => item.id === eventId ? { ...item, ...changes, lastUpdated: todayISO() } : item),
       activities: [{ id: id('act'), type: 'event', title: 'Event updated', detail: `${current.events.find((item) => item.id === eventId)?.title ?? 'Event'} was updated.`, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities],
-    }));audit('update','event',eventId,changes);if(supabase){const event=data.events.find((item)=>item.id===eventId);if(event)void supabase.from('events').update(toEventRow({...event,...changes,lastUpdated:todayISO()})).eq('id',eventId)}},
+    }));audit('update','event',eventId,changes);const event=data.events.find((item)=>item.id===eventId);if(event)persistEvent({...event,...changes,lastUpdated:todayISO()})},
     publishEvent: (eventId) => {setData((current) => ({
       ...current,
       events: current.events.map((item) => item.id === eventId ? { ...item, status: 'Published', lastUpdated: todayISO() } : item),
-    }));audit('publish','event',eventId);if(supabase)void supabase.from('events').update({status:'Published',updated_at:new Date().toISOString()}).eq('id',eventId)},
-    deleteEvent: (eventId) => {setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) }));audit('delete','event',eventId);if(supabase)void supabase.from('events').delete().eq('id',eventId)},
+    }));audit('publish','event',eventId);const event=data.events.find((item)=>item.id===eventId);if(event)persistEvent({...event,status:'Published',lastUpdated:todayISO()})},
+    deleteEvent: (eventId) => {setData((current) => ({ ...current, events: current.events.filter((item) => item.id !== eventId) }));audit('delete','event',eventId);if(supabase)queueCatalogWrite(async()=>{const {error}=await supabase!.from('events').delete().eq('tenant_id',tenant.id).eq('id',eventId);if(error)throw error})},
     moveOpportunity: (opportunityId, stage) => {setData((current)=>{const opportunity=current.opportunities.find((item)=>item.id===opportunityId);if(!opportunity)return current;const alreadyExists=current.organisations.some((item)=>item.name.toLowerCase()===opportunity.organisationName.toLowerCase());const organisationId=id('org');const contactId=id('con');const level=current.levels.find((item)=>item.name===opportunity.proposedLevel);const closed=stage==='Won'||stage==='Lost';return{...current,opportunities:current.opportunities.map((item)=>item.id===opportunityId?{...item,stage,daysInStage:0,stageEnteredAt:new Date().toISOString(),probability:stage==='Won'?100:stage==='Lost'?0:item.probability,outcomeDate:closed?todayISO():undefined,lostReason:stage==='Lost'?(item.lostReason||'Not recorded'):undefined}:item),...(stage==='Won'&&!alreadyExists?{organisations:[{id:organisationId,name:opportunity.organisationName,type:'Other',town:'Valechester',address:'',website:'',tier:opportunity.proposedLevel,status:'Active' as const,health:'OK' as const,owner:opportunity.owner,primaryContactId:contactId,renewalDate:'',membershipStart:todayISO(),annualValue:opportunity.value,listings:0,lastActivity:new Date().toISOString(),nextAction:'Complete member onboarding',nextActionDate:todayISO(),tags:['New member'],notes:`Converted from ${opportunity.source}`,colour:level?.colour??'#376b87'},...current.organisations],contacts:[{id:contactId,organisationId,name:opportunity.contactName,jobTitle:'',email:'',phone:'',roles:['Primary'],primary:true,portalAccess:false},...current.contacts],tasks:[{id:id('task'),title:`Complete onboarding for ${opportunity.organisationName}`,organisationId,dueDate:todayISO(),priority:'High' as const,assignee:opportunity.owner,category:'Follow-up' as const,completed:false},...current.tasks]}:{})}});audit('move','opportunity',opportunityId,{stage})},
     addOpportunity: (opportunity) => setData((current) => ({ ...current, opportunities: [{ ...opportunity, id: id('opp'), daysInStage: 0, stageEnteredAt:new Date().toISOString() }, ...current.opportunities] })),
     updateOpportunity: (opportunityId, changes) => {setData((current)=>({...current,opportunities:current.opportunities.map((item)=>item.id===opportunityId?{...item,...changes}:item)}));audit('update','opportunity',opportunityId,changes)},
@@ -649,10 +695,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     updateSubmission: (submissionId, changes) => {setData((current)=>({...current,submissions:current.submissions.map((item)=>item.id===submissionId?{...item,...changes}:item)}));if(supabase)void supabase.from('public_submissions').update(changes.status?{status:changes.status}:{}).eq('id',submissionId)},
     updateSocialMetric: (metricId, changes) => setData((current)=>({...current,socialMetrics:current.socialMetrics.map((item)=>item.id===metricId?{...item,...changes}:item)})),
     resetWorkspace: () => {
+      if(supabase)return
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [audit,data,remoteReady,remoteAutomationRevision,saveError,user?.name])
+  }), [audit,data,persistEvent,persistListing,queueCatalogWrite,remoteReady,remoteAutomationRevision,saveError,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }
