@@ -329,14 +329,17 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         const {data:experiments}=await client.from('website_experiments').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
         if(active&&experiments?.length)setData((current)=>({...current,websiteExperiments:experiments.map((row)=>({id:row.id,name:row.name,hypothesis:row.hypothesis,pagePath:row.page_path,goal:row.goal,status:row.status,variants:row.variants,createdAt:row.created_at,startedAt:row.started_at??undefined,endedAt:row.ended_at??undefined} as WebsiteExperiment))}))
       } else {
-        const [{ data: listings },{data:events},{data:content},{data:websitePages},{data:experiments}] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published'),client.from('public_website_pages').select('*').eq('tenant_id',tenant.id),client.from('website_experiments').select('*').eq('tenant_id',tenant.id).eq('status','Running')])
+        const [listingResult,eventResult,contentResult,websitePageResult,experimentResult] = await Promise.all([client.from('public_listings').select('*').eq('tenant_id', tenant.id).eq('status', 'Published'),client.from('events').select('*').eq('tenant_id',tenant.id),client.from('public_content').select('*').eq('tenant_id',tenant.id).eq('status','Published'),client.from('public_website_pages').select('*').eq('tenant_id',tenant.id),client.from('website_experiments').select('*').eq('tenant_id',tenant.id).eq('status','Running')])
+        const catalogueError=listingResult.error??eventResult.error
+        if(catalogueError){if(active)setSaveError(`Public catalogue could not be loaded: ${catalogueError.message}`);return}
+        const listings=listingResult.data,events=eventResult.data,content=contentResult.data,websitePages=websitePageResult.data,experiments=experimentResult.data
         if (active && listings) setData((current) => ({ ...current, listings: (listings as PublicListingRow[]).map(fromPublicListing) }))
         if(active&&events)setData((current)=>({...current,events:(events as EventRow[]).map(fromEventRow)}))
         if(active&&content)setData((current)=>({...current,contentPages:content.map((row)=>({id:row.id,type:row.type,title:row.title,slug:row.slug,summary:row.summary,body:row.body,image:row.image,status:row.status,metaTitle:row.meta_title??'',metaDescription:row.meta_description??'',updatedAt:row.updated_at.slice(0,10)} as ContentPage))}))
         if(active&&websitePages?.length)setData((current)=>({...current,websitePages:websitePages.map((row)=>({id:row.id,name:row.name,path:row.path,template:row.template,status:'Published',draft:row.content,published:row.content,version:row.version,versions:[],updatedAt:row.updated_at.slice(0,10),publishedAt:row.published_at} as WebsitePage))}))
         if(active&&experiments)setData((current)=>({...current,websiteExperiments:experiments.map((row)=>({id:row.id,name:row.name,hypothesis:row.hypothesis,pagePath:row.page_path,goal:row.goal,status:row.status,variants:row.variants,createdAt:row.created_at,startedAt:row.started_at??undefined,endedAt:row.ended_at??undefined} as WebsiteExperiment))}))
       }
-      if (active) setRemoteReady(true)
+      if (active){setSaveError(undefined);setRemoteReady(true)}
     }
     void hydrate().catch((error:unknown)=>{if(active)setSaveError(`Workspace could not be loaded: ${error instanceof Error?error.message:String(error)}`)})
     return () => { active = false }

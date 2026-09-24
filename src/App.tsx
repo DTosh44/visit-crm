@@ -148,7 +148,7 @@ export default function App() {
 
   if (surveySlug) return <PublicSurvey slug={decodeURIComponent(surveySlug)} />
   if (isPortal) return <SecurePortalApp />
-  if (!isCRM) return <PublicSite />
+  if (!isCRM) return supabase&&!ready?<div className="auth-loading"><ProductLogo /><span>{saveError ?? 'Loading destination listings and events…'}</span>{saveError&&<button onClick={()=>window.location.reload()}>Try again</button>}</div>:<PublicSite />
   if (loading) return <div className="auth-loading"><ProductLogo /><span>Opening your workspace…</span></div>
   if (passwordRecovery) return <LoginPage />
   if (!user) return <LoginPage />
