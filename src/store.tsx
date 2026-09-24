@@ -241,7 +241,7 @@ function normalizeCRMData(parsed: CRMData): CRMData {
       const hasLegacyMedia = Boolean(legacy && level.imageAllowance === legacy[0] && level.videoAllowance === legacy[1])
       return { ...level, imageAllowance: hasLegacyMedia ? baseline?.imageAllowance ?? level.imageAllowance : level.imageAllowance, videoAllowance: hasLegacyMedia ? baseline?.videoAllowance ?? level.videoAllowance : level.videoAllowance, taxonomyAllowance: level.taxonomyAllowance ?? baseline?.taxonomyAllowance ?? 6 }
     }),
-    listings: normalized.listings.map((item) => {
+    listings: (normalized.listings??[]).map((item) => {
       const sampleBaseline=/^list-1\d\d$/.test(item.id)?initialData.listings.find((listing)=>listing.id===item.id):undefined
       const searchTags=Array.from(new Set([...(item.searchTags??[]),...(sampleBaseline?.searchTags??[])]))
       const listing = { ...item, searchTags }
@@ -292,7 +292,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const [remoteAutomationRevision,setRemoteAutomationRevision]=useState(0)
   const catalogWriteQueue=useRef<Promise<void>>(Promise.resolve())
   const queueCatalogWrite=useCallback((operation:()=>Promise<void>)=>{
-    const next=catalogWriteQueue.current.then(operation)
+    const next=catalogWriteQueue.current.then(async()=>{await operation();setSaveError((current)=>current?.startsWith('Catalogue change could not be saved:')?undefined:current)})
     catalogWriteQueue.current=next.catch((error:unknown)=>{setSaveError(`Catalogue change could not be saved: ${error instanceof Error?error.message:String(error)}`)})
   },[])
   const persistListing=useCallback((listing:Listing)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {error}=await client.from('public_listings').upsert(toPublicListing(listing),{onConflict:'tenant_id,id'});if(error)throw error})},[queueCatalogWrite])
