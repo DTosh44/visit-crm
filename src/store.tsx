@@ -47,11 +47,11 @@ interface CRMContextValue {
   updateContact: (id: string, changes: Partial<Contact>) => void
   deleteContact: (id: string) => void
   addActivity: (organisationId: string | undefined, title: string, detail: string) => void
-  createListing: (organisationId: string, name: string) => Listing
+  createListing: (organisationId: string, name: string) => Promise<Listing>
   updateListing: (id: string, changes: Partial<Listing>) => Promise<void>
   publishListing: (id: string) => Promise<void>
   unpublishListing: (id: string) => Promise<void>
-  duplicateListing: (id: string) => Listing | undefined
+  duplicateListing: (id: string) => Promise<Listing | undefined>
   deleteListing: (id: string) => Promise<void>
   createEvent: (draft: EventDraft) => DestinationEvent
   updateEvent: (id: string, changes: Partial<DestinationEvent>) => void
@@ -304,7 +304,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     catalogWriteQueue.current=result.then(()=>undefined)
     return result
   },[])
-  const persistListing=useCallback((listing:Listing)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {error}=await client.from('public_listings').upsert(toPublicListing(listing),{onConflict:'tenant_id,id'});if(error)throw error})},[queueCatalogWrite])
+  const persistListing=useCallback(async(listing:Listing)=>{const client=supabase;if(!client)return;const failure=await queueCatalogWrite(async()=>{const {error}=await client.from('public_listings').upsert(toPublicListing(listing),{onConflict:'tenant_id,id'});if(error)throw error});if(failure)throw new Error(failure)},[queueCatalogWrite])
   const persistEvent=useCallback((event:DestinationEvent)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {id:_id,tenant_id:_tenantId,submitted_by:_submittedBy,...changes}=toEventRow(event);void _id;void _tenantId;void _submittedBy;const {error}=await client.from('events').update(changes).eq('tenant_id',tenant.id).eq('id',event.id);if(error)throw error})},[queueCatalogWrite])
   const audit=useCallback((action:string,entityType:string,entityId?:string,detail:Record<string,unknown>={})=>{const client=supabase;if(client&&user)void client.from('audit_log').insert({tenant_id:tenant.id,actor_id:user.id,action,entity_type:entityType,entity_id:entityId,detail})},[user])
 
@@ -509,11 +509,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     updateContact: (contactId, changes) => setData((current) => {const target=current.contacts.find((item)=>item.id===contactId);return{...current,contacts:current.contacts.map((item)=>changes.primary&&target&&item.organisationId===target.organisationId?{...item,...(item.id===contactId?changes:{primary:false})}:item.id===contactId?{...item,...changes}:item)}}),
     deleteContact: (contactId) => {setData((current)=>{const removed=current.contacts.find((item)=>item.id===contactId);const contacts=current.contacts.filter((item)=>item.id!==contactId);if(!removed)return current;const remaining=contacts.filter((item)=>item.organisationId===removed.organisationId);const nextPrimary=remaining[0];return{...current,contacts:contacts.map((item)=>item.id===nextPrimary?.id?{...item,primary:true}:item),organisations:current.organisations.map((item)=>item.id===removed.organisationId?{...item,primaryContactId:nextPrimary?.id??''}:item)}});audit('delete','contact',contactId)},
     addActivity: (organisationId, title, detail) => setData((current) => ({ ...current, activities: [{ id: id('act'), organisationId, type: 'note', title, detail, timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user' }, ...current.activities] })),
-    createListing: (organisationId, name) => {
+    createListing: async (organisationId, name) => {
       const organisation = data.organisations.find((item) => item.id === organisationId)
       const listing: Listing = { id: id('list'), organisationId, name, category: organisation?.type ?? 'Attractions', town: organisation?.town ?? '', status: 'Draft', completeness: 9, views: 0, enquiries: 0, shortDescription: '', description: '', website: organisation?.website ?? '', bookingUrl: '', phone: '', email: '', openingHours: '', facilities: [], searchTags: [], visitorTaxonomy: [], reviewHighlights: [], reviewSites: [], goodToKnow: [], awards:[], imageRightsConfirmed:false, lastUpdated: todayISO(), image: 'hero', media: [] }
+      await persistListing(listing)
       setData((current) => ({ ...current, listings: [listing, ...current.listings], organisations: current.organisations.map((item) => item.id === organisationId ? { ...item, listings: item.listings + 1 } : item) }))
-      persistListing(listing)
       audit('create','listing',listing.id,{organisationId,name})
       return listing
     },
@@ -561,7 +561,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       if(!supabase)audit('publish','listing',listingId)
     },
     unpublishListing: async (listingId) => {if(supabase){const client=supabase;const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('unpublish_listing',{p_tenant:tenant.id,p_id:listingId});if(error)throw error});if(failure)throw new Error(failure)}setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',isPublic:false,lastUpdated:todayISO()}:item)}));if(!supabase)audit('unpublish','listing',listingId)},
-    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,isPublic:false,hasUnpublishedChanges:false,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));persistListing(copy);audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
+    duplicateListing: async (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,isPublic:false,hasUnpublishedChanges:false,views:0,enquiries:0,lastUpdated:todayISO()};await persistListing(copy);setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
     deleteListing: async (listingId) => {if(supabase){const client=supabase;const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('delete_listing',{p_tenant:tenant.id,p_id:listingId});if(error)throw error});if(failure)throw new Error(failure)}setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});if(!supabase)audit('delete','listing',listingId)},
     createEvent: (draft) => {
       const event: DestinationEvent = { ...draft, id: id('event'), lastUpdated: todayISO() }

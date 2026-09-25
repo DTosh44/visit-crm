@@ -305,13 +305,13 @@ describe('Visit CRM', () => {
     expect(screen.getByDisplayValue('https://vimeo.com/123456')).toBeInTheDocument()
   })
 
-  it('creates a new listing draft and opens its editor', () => {
+  it('creates a new listing draft and opens its editor', async () => {
     renderApp()
     fireEvent.click(screen.getByRole('button',{name:'Listings'}))
     fireEvent.click(screen.getByRole('button',{name:'Add listing'}))
     fireEvent.change(screen.getByLabelText('Listing name'),{target:{value:'New visitor experience'}})
     fireEvent.click(screen.getByRole('button',{name:'Create draft'}))
-    expect(screen.getByRole('heading',{name:'Edit website listing'})).toBeInTheDocument()
+    expect(await screen.findByRole('heading',{name:'Edit website listing'})).toBeInTheDocument()
     expect(screen.getByDisplayValue('New visitor experience')).toBeInTheDocument()
   })
 
