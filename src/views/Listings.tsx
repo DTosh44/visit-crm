@@ -1,6 +1,7 @@
 import { CheckCircle2, ChevronDown, Copy, Eye, FilePenLine, Globe2, Grid2X2, List, Plus, Search, Send, Trash2, Undo2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCRM } from '../store'
+import { useAuth, supabase } from '../auth'
 import type { Listing } from '../types'
 import { formatDate } from '../utils'
 import { imageLibrary } from '../siteData'
@@ -8,6 +9,10 @@ import { Badge, Button, EmptyState, Field, Modal, PageHeader, Progress } from '.
 
 export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing) => void;createRequest?:number }) {
   const { data, publishListing, unpublishListing, duplicateListing, deleteListing, createListing } = useCRM()
+  const {user}=useAuth()
+  const canPublish=!supabase||user?.role==='Administrator'||user?.role==='Membership manager'
+  const [actionError,setActionError]=useState('')
+  const runAction=(action:()=>Promise<void>)=>{setActionError('');void action().catch((error:unknown)=>setActionError(error instanceof Error?error.message:'Listing change failed'))}
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('All statuses')
   const [layout, setLayout] = useState<'grid' | 'list'>('grid')
@@ -24,10 +29,12 @@ export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing
   return (
     <div>
       <PageHeader eyebrow="Website content" title="Listings" description="Edit, review and publish public listings without leaving the CRM." actions={<Button icon={Plus} onClick={()=>setAdding(true)}>Add listing</Button>} />
+      {actionError&&<p className="form-error" role="alert">{actionError}</p>}
+      <p className="info-note">Valechester is a demonstration destination. Example contact details and links are illustrative; listing view counts represent consented visits recorded by the system.</p>
       <section className="listing-summary">
         <div><span className="summary-icon green"><Globe2 size={18} /></span><p><small>Published</small><strong>{data.listings.filter((item) => item.status === 'Published').length}</strong></p></div>
         <div><span className="summary-icon blue"><FilePenLine size={18} /></span><p><small>Awaiting review</small><strong>{reviewCount}</strong></p></div>
-        <div><span className="summary-icon purple"><Eye size={18} /></span><p><small>Views this month</small><strong>{data.listings.reduce((sum, item) => sum + item.views, 0).toLocaleString()}</strong></p></div>
+        <div><span className="summary-icon purple"><Eye size={18} /></span><p><small>Consented views this month</small><strong>{data.listings.reduce((sum,item)=>sum+(item.viewsThisMonth??0),0).toLocaleString()}</strong></p></div>
         <div><p><small>Average completeness</small><strong>{averageCompleteness}%</strong></p><Progress value={averageCompleteness} colour="#5c57d6" /></div>
       </section>
 
@@ -48,9 +55,9 @@ export function Listings({ onEdit,createRequest=0 }: { onEdit: (listing: Listing
               <div className="listing-card-content">
                 <small>{org?.name}</small><h3>{listing.name}</h3><p>{listing.shortDescription}</p>
                 <div className="listing-completeness"><div><span>Completeness</span><strong>{listing.completeness}%</strong></div><Progress value={listing.completeness} colour={listing.completeness >= 85 ? '#278362' : '#d28d30'} /></div>
-                <div className="listing-metrics"><span><Eye size={14} /><strong>{listing.views.toLocaleString()}</strong> views</span><span><Send size={14} /><strong>{listing.enquiries}</strong> enquiries</span></div>
+                <div className="listing-metrics"><span><Eye size={14} /><strong>{listing.views.toLocaleString()}</strong> consented views</span><span><Send size={14} /><strong>{listing.enquiries}</strong> enquiries</span></div>
               </div>
-              <footer><span>Updated {formatDate(listing.lastUpdated, { day: 'numeric', month: 'short' })}</span><div>{listing.status !== 'Published' ? <button className="publish-icon" onClick={() => publishListing(listing.id)} title="Approve and publish" aria-label={`Publish ${listing.name}`}><CheckCircle2 size={17} /></button>:<button className="icon-button" onClick={()=>unpublishListing(listing.id)} title="Return to draft" aria-label={`Unpublish ${listing.name}`}><Undo2 size={16}/></button>}<button className="icon-button" onClick={()=>{const copy=duplicateListing(listing.id);if(copy)onEdit(copy)}} title="Duplicate" aria-label={`Duplicate ${listing.name}`}><Copy size={16}/></button><button className="icon-button danger" onClick={()=>confirm(`Delete ${listing.name}?`)&&deleteListing(listing.id)} title="Delete" aria-label={`Delete ${listing.name}`}><Trash2 size={16}/></button><Button variant="secondary" size="sm" onClick={() => onEdit(listing)}>Edit</Button></div></footer>
+              <footer><span>Updated {formatDate(listing.lastUpdated, { day: 'numeric', month: 'short' })}{listing.hasUnpublishedChanges?' · Unpublished edits':''}</span><div>{canPublish&&(listing.isPublic??listing.status==='Published')?<button className="icon-button" onClick={()=>{if(confirm(`Unpublish ${listing.name}?`))runAction(()=>unpublishListing(listing.id))}} title="Return to draft" aria-label={`Unpublish ${listing.name}`}><Undo2 size={16}/></button>:canPublish?<button className="publish-icon" onClick={() => {if(confirm(`Publish ${listing.name} to the public website?`))runAction(()=>publishListing(listing.id))}} title="Approve and publish" aria-label={`Publish ${listing.name}`}><CheckCircle2 size={17} /></button>:null}<button className="icon-button" onClick={()=>{const copy=duplicateListing(listing.id);if(copy)onEdit(copy)}} title="Duplicate" aria-label={`Duplicate ${listing.name}`}><Copy size={16}/></button>{canPublish&&<button className="icon-button danger" onClick={()=>{if(confirm(`Permanently delete ${listing.name}?`))runAction(()=>deleteListing(listing.id))}} title="Delete" aria-label={`Delete ${listing.name}`}><Trash2 size={16}/></button>}<Button variant="secondary" size="sm" onClick={() => onEdit(listing)}>Edit</Button></div></footer>
             </article>
           })}
         </div>

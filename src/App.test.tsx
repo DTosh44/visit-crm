@@ -520,13 +520,13 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Day 1')).toBeInTheDocument()
   })
 
-  it('confirms the newsletter signup', () => {
+  it('confirms the newsletter signup', async () => {
     window.history.pushState({}, '', '/')
     renderApp()
     fireEvent.change(screen.getByRole('textbox', { name: 'Email address' }), { target: { value: 'visitor@example.com' } })
     fireEvent.click(screen.getByRole('checkbox', { name: /I agree to receive destination emails/ }))
     fireEvent.click(screen.getByRole('button', { name: /Count me in/ }))
-    expect(screen.getByRole('heading', { name: 'You’re on the list.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'You’re on the list.' })).toBeInTheDocument()
   })
 
   it('manages every website route through a draft and publish workflow', () => {

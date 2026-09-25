@@ -4,6 +4,7 @@ dist
 *.local
 *.log
 coverage
+supabase/.temp/
 .env
 .env.*
 !.env.example

@@ -28,4 +28,12 @@ describe('database-backed catalogue initial state', () => {
     expect(data.listings).toEqual([])
     expect(data.events).toEqual([])
   })
+
+  it('shows private draft edits to staff without changing the published row or sample counters', () => {
+    const published={id:'list-001',organisation_id:'org-001',name:'Published name',category:'Attractions',town:'Valechester',status:'Published',completeness:90,views:18420,enquiries:814,short_description:'Published summary',description:'Published description',website:'',booking_url:'',phone:'',email:'',opening_hours:'Daily',facilities:[],image:'castle',media:[],updated_at:'2026-09-25T12:00:00Z'} as Parameters<typeof catalogueFromDatabase>[1][number]
+    const draft={...published,name:'Private draft name',status:'In review'} as typeof published
+    const data=catalogueFromDatabase(initialData,[published],[],[{id:published.id,data:draft}],[{listing_id:published.id,views:3,views_this_month:2,enquiries:1}])
+    expect(data.listings[0]).toMatchObject({name:'Private draft name',status:'In review',isPublic:true,hasUnpublishedChanges:true,views:3,viewsThisMonth:2,enquiries:1})
+    expect(published.name).toBe('Published name')
+  })
 })

@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Check, Film, Globe2, Image, Info, Link2, MapPin, Plus, Save, Send, Sparkles, Star, Trash2, UploadCloud } from 'lucide-react'
-import { useState, type ChangeEvent, type DragEvent } from 'react'
-import { supabase } from '../auth'
+import { useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { supabase, useAuth } from '../auth'
 import { useCRM } from '../store'
 import { imageLibrary } from '../siteData'
 import { tenant } from '../tenant'
@@ -15,11 +15,15 @@ function fileDataUrl(file:File) { return new Promise<string>((resolve,reject)=>{
 
 export function ListingEditor({ listing, onClose }: { listing: Listing; onClose: () => void }) {
   const { data, updateListing, publishListing } = useCRM()
+  const {user}=useAuth()
   const [tab, setTab] = useState<EditorTab>('Content')
   const [draft, setDraft] = useState(listing)
   const [saved, setSaved] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [mediaError, setMediaError] = useState('')
+  const [actionError,setActionError]=useState('')
+  const [saving,setSaving]=useState(false)
+  const pendingUploads=useRef<string[]>([])
   const [aiLoading,setAiLoading]=useState(false)
   const [aiError,setAiError]=useState('')
   const organisation = data.organisations.find((item) => item.id === listing.organisationId)
@@ -34,15 +38,19 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
   const mediaEnabled=Boolean(membershipLevel&&membershipLevel.id!=='level-006')
 
   const set = <K extends keyof Listing>(key: K, value: Listing[K]) => setDraft((current) => ({ ...current, [key]: value }))
-  const save = () => {
-    updateListing(listing.id, draft)
-    setSaved(true)
-    window.setTimeout(() => setSaved(false), 1600)
+  const commitUploads=async()=>{if(supabase){const unused=pendingUploads.current.filter((path)=>!draft.media?.some((item)=>item.storagePath===path));if(unused.length)await supabase.storage.from('listing-media').remove(unused)}pendingUploads.current=[]}
+  const close=()=>{if(supabase&&pendingUploads.current.length)void supabase.storage.from('listing-media').remove(pendingUploads.current);pendingUploads.current=[];onClose()}
+  const save = async () => {
+    setSaving(true);setActionError('')
+    try{await updateListing(listing.id,draft);await commitUploads();setSaved(true);window.setTimeout(()=>setSaved(false),1600)}
+    catch(error){setActionError(error instanceof Error?error.message:'Listing could not be saved')}
+    finally{setSaving(false)}
   }
-  const publish = () => {
-    updateListing(listing.id, draft)
-    publishListing(listing.id)
-    onClose()
+  const publish = async () => {
+    setSaving(true);setActionError('')
+    try{await updateListing(listing.id,draft);await publishListing(listing.id);await commitUploads();onClose()}
+    catch(error){setActionError(error instanceof Error?error.message:'Listing could not be published')}
+    finally{setSaving(false)}
   }
   const storeImage=async(file:File)=>{
     if(!['image/jpeg','image/png','image/webp'].includes(file.type)) throw new Error(`${file.name} is not a JPG, PNG or WebP image.`)
@@ -52,6 +60,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
       const storagePath=`${tenant.id}/${listing.id}/${Date.now()}-${safeName}`
       const {error}=await supabase.storage.from('listing-media').upload(storagePath,file,{contentType:file.type,upsert:false})
       if(error) throw error
+      pendingUploads.current.push(storagePath)
       return {url:supabase.storage.from('listing-media').getPublicUrl(storagePath).data.publicUrl,storagePath}
     }
     if(file.size>2*1024*1024) throw new Error('Connect Supabase Storage to upload images over 2 MB. Smaller files can be stored in this browser.')
@@ -81,7 +90,6 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
     const next=media.filter((entry)=>entry.id!==item.id)
     const nextHero=draft.image===item.url?(next.find((entry)=>entry.type==='image')?.url??''):draft.image
     setDraft((current)=>({...current,media:next,image:nextHero}))
-    if(item.storagePath&&supabase)void supabase.storage.from('listing-media').remove([item.storagePath])
   }
   const moveImage=(item:ListingMedia,direction:-1|1)=>{
     const currentIndex=media.findIndex((entry)=>entry.id===item.id);let target=currentIndex+direction
@@ -102,7 +110,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
   }
 
   return (
-    <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={onClose}>
+    <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={close}>
       <div className="listing-editor-top">
         <div><Badge>{listing.status}</Badge><span>Last updated {listing.lastUpdated}</span></div>
         <div className="completion-inline"><span>Listing completeness</span><Progress value={draft.completeness} colour="#5c57d6" /><strong>{draft.completeness}%</strong></div>
@@ -168,6 +176,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
           </div>}
 
           {tab === 'Preview' && <div className="website-preview">
+            <a href={`/place/${encodeURIComponent(listing.id)}?preview=true`} target="_blank" rel="noreferrer">Open the saved draft on the actual website (staff only)</a>
             <div className="preview-browser"><span /><span /><span /><p>visitvalechester.co.uk/place/{draft.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')}</p></div>
             <div className="preview-hero" style={{backgroundImage:`url("${listingMediaUrl(draft.image)}")`,backgroundSize:'cover',backgroundPosition:'center'}}><div><Badge tone="purple">{draft.category}</Badge><h2>{draft.name}</h2><p><MapPin size={15} />{draft.town}</p></div></div>
             <div className="preview-content"><main><p className="preview-lead">{draft.shortDescription}</p><p>{draft.description}</p><h3>Facilities</h3><div className="preview-facilities">{draft.facilities.map((item) => <span key={item}><Check size={13} />{item}</span>)}</div></main><aside><h3>Plan your visit</h3><p><strong>Opening hours</strong>{draft.openingHours}</p><p><strong>Contact</strong>{draft.phone}<br />{draft.email}</p>{draft.bookingUrl && <Button onClick={()=>window.open(draft.bookingUrl,'_blank','noopener,noreferrer')}>Book now</Button>}{draft.website&&<Button variant="secondary" icon={Globe2} onClick={()=>window.open(draft.website,'_blank','noopener,noreferrer')}>Visit website</Button>}</aside></div>
@@ -175,12 +184,12 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
         </div>
 
         <aside className="editor-side">
-          <div className="editor-status-card"><h3>Publishing</h3><div><span>Current status</span><Badge>{draft.status}</Badge></div><div><span>Visibility</span><strong><Globe2 size={14} /> {draft.status==='Published'?'Public':'Not public'}</strong></div><div><span>Last updated</span><strong>{listing.lastUpdated}</strong></div></div>
+          <div className="editor-status-card"><h3>Publishing</h3><div><span>Current status</span><Badge>{draft.status}</Badge></div><div><span>Visibility</span><strong><Globe2 size={14} /> {listing.isPublic??listing.status==='Published'?'Public version remains live':'Not public'}</strong></div><div><span>Last updated</span><strong>{listing.lastUpdated}</strong></div></div>
           <div className="editor-checklist"><h3>Before publishing</h3><p className={draft.name&&draft.category?'done':''}>{draft.name&&draft.category?<Check size={13}/>:<span/>}Name and category</p><p className={draft.shortDescription&&draft.description?'done':''}>{draft.shortDescription&&draft.description?<Check size={13}/>:<span/>}Visitor description</p><p className={draft.bookingUrl ? 'done' : ''}>{draft.bookingUrl ? <Check size={13} /> : <span /> }Booking link</p><p className={draft.facilities.length >= 3 ? 'done' : ''}>{draft.facilities.length >= 3 ? <Check size={13} /> : <span /> }Facilities</p><p className={draft.imageRightsConfirmed?'done':''}>{draft.imageRightsConfirmed?<Check size={13}/>:<span/>}Image rights confirmed</p></div>
         </aside>
       </div>
 
-      <footer className="drawer-actionbar"><span>{saved ? <><Check size={15} /> Changes saved</> : 'Changes stay in draft until published'}</span><div><Button variant="secondary" icon={Save} onClick={save}>Save draft</Button><Button icon={Send} onClick={publish}>{listing.status === 'Published' ? 'Publish changes' : 'Approve & publish'}</Button></div></footer>
+      <footer className="drawer-actionbar"><span role={actionError?'alert':undefined}>{actionError|| (saved ? <><Check size={15} /> Draft saved</> : 'Changes stay in draft until published')}</span><div><Button variant="secondary" icon={Save} disabled={saving||uploading} onClick={()=>void save()}>{saving?'Saving…':'Save draft'}</Button>{['Administrator','Membership manager'].includes(user?.role??'')&&<Button icon={Send} disabled={saving||uploading} onClick={()=>void publish()}>{listing.isPublic??listing.status==='Published' ? 'Publish changes' : 'Approve & publish'}</Button>}</div></footer>
     </Drawer>
   )
 }

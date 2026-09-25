@@ -42,17 +42,17 @@ interface CRMContextValue {
   updateOrganisation: (id: string, changes: Partial<Organisation>) => void
   deleteOrganisation: (id: string) => void
   deduplicateOrganisations: () => number
-  mergeOrganisations: (survivorId: string, duplicateId: string) => void
+  mergeOrganisations: (survivorId: string, duplicateId: string) => Promise<void>
   addContact: (contact: Omit<Contact, 'id'>) => void
   updateContact: (id: string, changes: Partial<Contact>) => void
   deleteContact: (id: string) => void
   addActivity: (organisationId: string | undefined, title: string, detail: string) => void
   createListing: (organisationId: string, name: string) => Listing
-  updateListing: (id: string, changes: Partial<Listing>) => void
-  publishListing: (id: string) => void
-  unpublishListing: (id: string) => void
+  updateListing: (id: string, changes: Partial<Listing>) => Promise<void>
+  publishListing: (id: string) => Promise<void>
+  unpublishListing: (id: string) => Promise<void>
   duplicateListing: (id: string) => Listing | undefined
-  deleteListing: (id: string) => void
+  deleteListing: (id: string) => Promise<void>
   createEvent: (draft: EventDraft) => DestinationEvent
   updateEvent: (id: string, changes: Partial<DestinationEvent>) => void
   publishEvent: (id: string) => void
@@ -150,6 +150,7 @@ function fromPublicListing(row: PublicListingRow): Listing {
     category: row.category,
     town: row.town,
     status: row.status,
+    isPublic: row.status==='Published',
     completeness: row.completeness,
     views: row.views,
     enquiries: row.enquiries,
@@ -252,10 +253,14 @@ function normalizeCRMData(parsed: CRMData): CRMData {
   }
 }
 
-export function catalogueFromDatabase(workspace: CRMData, listingRows: PublicListingRow[], eventRows: EventRow[]): CRMData {
+type ListingDraftRow = { id:string; data:PublicListingRow }
+type ListingMetricsRow = {listing_id:string;views:number;views_this_month:number;enquiries:number}
+function withMetrics(listings:Listing[],rows:ListingMetricsRow[]){const metrics=new Map(rows.map((row)=>[row.listing_id,row]));return listings.map((listing)=>{const item=metrics.get(listing.id);return{...listing,views:item?.views??0,viewsThisMonth:item?.views_this_month??0,enquiries:item?.enquiries??0}})}
+export function catalogueFromDatabase(workspace: CRMData, listingRows: PublicListingRow[], eventRows: EventRow[], draftRows: ListingDraftRow[]=[],metricsRows:ListingMetricsRow[]=[]): CRMData {
+  const drafts=new Map(draftRows.map((row)=>[row.id,row.data]))
   return {
     ...normalizeCRMData(workspace),
-    listings: listingRows.map(fromPublicListing),
+    listings: withMetrics(listingRows.map((row)=>{const draft=drafts.get(row.id);return draft?{...fromPublicListing(draft),isPublic:row.status==='Published',hasUnpublishedChanges:true}:fromPublicListing(row)}),metricsRows),
     events: eventRows.map(fromEventRow),
   }
 }
@@ -291,9 +296,13 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const [saveError,setSaveError]=useState<string>()
   const [remoteAutomationRevision,setRemoteAutomationRevision]=useState(0)
   const catalogWriteQueue=useRef<Promise<void>>(Promise.resolve())
+  const dataRef=useRef(data)
+  useEffect(()=>{dataRef.current=data},[data])
   const queueCatalogWrite=useCallback((operation:()=>Promise<void>)=>{
-    const next=catalogWriteQueue.current.then(async()=>{await operation();setSaveError((current)=>current?.startsWith('Catalogue change could not be saved:')?undefined:current)})
-    catalogWriteQueue.current=next.catch((error:unknown)=>{setSaveError(`Catalogue change could not be saved: ${error instanceof Error?error.message:String(error)}`)})
+    const next=catalogWriteQueue.current.then(operation)
+    const result=next.then(()=>null,(error:unknown)=>{const message=error instanceof Error?error.message:String(error);setSaveError(`Catalogue change could not be saved: ${message}`);return message})
+    catalogWriteQueue.current=result.then(()=>undefined)
+    return result
   },[])
   const persistListing=useCallback((listing:Listing)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {error}=await client.from('public_listings').upsert(toPublicListing(listing),{onConflict:'tenant_id,id'});if(error)throw error})},[queueCatalogWrite])
   const persistEvent=useCallback((event:DestinationEvent)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {id:_id,tenant_id:_tenantId,submitted_by:_submittedBy,...changes}=toEventRow(event);void _id;void _tenantId;void _submittedBy;const {error}=await client.from('events').update(changes).eq('tenant_id',tenant.id).eq('id',event.id);if(error)throw error})},[queueCatalogWrite])
@@ -306,16 +315,18 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     const hydrate = async () => {
       setRemoteReady(false)
       if (user) {
-        const [stateResult,listingsResult,eventsResult]=await Promise.all([
+        const [stateResult,listingsResult,eventsResult,draftsResult,metricsResult]=await Promise.all([
           client.from('workspace_states').select('data').eq('tenant_id',tenant.id).maybeSingle(),
           client.from('public_listings').select('*').eq('tenant_id',tenant.id),
           client.from('events').select('*').eq('tenant_id',tenant.id),
+          client.from('listing_drafts').select('id,data').eq('tenant_id',tenant.id),
+          client.rpc('listing_performance',{p_tenant:tenant.id}),
         ])
-        const catalogError=stateResult.error??listingsResult.error??eventsResult.error
+        const catalogError=stateResult.error??listingsResult.error??eventsResult.error??draftsResult.error??metricsResult.error
         if(catalogError){if(active)setSaveError(`Catalogue could not be loaded: ${catalogError.message}`);return}
         if(active){
           const workspace=stateResult.data?.data?stateResult.data.data as CRMData:initialData
-          setData(catalogueFromDatabase(workspace,listingsResult.data as PublicListingRow[],eventsResult.data as EventRow[]))
+          setData(catalogueFromDatabase(workspace,listingsResult.data as PublicListingRow[],eventsResult.data as EventRow[],draftsResult.data as ListingDraftRow[],metricsResult.data as ListingMetricsRow[]))
           setSaveError(undefined)
         }
         const {data:submissions}=await client.from('public_submissions').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
@@ -361,14 +372,17 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     let active=true
     const refresh=async()=>{
       await catalogWriteQueue.current
-      const [listingsResult,eventsResult]=await Promise.all([
+      const [listingsResult,eventsResult,draftsResult,metricsResult]=await Promise.all([
         client.from('public_listings').select('*').eq('tenant_id',tenant.id),
         client.from('events').select('*').eq('tenant_id',tenant.id),
+        user?client.from('listing_drafts').select('id,data').eq('tenant_id',tenant.id):Promise.resolve({data:[] as ListingDraftRow[],error:null}),
+        user?client.rpc('listing_performance',{p_tenant:tenant.id}):Promise.resolve({data:[] as ListingMetricsRow[],error:null}),
       ])
       if(!active)return
-      const error=listingsResult.error??eventsResult.error
+      const error=listingsResult.error??eventsResult.error??draftsResult.error??metricsResult.error
       if(error){setSaveError(`Catalogue could not be refreshed: ${error.message}`);return}
-      const listings=(listingsResult.data as PublicListingRow[]).map(fromPublicListing)
+      const drafts=new Map((draftsResult.data as ListingDraftRow[]).map((row)=>[row.id,row.data]))
+      const listings=withMetrics((listingsResult.data as PublicListingRow[]).map((row)=>{const draft=drafts.get(row.id);return draft?{...fromPublicListing(draft),isPublic:row.status==='Published',hasUnpublishedChanges:true}:fromPublicListing(row)}),metricsResult.data as ListingMetricsRow[])
       const events=(eventsResult.data as EventRow[]).map(fromEventRow)
       setData((current)=>JSON.stringify(current.listings)===JSON.stringify(listings)&&JSON.stringify(current.events)===JSON.stringify(events)?current:{...current,listings,events})
     }
@@ -488,9 +502,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       }))
       audit('update','organisation',organisationId,changes)
     },
-    deleteOrganisation: (organisationId) => {setData((current)=>({...current,organisations:current.organisations.filter((item)=>item.id!==organisationId),contacts:current.contacts.filter((item)=>item.organisationId!==organisationId),listings:current.listings.filter((item)=>item.organisationId!==organisationId),agreements:current.agreements.filter((item)=>item.organisationId!==organisationId),membershipPeriods:current.membershipPeriods.filter((item)=>item.organisationId!==organisationId),invoices:current.invoices.filter((item)=>item.organisationId!==organisationId),tasks:current.tasks.filter((item)=>item.organisationId!==organisationId),benefitUsage:current.benefitUsage.filter((item)=>item.organisationId!==organisationId),activities:current.activities.filter((item)=>item.organisationId!==organisationId),events:current.events.map((item)=>item.organisationId===organisationId?{...item,organisationId:undefined}:item)}));audit('delete','organisation',organisationId)},
-    deduplicateOrganisations: () => {const canonical=new Map<string,string>();const remap=new Map<string,string>();data.organisations.forEach((item)=>{const key=`${item.name}|${item.town}`.toLowerCase();const existing=canonical.get(key);if(existing)remap.set(item.id,existing);else canonical.set(key,item.id)});const duplicateIds=new Set(remap.keys());setData((current)=>({...current,organisations:current.organisations.filter((item)=>!duplicateIds.has(item.id)),contacts:current.contacts.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),listings:current.listings.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),agreements:current.agreements.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),invoices:current.invoices.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),tasks:current.tasks.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),benefitUsage:current.benefitUsage.map((item)=>remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),activities:current.activities.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item),events:current.events.map((item)=>item.organisationId&&remap.has(item.organisationId)?{...item,organisationId:remap.get(item.organisationId)!}:item)}));audit('deduplicate','organisation',undefined,{removed:duplicateIds.size});return duplicateIds.size},
-    mergeOrganisations: (survivorId,duplicateId) => {if(survivorId===duplicateId)return;setData((current)=>{if(!current.organisations.some((item)=>item.id===survivorId)||!current.organisations.some((item)=>item.id===duplicateId))return current;return{...current,organisations:current.organisations.filter((item)=>item.id!==duplicateId),contacts:current.contacts.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),listings:current.listings.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),agreements:current.agreements.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),membershipPeriods:current.membershipPeriods.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),invoices:current.invoices.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),tasks:current.tasks.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),benefitUsage:current.benefitUsage.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),activities:current.activities.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),events:current.events.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item)}});audit('merge','organisation',survivorId,{duplicateId})},
+    deleteOrganisation: (organisationId) => {if(dataRef.current.listings.some((item)=>item.organisationId===organisationId)||dataRef.current.events.some((item)=>item.organisationId===organisationId)){setSaveError('Move or remove this organisation’s listings and events before deleting it. No records were changed.');return}setData((current)=>({...current,organisations:current.organisations.filter((item)=>item.id!==organisationId),contacts:current.contacts.filter((item)=>item.organisationId!==organisationId),listings:current.listings.filter((item)=>item.organisationId!==organisationId),agreements:current.agreements.filter((item)=>item.organisationId!==organisationId),membershipPeriods:current.membershipPeriods.filter((item)=>item.organisationId!==organisationId),invoices:current.invoices.filter((item)=>item.organisationId!==organisationId),tasks:current.tasks.filter((item)=>item.organisationId!==organisationId),benefitUsage:current.benefitUsage.filter((item)=>item.organisationId!==organisationId),activities:current.activities.filter((item)=>item.organisationId!==organisationId),events:current.events.map((item)=>item.organisationId===organisationId?{...item,organisationId:undefined}:item)}));audit('delete','organisation',organisationId)},
+    deduplicateOrganisations: () => {setSaveError('Automatic organisation deduplication is disabled to protect linked listings. Review and merge records individually.');return 0},
+    mergeOrganisations: async (survivorId,duplicateId) => {if(survivorId===duplicateId)return;if(supabase){const client=supabase;const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('relink_listing_organisation',{p_tenant:tenant.id,p_from:duplicateId,p_to:survivorId});if(error)throw error});if(failure)throw new Error(failure)}setData((current)=>{if(!current.organisations.some((item)=>item.id===survivorId)||!current.organisations.some((item)=>item.id===duplicateId))return current;return{...current,organisations:current.organisations.filter((item)=>item.id!==duplicateId),contacts:current.contacts.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),listings:current.listings.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),agreements:current.agreements.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),membershipPeriods:current.membershipPeriods.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),invoices:current.invoices.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),tasks:current.tasks.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),benefitUsage:current.benefitUsage.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),activities:current.activities.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item),events:current.events.map((item)=>item.organisationId===duplicateId?{...item,organisationId:survivorId}:item)}});audit('merge','organisation',survivorId,{duplicateId})},
     addContact: (contact) => setData((current) => ({ ...current, contacts: [{ ...contact, id: id('con') }, ...current.contacts.map((item)=>contact.primary&&item.organisationId===contact.organisationId?{...item,primary:false}:item)] })),
     updateContact: (contactId, changes) => setData((current) => {const target=current.contacts.find((item)=>item.id===contactId);return{...current,contacts:current.contacts.map((item)=>changes.primary&&target&&item.organisationId===target.organisationId?{...item,...(item.id===contactId?changes:{primary:false})}:item.id===contactId?{...item,...changes}:item)}}),
     deleteContact: (contactId) => {setData((current)=>{const removed=current.contacts.find((item)=>item.id===contactId);const contacts=current.contacts.filter((item)=>item.id!==contactId);if(!removed)return current;const remaining=contacts.filter((item)=>item.organisationId===removed.organisationId);const nextPrimary=remaining[0];return{...current,contacts:contacts.map((item)=>item.id===nextPrimary?.id?{...item,primary:true}:item),organisations:current.organisations.map((item)=>item.id===removed.organisationId?{...item,primaryContactId:nextPrimary?.id??''}:item)}});audit('delete','contact',contactId)},
@@ -503,37 +517,52 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       audit('create','listing',listing.id,{organisationId,name})
       return listing
     },
-    updateListing: (listingId, changes) => {
+    updateListing: async (listingId, changes) => {
+      const source=dataRef.current.listings.find((item)=>item.id===listingId)??changes as Listing
+      if(!source?.id)throw new Error('Listing not found')
+      const updated={...source,...changes,lastUpdated:todayISO()}
+      const draft={...updated,completeness:listingCompleteness(updated),hasUnpublishedChanges:true}
+      if(supabase){
+        const client=supabase
+        const failure=await queueCatalogWrite(async()=>{const {error}=await client.from('listing_drafts').upsert({tenant_id:tenant.id,id:listingId,data:toPublicListing(draft),updated_by:user?.id??null,updated_at:new Date().toISOString()},{onConflict:'tenant_id,id'});if(error)throw error})
+        if(failure)throw new Error(failure)
+      }
       setData((current) => ({
         ...current,
-        listings: current.listings.map((item) => {if(item.id!==listingId)return item;const updated={...item,...changes,lastUpdated:todayISO()};return{...updated,completeness:listingCompleteness(updated)}}),
+        listings: current.listings.map((item) => item.id===listingId?{...item,...draft}:item),
         activities: [{
           id: id('act'), organisationId: current.listings.find((item) => item.id === listingId)?.organisationId,
           type: 'listing', title: 'Listing updated', detail: 'Listing content was updated in the CRM.',
           timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
-      const listing=data.listings.find((item)=>item.id===listingId)
-      if(listing){const updated={...listing,...changes,lastUpdated:todayISO()};persistListing({...updated,completeness:listingCompleteness(updated)})}
       audit('update','listing',listingId,changes)
     },
-    publishListing: (listingId) => {
+    publishListing: async (listingId) => {
+      let published:Listing|undefined
+      if(supabase){
+        const client=supabase
+        const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('publish_listing_draft',{p_tenant:tenant.id,p_id:listingId});if(error)throw error})
+        if(failure)throw new Error(failure)
+        const {data:row,error}=await supabase.from('public_listings').select('*').eq('tenant_id',tenant.id).eq('id',listingId).single()
+        if(error)throw error
+        const previous=dataRef.current.listings.find((item)=>item.id===listingId)
+        published={...fromPublicListing(row as PublicListingRow),views:previous?.views??0,viewsThisMonth:previous?.viewsThisMonth??0,enquiries:previous?.enquiries??0}
+      }
       setData((current) => ({
         ...current,
-        listings: current.listings.map((item) => item.id === listingId ? { ...item, status: 'Published', lastUpdated: todayISO() } : item),
+        listings: current.listings.map((item) => item.id === listingId ? published??{ ...item, status: 'Published', isPublic:true,hasUnpublishedChanges:false, lastUpdated: todayISO() } : item),
         activities: [{
           id: id('act'), organisationId: current.listings.find((item) => item.id === listingId)?.organisationId,
           type: 'listing', title: 'Listing published', detail: 'The approved listing is now live on the destination website.',
           timestamp: new Date().toISOString(), user: user?.name ?? 'Workspace user',
         }, ...current.activities],
       }))
-      const listing=data.listings.find((item)=>item.id===listingId)
-      if(listing)persistListing({...listing,status:'Published',lastUpdated:todayISO()})
-      audit('publish','listing',listingId)
+      if(!supabase)audit('publish','listing',listingId)
     },
-    unpublishListing: (listingId) => {setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',lastUpdated:todayISO()}:item)}));const listing=data.listings.find((item)=>item.id===listingId);if(listing)persistListing({...listing,status:'Draft',lastUpdated:todayISO()});audit('unpublish','listing',listingId)},
-    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));persistListing(copy);audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
-    deleteListing: (listingId) => {setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});audit('delete','listing',listingId);if(supabase)queueCatalogWrite(async()=>{const {error}=await supabase!.from('public_listings').delete().eq('tenant_id',tenant.id).eq('id',listingId);if(error)throw error})},
+    unpublishListing: async (listingId) => {if(supabase){const client=supabase;const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('unpublish_listing',{p_tenant:tenant.id,p_id:listingId});if(error)throw error});if(failure)throw new Error(failure)}setData((current)=>({...current,listings:current.listings.map((item)=>item.id===listingId?{...item,status:'Draft',isPublic:false,lastUpdated:todayISO()}:item)}));if(!supabase)audit('unpublish','listing',listingId)},
+    duplicateListing: (listingId) => {const source=data.listings.find((item)=>item.id===listingId);if(!source)return undefined;const copy={...source,id:id('list'),name:`${source.name} copy`,status:'Draft' as const,isPublic:false,hasUnpublishedChanges:false,views:0,enquiries:0,lastUpdated:todayISO()};setData((current)=>({...current,listings:[copy,...current.listings],organisations:current.organisations.map((item)=>item.id===copy.organisationId?{...item,listings:item.listings+1}:item)}));persistListing(copy);audit('duplicate','listing',copy.id,{sourceId:listingId});return copy},
+    deleteListing: async (listingId) => {if(supabase){const client=supabase;const failure=await queueCatalogWrite(async()=>{const {error}=await client.rpc('delete_listing',{p_tenant:tenant.id,p_id:listingId});if(error)throw error});if(failure)throw new Error(failure)}setData((current)=>{const source=current.listings.find((item)=>item.id===listingId);return{...current,listings:current.listings.filter((item)=>item.id!==listingId),organisations:current.organisations.map((item)=>item.id===source?.organisationId?{...item,listings:Math.max(0,item.listings-1)}:item)}});if(!supabase)audit('delete','listing',listingId)},
     createEvent: (draft) => {
       const event: DestinationEvent = { ...draft, id: id('event'), lastUpdated: todayISO() }
       setData((current) => ({
@@ -702,7 +731,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [audit,data,persistEvent,persistListing,queueCatalogWrite,remoteReady,remoteAutomationRevision,saveError,user?.name])
+  }), [audit,data,persistEvent,persistListing,queueCatalogWrite,remoteReady,remoteAutomationRevision,saveError,user?.id,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }

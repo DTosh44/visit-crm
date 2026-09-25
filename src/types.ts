@@ -137,8 +137,11 @@ export interface Listing {
   category: string
   town: string
   status: ListingStatus
+  hasUnpublishedChanges?: boolean
+  isPublic?: boolean
   completeness: number
   views: number
+  viewsThisMonth?: number
   enquiries: number
   shortDescription: string
   description: string

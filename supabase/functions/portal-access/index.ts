@@ -27,6 +27,18 @@ function safeOrganisation(org:any){return pickFields(org,['id','name','type','to
 function safeContact(contact:any){return pickFields(contact,['id','organisationId','name','jobTitle','email','phone','primary','portalAccess'])}
 function safeListing(listing:any){return pickFields(listing,['id','organisationId','name','category','town','status','completeness','views','enquiries','shortDescription','description','website','bookingUrl','phone','email','openingHours','facilities','goodToKnow','image','media','accessibility','lastUpdated'])}
 function safeEvent(event:any){return pickFields(event,['id','organisationId','title','category','format','description','startDate','endDate','startTime','endTime','venueName','address','town','postcode','price','bookingUrl','contactName','contactEmail','image','accessibility','status','moderationNote','lastUpdated'])}
+function listingFromRow(row:any){return{id:row.id,organisationId:row.organisation_id,name:row.name,category:row.category,town:row.town,status:row.status,completeness:row.completeness,views:row.views,enquiries:row.enquiries,shortDescription:row.short_description,description:row.description,website:row.website,bookingUrl:row.booking_url,phone:row.phone,email:row.email,openingHours:row.opening_hours,facilities:row.facilities??[],goodToKnow:row.good_to_know??[],image:row.image,media:row.media??[],accessibility:row.accessibility??'',lastUpdated:String(row.updated_at).slice(0,10)}}
+function eventFromRow(row:any){return{id:row.id,organisationId:row.organisation_id,title:row.title,category:row.category,format:row.format,description:row.description,startDate:row.start_date,endDate:row.end_date,startTime:row.start_time,endTime:row.end_time,venueName:row.venue_name,address:row.address,town:row.town,postcode:row.postcode,price:row.price,bookingUrl:row.booking_url,contactName:row.contact_name,contactEmail:row.contact_email,image:row.image,accessibility:row.accessibility,status:row.status,moderationNote:row.moderation_note,lastUpdated:String(row.updated_at).slice(0,10)}}
+async function catalogueForOrganisation(tenantId:string,orgId:string){
+  const [listings,drafts,events]=await Promise.all([
+    admin.from('public_listings').select('*').eq('tenant_id',tenantId).eq('organisation_id',orgId),
+    admin.from('listing_drafts').select('id,data').eq('tenant_id',tenantId),
+    admin.from('events').select('*').eq('tenant_id',tenantId).eq('organisation_id',orgId),
+  ])
+  if(listings.error||drafts.error||events.error)throw new Error(listings.error?.message??drafts.error?.message??events.error?.message)
+  const draftById=new Map((drafts.data??[]).map((row:any)=>[row.id,row.data]))
+  return{listings:(listings.data??[]).map((row:any)=>listingFromRow(draftById.get(row.id)??row)),events:(events.data??[]).map(eventFromRow)}
+}
 async function audit(tenantId:string,userId:string,orgId:string,action:string,targetId?:string){await admin.from('audit_log').insert({tenant_id:tenantId,actor_id:userId,action:`portal.${action}`,entity_type:'organisation',entity_id:orgId,detail:{organisation_id:orgId,target_id:targetId??null}})}
 async function workspaceFor(tenantId:string){const {data,error}=await admin.from('workspace_states').select('data').eq('tenant_id',tenantId).single();if(error||!data)throw new Error('Workspace data unavailable');return data.data as Record<string,any>}
 async function saveWorkspace(tenantId:string,_userId:string,state:Record<string,any>){const {error}=await admin.from('workspace_states').update({data:state,updated_by:null,updated_at:now()}).eq('tenant_id',tenantId);if(error)throw error}
@@ -39,7 +51,8 @@ async function portalBundle(tenantId:string,grant:PortalGrant,state:Record<strin
   const {data:requests}=await admin.from('portal_change_requests').select('id,entity_type,entity_id,proposed,status,review_note,created_at,updated_at').eq('tenant_id',tenantId).eq('organisation_id',org.id).order('created_at',{ascending:false})
   const opportunities=(platform.memberOpportunities??[]).map(normaliseOpportunity).filter((item:any)=>opportunityEligible(item,org,now().slice(0,10))||item.applications.some((entry:any)=>entry.organisationId===org.id)).map((item:any)=>({id:item.id,title:item.title,description:item.description,type:item.type,category:item.category,requirements:item.requirements,eligibilityCriteria:item.eligibilityCriteria,openingDate:item.openingDate,closingDate:item.closingDate,activityStartDate:item.activityStartDate,activityEndDate:item.activityEndDate,price:item.price,subsidisedValue:item.subsidisedValue,capacity:item.capacity,placesAvailable:opportunityCapacity(item).placesAvailable,status:item.status,links:item.links,applications:item.applications.filter((entry:any)=>entry.organisationId===org.id).map((entry:any)=>pickFields(entry,['id','contactId','response','status','amount','participated','outcome']))}))
   const level=(state.levels??[]).find((item:any)=>item.name===org.tier)
-  return {role:grant.role,contact:safeContact(contact),organisation:safeOrganisation(org),contacts:(state.contacts??[]).filter((item:any)=>item.organisationId===org.id).map(safeContact),listings:(state.listings??[]).filter((item:any)=>item.organisationId===org.id).map(safeListing),events:(state.events??[]).filter((item:any)=>item.organisationId===org.id).map(safeEvent),benefits:(level?.benefits??[]).map((id:string)=>{const benefit=(state.benefits??[]).find((item:any)=>item.id===id);const usage=(state.benefitUsage??[]).find((item:any)=>item.organisationId===org.id&&item.benefitId===id);return benefit?{id,name:benefit.name,kind:benefit.kind,category:benefit.category,allowance:benefit.allowance,used:usage?.used??0,note:usage?.note??'',dateUsed:usage?.updatedAt??''}:null}).filter(Boolean),opportunities,documents:(platform.resources??[]).filter((item:any)=>item.published&&/^https:\/\//.test(item.url??'')&&(!item.membershipLevels?.length||item.membershipLevels.includes(org.tier))).map((item:any)=>pickFields(item,['id','title','category','description','url','updatedAt'])),agreements:(state.agreements??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','membershipLevel','status','validUntil'])),invoices:grant.role==='Billing contact'||grant.role==='Member admin'?(state.invoices??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','description','dueDate','total','status'])):[],requests:requests??[],destination:{name:state.workspace?.destinationName??'',email:state.workspace?.contactEmail??'',logoUrl:state.workspace?.destinationLogoUrl??''}}
+  const catalogue=await catalogueForOrganisation(tenantId,org.id)
+  return {role:grant.role,contact:safeContact(contact),organisation:safeOrganisation(org),contacts:(state.contacts??[]).filter((item:any)=>item.organisationId===org.id).map(safeContact),listings:catalogue.listings.map(safeListing),events:catalogue.events.map(safeEvent),benefits:(level?.benefits??[]).map((id:string)=>{const benefit=(state.benefits??[]).find((item:any)=>item.id===id);const usage=(state.benefitUsage??[]).find((item:any)=>item.organisationId===org.id&&item.benefitId===id);return benefit?{id,name:benefit.name,kind:benefit.kind,category:benefit.category,allowance:benefit.allowance,used:usage?.used??0,note:usage?.note??'',dateUsed:usage?.updatedAt??''}:null}).filter(Boolean),opportunities,documents:(platform.resources??[]).filter((item:any)=>item.published&&/^https:\/\//.test(item.url??'')&&(!item.membershipLevels?.length||item.membershipLevels.includes(org.tier))).map((item:any)=>pickFields(item,['id','title','category','description','url','updatedAt'])),agreements:(state.agreements??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','membershipLevel','status','validUntil'])),invoices:grant.role==='Billing contact'||grant.role==='Member admin'?(state.invoices??[]).filter((item:any)=>item.organisationId===org.id).map((item:any)=>pickFields(item,['id','number','description','dueDate','total','status'])):[],requests:requests??[],destination:{name:state.workspace?.destinationName??'',email:state.workspace?.contactEmail??'',logoUrl:state.workspace?.destinationLogoUrl??''}}
 }
 
 Deno.serve(async(request)=>{
@@ -100,11 +113,17 @@ Deno.serve(async(request)=>{
         if(decision==='Approved'){
           if(item.entity_type==='organisation'){state.organisations=state.organisations.map((entry:any)=>entry.id===orgId?{...entry,...cleanProposal('organisation',item.proposed)}:entry)}
           if(item.entity_type==='listing'){
-            const listing=(state.listings??[]).find((entry:any)=>entry.id===item.entity_id&&entry.organisationId===orgId)
+            const {data:listing,error:listingError}=await admin.from('public_listings').select('*').eq('tenant_id',tenantId).eq('id',item.entity_id).eq('organisation_id',orgId).maybeSingle()
+            if(listingError)throw listingError
             if(!listing)return json({error:'Listing no longer belongs to this organisation'},409)
-            state.listings=state.listings.map((entry:any)=>entry.id===listing.id?{...entry,...cleanProposal('listing',item.proposed),status:entry.status==='Published'?'Published':'In review',lastUpdated:now().slice(0,10)}:entry)
-            const updated=state.listings.find((entry:any)=>entry.id===listing.id)
-            if(updated.status==='Published'){const {error:listingError}=await admin.from('public_listings').update({name:updated.name,category:updated.category,short_description:updated.shortDescription,description:updated.description,website:updated.website,booking_url:updated.bookingUrl,phone:updated.phone,email:updated.email,opening_hours:updated.openingHours,facilities:updated.facilities,accessibility:updated.accessibility??'',image:updated.image,media:updated.media,updated_at:now()}).eq('tenant_id',tenantId).eq('id',listing.id).eq('organisation_id',orgId);if(listingError)throw listingError}
+            const {data:draftRow,error:draftError}=await admin.from('listing_drafts').select('data').eq('tenant_id',tenantId).eq('id',listing.id).maybeSingle()
+            if(draftError)throw draftError
+            const proposal=cleanProposal('listing',item.proposed)
+            const fieldNames:Record<string,string>={shortDescription:'short_description',bookingUrl:'booking_url',openingHours:'opening_hours',goodToKnow:'good_to_know'}
+            const changes=Object.fromEntries(Object.entries(proposal).map(([key,value])=>[fieldNames[key]??key,value]))
+            const updated={...(draftRow?.data??listing),...changes,status:'In review',updated_at:now()}
+            const {error:saveError}=await admin.from('listing_drafts').upsert({tenant_id:tenantId,id:listing.id,data:updated,updated_by:user.id,updated_at:now()},{onConflict:'tenant_id,id'})
+            if(saveError)throw saveError
           }
           if(item.entity_type==='event'){
             const proposed=cleanProposal('event',item.proposed)
@@ -112,9 +131,8 @@ Deno.serve(async(request)=>{
             if(!event.title||!event.description||!event.startDate||!event.endDate||!event.startTime||!event.endTime||!event.venueName||!event.address||!event.town||!event.contactName||!event.contactEmail)return json({error:'The event submission is incomplete'},400)
             const {error:eventError}=await admin.from('events').upsert({id:event.id,tenant_id:tenantId,organisation_id:orgId,submitted_by:item.actor_id,submitted_by_label:'Member portal',title:event.title,category:event.category||'Other',format:event.format||'One-off and short run',description:event.description,start_date:event.startDate,end_date:event.endDate,start_time:event.startTime,end_time:event.endTime,venue_name:event.venueName,address:event.address,town:event.town,postcode:event.postcode||'',price:event.price||'Free',booking_url:event.bookingUrl||'',contact_name:event.contactName,contact_email:event.contactEmail,image:event.image||'theatre',accessibility:event.accessibility||'',recurrence:event.recurrence||'None',recurrence_until:event.recurrenceUntil||null,status:'In review',updated_at:now()},{onConflict:'id'})
             if(eventError)throw eventError
-            state.events=[...(state.events??[]).filter((entry:any)=>entry.id!==event.id),event]
           }
-          await saveWorkspace(tenantId,user.id,state)
+          if(item.entity_type==='organisation')await saveWorkspace(tenantId,user.id,state)
         }
         const {error}=await admin.from('portal_change_requests').update({status:decision,review_note:text(body.note,2000),reviewed_by:user.id,reviewed_at:now(),updated_at:now()}).eq('tenant_id',tenantId).eq('organisation_id',orgId).eq('id',item.id)
         if(error)throw error
@@ -131,11 +149,12 @@ Deno.serve(async(request)=>{
     const contact=(state.contacts??[]).find((item:any)=>item.id===grant.contactId&&item.organisationId===grant.organisationId)
     if(!org||!contact?.portalAccess)return json({error:'Portal access is no longer valid'},403)
     if(action==='read')return json(await portalBundle(tenantId,grant,state))
+    const catalogue=await catalogueForOrganisation(tenantId,org.id)
     const targetId=text(body.id,100),changes=body.changes??{}
     const deny=()=>json({error:'This action is not permitted for your organisation'},403)
     if(action==='sign_upload'){
       const entity=body.entity==='listing'?'listing':'organisation'
-      const listing=entity==='listing'?(state.listings??[]).find((item:any)=>item.id===targetId):null
+      const listing=entity==='listing'?catalogue.listings.find((item:any)=>item.id===targetId):null
       if(entity==='listing'&&!listing)return deny()
       if(!canPortalAccess(grant,{tenantId,organisationId:listing?.organisationId??org.id,entity,id:targetId},'propose'))return deny()
       const mime=text(body.mime,50),extension=mime==='image/png'?'png':mime==='image/webp'?'webp':mime==='image/jpeg'?'jpg':''
@@ -148,7 +167,7 @@ Deno.serve(async(request)=>{
     }
     if(action==='propose_organisation'||action==='propose_listing'||action==='save_event_draft'){
       const entity=action==='propose_organisation'?'organisation':action==='propose_listing'?'listing':'event'
-      const existing=entity==='listing'?(state.listings??[]).find((item:any)=>item.id===targetId):entity==='event'?(state.events??[]).find((item:any)=>item.id===targetId):org
+      const existing=entity==='listing'?catalogue.listings.find((item:any)=>item.id===targetId):entity==='event'?catalogue.events.find((item:any)=>item.id===targetId):org
       const targetOrg=existing?.organisationId??org.id
       if(entity==='listing'&&!existing)return deny()
       if(!canPortalAccess(grant,{tenantId,organisationId:targetOrg,entity,id:targetId,status:existing?.status},entity==='event'?'save_event_draft':'propose'))return deny()
