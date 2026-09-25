@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { initialData } from './data'
-import { supabase, useAuth } from './auth'
+import { canAccessView, supabase, useAuth } from './auth'
 import { tenant } from './tenant'
 import { visitorTaxonomyFor } from './listingTaxonomy'
 import type {
@@ -29,6 +29,7 @@ import type {
   WebsiteExperiment,
 } from './types'
 import { contentSnapshot } from './contentPublishing'
+import { cmsPagesFromRows, contentPageSnapshot, type CmsPageRow, type CmsRevisionRow } from './cmsPages'
 
 const STORAGE_KEY = 'visit-valechester-crm-v4'
 
@@ -79,17 +80,18 @@ interface CRMContextValue {
   updateLevel: (id: string, changes: Partial<MembershipLevel>) => void
   addBenefit: (benefit: Omit<Benefit, 'id'>) => void
   updateWorkspace: (changes: Partial<CRMData['workspace']>) => void
-  createContentPage: (page: Omit<ContentPage, 'id' | 'updatedAt'>) => ContentPage
-  updateContentPage: (id: string, changes: Partial<ContentPage>) => void
-  publishContentPage: (id: string) => void
-  discardContentDraft: (id: string) => void
-  deleteContentPage: (id: string) => void
-  createWebsitePage: (input: { name: string; path: string; content: WebsitePageContent }) => WebsitePage
-  updateWebsitePageDraft: (id: string, draft: WebsitePageContent) => void
-  publishWebsitePage: (id: string) => void
-  discardWebsitePageDraft: (id: string) => void
-  restoreWebsitePageVersion: (id: string, version: number) => void
-  deleteWebsitePage: (id: string) => void
+  createContentPage: (page: Omit<ContentPage, 'id' | 'updatedAt'>) => Promise<ContentPage>
+  updateContentPage: (id: string, changes: Partial<ContentPage>) => Promise<void>
+  publishContentPage: (id: string) => Promise<void>
+  discardContentDraft: (id: string) => Promise<void>
+  restoreContentPageVersion: (id: string, revisionId: number) => Promise<void>
+  deleteContentPage: (id: string) => Promise<void>
+  createWebsitePage: (input: { name: string; path: string; content: WebsitePageContent }) => Promise<WebsitePage>
+  updateWebsitePageDraft: (id: string, draft: WebsitePageContent) => Promise<void>
+  publishWebsitePage: (id: string) => Promise<void>
+  discardWebsitePageDraft: (id: string) => Promise<void>
+  restoreWebsitePageVersion: (id: string, revisionId: number) => Promise<void>
+  deleteWebsitePage: (id: string) => Promise<void>
   createImageAsset: (asset: Omit<ImageAsset, 'id' | 'uploadedAt'>) => ImageAsset
   updateImageAsset: (id: string, changes: Partial<ImageAsset>) => void
   archiveImageAsset: (id: string) => void
@@ -308,6 +310,37 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const persistEvent=useCallback((event:DestinationEvent)=>{const client=supabase;if(!client)return;queueCatalogWrite(async()=>{const {id:_id,tenant_id:_tenantId,submitted_by:_submittedBy,...changes}=toEventRow(event);void _id;void _tenantId;void _submittedBy;const {error}=await client.from('events').update(changes).eq('tenant_id',tenant.id).eq('id',event.id);if(error)throw error})},[queueCatalogWrite])
   const audit=useCallback((action:string,entityType:string,entityId?:string,detail:Record<string,unknown>={})=>{const client=supabase;if(client&&user)void client.from('audit_log').insert({tenant_id:tenant.id,actor_id:user.id,action,entity_type:entityType,entity_id:entityId,detail})},[user])
 
+  const readCms=useCallback(async()=>{
+    const client=supabase
+    if(!client)return {websitePages:[] as WebsitePage[],contentPages:[] as ContentPage[]}
+    const {data:pageRows,error:pageError}=await client.from('cms_pages').select('*').eq('tenant_id',tenant.id).is('deleted_at',null)
+    if(pageError)throw new Error(`CMS pages could not be loaded: ${pageError.message}`)
+    const revisionRows:CmsRevisionRow[]=[]
+    for(let offset=0;;offset+=1000){
+      const {data:batch,error}=await client.from('cms_page_revisions').select('id,page_id,kind,action,version,page_revision,snapshot,changed_fields,actor_id,actor_name,source_revision_id,created_at').eq('tenant_id',tenant.id).order('id',{ascending:false}).range(offset,offset+999)
+      if(error)throw new Error(`CMS history could not be loaded: ${error.message}`)
+      revisionRows.push(...((batch ?? []) as CmsRevisionRow[]))
+      if(!batch||batch.length<1000)break
+    }
+    const pages=cmsPagesFromRows(pageRows as CmsPageRow[],revisionRows)
+    setData((current)=>({...current,...pages}))
+    return pages
+  },[])
+
+  const mutateCms=useCallback(async(input:{id:string;action:string;payload?:Record<string,unknown>;expectedRevision?:number;kind?:string;name?:string;path?:string;template?:string;restoreRevision?:number})=>{
+    const client=supabase
+    if(!client)throw new Error('Database-backed CMS is unavailable')
+    const {data:row,error}=await client.rpc('cms_page_mutate',{
+      p_tenant:tenant.id,p_id:input.id,p_action:input.action,p_payload:input.payload??null,
+      p_expected_revision:input.expectedRevision??null,p_kind:input.kind??null,p_name:input.name??null,
+      p_path:input.path??null,p_template:input.template??null,p_restore_revision:input.restoreRevision??null,
+    })
+    if(error){setSaveError(`CMS change could not be saved: ${error.message}`);throw new Error(error.message)}
+    await readCms()
+    setSaveError(undefined)
+    return row as CmsPageRow
+  },[readCms])
+
   useEffect(() => {
     const client = supabase
     if (!client) return
@@ -329,6 +362,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           setData(catalogueFromDatabase(workspace,listingsResult.data as PublicListingRow[],eventsResult.data as EventRow[],draftsResult.data as ListingDraftRow[],metricsResult.data as ListingMetricsRow[]))
           setSaveError(undefined)
         }
+        if(active&&canAccessView(user.role,'pages'))await readCms()
         const {data:submissions}=await client.from('public_submissions').select('*').eq('tenant_id',tenant.id).order('created_at',{ascending:false})
         if(active&&submissions)setData((current)=>({...current,submissions:submissions.map((item)=>({id:item.id,kind:item.kind,payload:item.payload as Record<string,unknown>,createdAt:item.created_at,status:(item.status??'New') as WebsiteSubmission['status']}))}))
         const {data:auditRows}=await client.from('audit_log').select('id,action,entity_type,entity_id,detail,created_at,actor_id').eq('tenant_id',tenant.id).order('created_at',{ascending:false}).limit(250)
@@ -354,17 +388,27 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     }
     void hydrate().catch((error:unknown)=>{if(active)setSaveError(`Workspace could not be loaded: ${error instanceof Error?error.message:String(error)}`)})
     return () => { active = false }
-  }, [user])
+  }, [user,readCms])
 
   useEffect(()=>{
     const client=supabase
     if(!client||!user)return
     const channel=client.channel(`workspace-${tenant.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'workspace_states',filter:`tenant_id=eq.${tenant.id}`},(payload)=>{
       const record=payload.new as {data?:CRMData;updated_by?:string}
-      if(record.updated_by!==user.id&&record.data){setData((current)=>({...normalizeCRMData(record.data!),listings:current.listings,events:current.events}));if(!record.updated_by)setRemoteAutomationRevision((current)=>current+1)}
+      if(record.updated_by!==user.id&&record.data){setData((current)=>({...normalizeCRMData(record.data!),listings:current.listings,events:current.events,contentPages:current.contentPages,websitePages:current.websitePages}));if(!record.updated_by)setRemoteAutomationRevision((current)=>current+1)}
     }).subscribe()
     return()=>{void client.removeChannel(channel)}
   },[user])
+
+  useEffect(()=>{
+    const client=supabase
+    if(!client||!user||!remoteReady||!canAccessView(user.role,'pages'))return
+    const refresh=()=>{void readCms().catch((error:unknown)=>setSaveError(error instanceof Error?error.message:String(error)))}
+    const onFocus=()=>{if(document.visibilityState==='visible')refresh()}
+    window.addEventListener('focus',onFocus)
+    const channel=client.channel(`cms-${tenant.id}`).on('postgres_changes',{event:'*',schema:'public',table:'cms_pages',filter:`tenant_id=eq.${tenant.id}`},refresh).subscribe()
+    return()=>{window.removeEventListener('focus',onFocus);void client.removeChannel(channel)}
+  },[user,remoteReady,readCms])
 
   useEffect(()=>{
     const client=supabase
@@ -411,24 +455,14 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       const write=async(query:PromiseLike<{error:{message:string}|null}>)=>{const {error}=await query;if(error)failures.push(error.message)}
       const writes:Array<Promise<void>>=[write(client.from('workspace_states').upsert({
         tenant_id: tenant.id,
-        data:{...data,listings:[],events:[]},
+        data:{...data,listings:[],events:[],contentPages:[],websitePages:[]},
         updated_by: user.id,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'tenant_id' }))]
-      const publishedContent=data.contentPages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,type:page.published!.type,title:page.published!.title,slug:page.published!.slug,summary:page.published!.summary,body:page.published!.body,image:page.published!.image,status:'Published',meta_title:page.published!.metaTitle??'',meta_description:page.published!.metaDescription??'',updated_at:page.publishedAt??new Date().toISOString()}))
-      const publishedWebsitePages=data.websitePages.filter((page)=>page.published).map((page)=>({id:page.id,tenant_id:tenant.id,name:page.name,path:page.path,template:page.template,content:page.published,version:page.version,published_at:page.publishedAt??new Date().toISOString(),updated_at:new Date().toISOString()}))
-      if(publishedContent.length)writes.push(write(client.from('public_content').upsert(publishedContent,{onConflict:'tenant_id,id'})))
-      if(publishedWebsitePages.length)writes.push(write(client.from('public_website_pages').upsert(publishedWebsitePages,{onConflict:'tenant_id,id'})))
       const imageAssets=data.imageAssets.map((asset)=>({id:asset.id,tenant_id:tenant.id,name:asset.name,storage_path:null,public_url:asset.url,alt_text:asset.alt,caption:asset.caption,credit:asset.credit,rights_holder:asset.rightsHolder,licence:asset.licence,usage_expiry:asset.usageExpiry??null,tags:asset.tags,collection_name:asset.collection,width:asset.width,height:asset.height,file_size:asset.fileSize,mime_type:asset.mimeType,status:asset.status,updated_at:new Date().toISOString()}))
       const experiments=data.websiteExperiments.map((experiment)=>({id:experiment.id,tenant_id:tenant.id,name:experiment.name,hypothesis:experiment.hypothesis,page_path:experiment.pagePath,goal:experiment.goal,status:experiment.status,variants:experiment.variants,started_at:experiment.startedAt??null,ended_at:experiment.endedAt??null,created_at:experiment.createdAt,updated_at:new Date().toISOString()}))
       if(imageAssets.length)writes.push(write(client.from('image_assets').upsert(imageAssets,{onConflict:'tenant_id,id'})))
       if(experiments.length)writes.push(write(client.from('website_experiments').upsert(experiments,{onConflict:'tenant_id,id'})))
-      const contentIds=publishedContent.map((item)=>item.id)
-      if(contentIds.length)writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id).not('id','in',`(${contentIds.join(',')})`)))
-      else writes.push(write(client.from('public_content').delete().eq('tenant_id',tenant.id)))
-      const websitePageIds=publishedWebsitePages.map((item)=>item.id)
-      if(websitePageIds.length)writes.push(write(client.from('public_website_pages').delete().eq('tenant_id',tenant.id).not('id','in',`(${websitePageIds.join(',')})`)))
-      else writes.push(write(client.from('public_website_pages').delete().eq('tenant_id',tenant.id)))
       const imageAssetIds=imageAssets.map((item)=>item.id)
       const experimentIds=experiments.map((item)=>item.id)
       if(imageAssetIds.length)writes.push(write(client.from('image_assets').delete().eq('tenant_id',tenant.id).not('id','in',`(${imageAssetIds.join(',')})`)))
@@ -444,7 +478,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     ready: remoteReady,
     saveError,
     remoteAutomationRevision,
-    applyAutomationUpdate: (update) => setData(update),
+    applyAutomationUpdate: (update) => setData((current)=>{const next=update(current);return supabase?{...next,contentPages:current.contentPages,websitePages:current.websitePages}:next}),
     addOrganisation: (draft) => {
       const organisationId = id('org')
       const contactId = id('con')
@@ -707,17 +741,18 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     },
     addBenefit: (benefit) => setData((current) => ({ ...current, benefits: [...current.benefits, { ...benefit, id: id('benefit') }] })),
     updateWorkspace: (changes) => setData((current) => ({ ...current, workspace: { ...current.workspace, ...changes } })),
-    createContentPage: (page) => {const created:ContentPage={...page,status:'Draft',id:id('content'),updatedAt:todayISO(),version:0};setData((current)=>({...current,contentPages:[created,...current.contentPages]}));audit('create_draft','content_page',created.id,{type:created.type,title:created.title});return created},
-    updateContentPage: (pageId, changes) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,...changes,status:item.published?'Draft changes':'Draft',updatedAt:todayISO()}:item)}));audit('save_draft','content_page',pageId,{title:changes.title})},
-    publishContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,status:'Published',published:contentSnapshot(item),publishedAt:new Date().toISOString(),updatedAt:todayISO(),version:(item.version??0)+1}:item)}));audit('publish','content_page',pageId)},
-    discardContentDraft: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId&&item.published?{...item,...item.published,status:'Published',updatedAt:todayISO()}:item)}));audit('discard_draft','content_page',pageId)},
-    deleteContentPage: (pageId) => {setData((current)=>({...current,contentPages:current.contentPages.filter((item)=>item.id!==pageId)}));audit('delete','content_page',pageId)},
-    createWebsitePage: ({name,path,content}) => {const created:WebsitePage={id:id('webpage'),name,path:path.startsWith('/')?path:`/${path}`,template:'Landing page',status:'Draft',draft:content,version:0,versions:[],updatedAt:todayISO()};setData((current)=>({...current,websitePages:[created,...current.websitePages]}));audit('create_draft','website_page',created.id,{name,path:created.path});return created},
-    updateWebsitePageDraft: (pageId,draft) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>page.id===pageId?{...page,draft,status:page.published?'Draft changes':'Draft',updatedAt:todayISO()}:page)}));audit('save_draft','website_page',pageId,{title:draft.title})},
-    publishWebsitePage: (pageId) => {const now=new Date().toISOString();setData((current)=>({...current,websitePages:current.websitePages.map((page)=>{if(page.id!==pageId)return page;const version=page.version+1;const published=structuredClone(page.draft);return {...page,published,status:'Published',version,publishedAt:now,updatedAt:todayISO(),versions:[{version,publishedAt:now,publishedBy:user?.name??'Workspace user',content:published},...page.versions].slice(0,20)}})}));audit('publish','website_page',pageId)},
-    discardWebsitePageDraft: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>page.id===pageId&&page.published?{...page,draft:structuredClone(page.published),status:'Published',updatedAt:todayISO()}:page)}));audit('discard_draft','website_page',pageId)},
-    restoreWebsitePageVersion: (pageId,version) => {setData((current)=>({...current,websitePages:current.websitePages.map((page)=>{const snapshot=page.versions.find((item)=>item.version===version);return page.id===pageId&&snapshot?{...page,draft:structuredClone(snapshot.content),status:'Draft changes',updatedAt:todayISO()}:page})}));audit('restore_version','website_page',pageId,{version})},
-    deleteWebsitePage: (pageId) => {setData((current)=>({...current,websitePages:current.websitePages.filter((page)=>page.id!==pageId)}));audit('delete','website_page',pageId)},
+    createContentPage: async (page) => {const created:ContentPage={...page,status:'Draft',id:id('content'),updatedAt:todayISO(),version:0};if(supabase){const row=await mutateCms({id:created.id,action:'create',kind:'content_page',payload:contentPageSnapshot(created)});return cmsPagesFromRows([row],[]).contentPages[0]}setData((current)=>({...current,contentPages:[created,...current.contentPages]}));return created},
+    updateContentPage: async (pageId, changes) => {const page=dataRef.current.contentPages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'save_draft',payload:contentPageSnapshot({...page,...changes}),expectedRevision:page.revision});return}setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,...changes,status:item.published?'Draft changes':'Draft',updatedAt:todayISO()}:item)}))},
+    publishContentPage: async (pageId) => {const page=dataRef.current.contentPages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'publish',expectedRevision:page.revision});return}setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,status:'Published',published:contentSnapshot(item),publishedAt:new Date().toISOString(),updatedAt:todayISO(),version:(item.version??0)+1}:item)}))},
+    discardContentDraft: async (pageId) => {const page=dataRef.current.contentPages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'discard',expectedRevision:page.revision});return}setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId&&item.published?{...item,...item.published,status:'Published',updatedAt:todayISO()}:item)}))},
+    restoreContentPageVersion: async (pageId,revisionId) => {const page=dataRef.current.contentPages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'restore',expectedRevision:page.revision,restoreRevision:revisionId});return}const snapshot=page.revisions?.find((item)=>item.id===revisionId)?.snapshot;if(snapshot)setData((current)=>({...current,contentPages:current.contentPages.map((item)=>item.id===pageId?{...item,...snapshot,status:'Draft changes',updatedAt:todayISO()}:item)}))},
+    deleteContentPage: async (pageId) => {const page=dataRef.current.contentPages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'delete',expectedRevision:page.revision});return}setData((current)=>({...current,contentPages:current.contentPages.filter((item)=>item.id!==pageId)}))},
+    createWebsitePage: async ({name,path,content}) => {const created:WebsitePage={id:id('webpage'),name,path:path.startsWith('/')?path:`/${path}`,template:'Landing page',status:'Draft',draft:content,version:0,versions:[],updatedAt:todayISO()};if(supabase){const row=await mutateCms({id:created.id,action:'create',kind:'website_page',name,path:created.path,template:created.template,payload:content as unknown as Record<string,unknown>});return cmsPagesFromRows([row],[]).websitePages[0]}setData((current)=>({...current,websitePages:[created,...current.websitePages]}));return created},
+    updateWebsitePageDraft: async (pageId,draft) => {const page=dataRef.current.websitePages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'save_draft',payload:draft as unknown as Record<string,unknown>,expectedRevision:page.revision});return}setData((current)=>({...current,websitePages:current.websitePages.map((item)=>item.id===pageId?{...item,draft,status:item.published?'Draft changes':'Draft',updatedAt:todayISO()}:item)}))},
+    publishWebsitePage: async (pageId) => {const page=dataRef.current.websitePages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'publish',expectedRevision:page.revision});return}const now=new Date().toISOString();setData((current)=>({...current,websitePages:current.websitePages.map((item)=>{if(item.id!==pageId)return item;const version=item.version+1;const published=structuredClone(item.draft);return {...item,published,status:'Published',version,publishedAt:now,updatedAt:todayISO(),versions:[{version,publishedAt:now,publishedBy:user?.name??'Workspace user',content:published},...item.versions].slice(0,20)}})}))},
+    discardWebsitePageDraft: async (pageId) => {const page=dataRef.current.websitePages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'discard',expectedRevision:page.revision});return}setData((current)=>({...current,websitePages:current.websitePages.map((item)=>item.id===pageId&&item.published?{...item,draft:structuredClone(item.published),status:'Published',updatedAt:todayISO()}:item)}))},
+    restoreWebsitePageVersion: async (pageId,revisionId) => {const page=dataRef.current.websitePages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'restore',expectedRevision:page.revision,restoreRevision:revisionId});return}const snapshot=page.versions.find((item)=>item.revisionId===revisionId||item.version===revisionId);if(snapshot)setData((current)=>({...current,websitePages:current.websitePages.map((item)=>item.id===pageId?{...item,draft:structuredClone(snapshot.content),status:'Draft changes',updatedAt:todayISO()}:item)}))},
+    deleteWebsitePage: async (pageId) => {const page=dataRef.current.websitePages.find((item)=>item.id===pageId);if(!page)throw new Error('Page not found');if(supabase){await mutateCms({id:pageId,action:'delete',expectedRevision:page.revision});return}setData((current)=>({...current,websitePages:current.websitePages.filter((item)=>item.id!==pageId)}))},
     createImageAsset: (asset) => {const created:ImageAsset={...asset,id:id('asset'),uploadedAt:new Date().toISOString()};setData((current)=>({...current,imageAssets:[created,...current.imageAssets]}));audit('upload','image_asset',created.id,{name:created.name,licence:created.licence});return created},
     updateImageAsset: (assetId,changes) => {setData((current)=>({...current,imageAssets:current.imageAssets.map((asset)=>asset.id===assetId?{...asset,...changes}:asset)}));audit('update','image_asset',assetId,{fields:Object.keys(changes)})},
     archiveImageAsset: (assetId) => {setData((current)=>({...current,imageAssets:current.imageAssets.map((asset)=>asset.id===assetId?{...asset,status:'Archived'}:asset)}));audit('archive','image_asset',assetId)},
@@ -731,7 +766,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(STORAGE_KEY)
       setData(initialData)
     },
-  }), [audit,data,persistEvent,persistListing,queueCatalogWrite,remoteReady,remoteAutomationRevision,saveError,user?.id,user?.name])
+  }), [audit,data,mutateCms,persistEvent,persistListing,queueCatalogWrite,remoteReady,remoteAutomationRevision,saveError,user?.id,user?.name])
 
   return <CRMContext.Provider value={value}>{children}</CRMContext.Provider>
 }

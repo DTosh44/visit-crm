@@ -298,6 +298,8 @@ export interface ContentPage {
   published?: PublishedContentPage
   publishedAt?: string
   version?: number
+  revision?: number
+  revisions?: CmsPageRevision[]
 }
 
 export type PublishedContentPage = Pick<ContentPage, 'type' | 'title' | 'slug' | 'summary' | 'body' | 'image' | 'metaTitle' | 'metaDescription'>
@@ -330,9 +332,23 @@ export interface WebsitePageContent {
 
 export interface WebsitePageVersion {
   version: number
+  revisionId?: number
   publishedAt: string
   publishedBy: string
   content: WebsitePageContent
+}
+
+export interface CmsPageRevision {
+  id: number
+  action: 'created' | 'draft_saved' | 'published' | 'restored' | 'discarded' | 'deleted' | 'imported_published' | 'imported_draft'
+  version: number
+  pageRevision: number
+  createdAt: string
+  actorId?: string
+  actorName: string
+  changedFields: string[]
+  snapshot?: Record<string, unknown>
+  sourceRevisionId?: number
 }
 
 export interface WebsitePage {
@@ -344,7 +360,9 @@ export interface WebsitePage {
   draft: WebsitePageContent
   published?: WebsitePageContent
   version: number
+  revision?: number
   versions: WebsitePageVersion[]
+  revisions?: CmsPageRevision[]
   updatedAt: string
   publishedAt?: string
 }

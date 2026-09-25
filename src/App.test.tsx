@@ -542,14 +542,14 @@ describe('Visit CRM', () => {
     expect(screen.getByText('Live v2')).toBeInTheDocument()
   })
 
-  it('creates structured landing pages for prompted website changes', () => {
+  it('creates structured landing pages for prompted website changes', async () => {
     renderApp()
     fireEvent.click(screen.getByRole('button', { name: 'Pages' }))
     fireEvent.click(screen.getByRole('button', { name: 'New landing page' }))
     fireEvent.change(screen.getByLabelText('Internal page name'), { target: { value: 'Autumn campaign' } })
     fireEvent.change(screen.getByLabelText('Website route'), { target: { value: '/autumn' } })
     fireEvent.click(screen.getByRole('button', { name: 'Create draft' }))
-    expect(screen.getByRole('heading', { name: 'Edit Autumn campaign' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Edit Autumn campaign' })).toBeInTheDocument()
     expect(screen.getByText('/autumn · Changes stay private until published.')).toBeInTheDocument()
   })
 
