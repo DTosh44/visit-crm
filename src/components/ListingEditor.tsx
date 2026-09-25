@@ -110,7 +110,7 @@ export function ListingEditor({ listing, onClose }: { listing: Listing; onClose:
   }
 
   return (
-    <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save to the CRM record`} onClose={close}>
+    <Drawer title="Edit website listing" subtitle={`${listing.name} · Changes save privately until published`} onClose={close}>
       <div className="listing-editor-top">
         <div><Badge>{listing.status}</Badge><span>Last updated {listing.lastUpdated}</span></div>
         <div className="completion-inline"><span>Listing completeness</span><Progress value={draft.completeness} colour="#5c57d6" /><strong>{draft.completeness}%</strong></div>
